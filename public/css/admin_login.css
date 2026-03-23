@@ -111,12 +111,9 @@ label {
     position: relative;
 }
 
-
-
 .building-wrapper {
     z-index: 1;
 }
-
 
 .building-img {
     height: 700px;          /* same as login-container height */
