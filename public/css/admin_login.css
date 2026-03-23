@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif !important;
+    background-color: #34218c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    /* overflow: hidden; */
+}
+
+.login-container {
+    position: relative;  /* FIX */
+    right: 0;            /* REMOVE */
+    z-index: 2;
+    background-color: #32418c;
+    width: 550px;
+    height: 630px;
+    border-radius: 40px;
+    padding: 40px;
+    box-shadow: 0px 6px 20px rgba(0,0,0,0.35);
+}
+.login-container {
+    margin-left: -80px;   /* overlap amount */
+    z-index: 3;
+}
+
+.login-container-content{
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.luminus-logo {
+    width: 70%;
+    margin: 0 auto 10px;
+    display: block;
+}
+
+.login-fields {
+    align-items: center;
+}
+
+/* LABEL */
+label {
+    color: #ffffff;
+    font-size: 20px;
+    margin: 5px auto 10px;
+    width: 85%;
+    display: block;
+    font-weight: 500;
+}
+
+/* TEXT FIELD */
+.login-textfield {
+    width: 80%;
+    padding: 14px 16px;
+    margin: 0 auto 18px;
+    border: none;
+    border-radius: 10px;
+    background-color: #ffffff;
+    font-size: 18px;
+    font-family: 'Poppins', sans-serif;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.15);
+    outline: none;
+    display: block;
+}
+
+/* PLACEHOLDER STYLE */
+.login-textfield::placeholder {
+    color: #777;
+    font-weight: 400;
+}
+
+/* BUTTON */
+.login-btn {
+    width: 80%;
+    padding: 14px;
+    margin: 25px auto 0;
+    background-color: #fbd117;
+    color: #32418c;
+    border-radius: 10px;
+    font-size: 20px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    display: block;
+    box-shadow: 0px 3px 6px rgba(0,0,0,0.15);
+    transition: 0.2s;
+    
+    text-decoration: none;
+    text-align: center;
+    display: block;
+
+}
+.login-btn:hover {
+    background-color: #e0bd0c;
+}
+
+.layout-wrapper {
+    width: 1200px;
+    height: 700px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    position: relative;
+}
+
+
+
+.building-wrapper {
+    z-index: 1;
+}
+
+
+.building-img {
+    height: 700px;          /* same as login-container height */
+    width: auto;
+    object-fit: cover;
+    border-radius: 40px;
+    box-shadow: 0px 6px 20px rgba(0,0,0,0.25);
+}
+
+.subtitle {
+    margin-top: -10px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 18px;
+    color: #ffffff;
+}
+
+
+/* ==========================================
+   RESPONSIVE (PRESERVE OVERLAP)
+   ========================================== */
+
+/* Tablets and small laptops */
+@media (max-width: 1100px) {
+    .layout-wrapper {
+        width: 100%;
+        height: auto;
+        flex-direction: column;
+    }
+
+    .building-img {
+        height: 450px !important;
+        width: 90%;
+    }
+
+    .login-container {
+        margin-left: 0 !important; /* reset overlap */
+        margin-top: -80px !important; /* overlap upward */
+        width: 90%;
+        height: auto;
+    }
+}
+
+/* Large mobile / portrait tablets */
+@media (max-width: 768px) {
+
+    body {
+        height: auto;
+        padding: 40px 0;
+    }
+
+    .layout-wrapper {
+        width: 100%;
+        height: auto;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .building-img {
+        height: 350px !important;
+        width: 90%;
+        border-radius: 30px;
+    }
+
+    .login-container {
+        width: 90%;
+        height: auto;
+        padding: 30px;
+        margin-top: -60px !important; /* OVERLAP remains */
+    }
+
+    .luminus-logo {
+        width: 75%;
+    }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+
+    .building-img {
+        height: 260px !important;
+        width: 92%;
+    }
+
+    .login-container {
+        width: 92%;
+        padding: 20px;
+        margin-top: -50px !important; /* keep overlap even on small phones */
+        height: auto;
+    }
+
+    label {
+        font-size: 16px;
+        width: 90%;
+    }
+
+    .login-textfield {
+        width: 90%;
+        font-size: 16px;
+        padding: 12px;
+    }
+
+    .login-btn {
+        width: 92%;
+        font-size: 18px;
+        padding: 12px;
+    }
+}
