@@ -21,7 +21,7 @@
         <div class="admin-menu">
             <p class="text-titles">Admin Menu</p>
             <div class="admin-menu-current">Admin Dashboard</div>
-            <div class="admin-menu-buttons">Alumni Directory</div>
+            <div class="admin-menu-buttons"><a href="directory" class="links-labels">Alumni Directory</a></div>
             <div class="admin-menu-buttons">Announcement Editor</div>
             <div class="admin-menu-buttons">Event Organizer</div>
             <div class="admin-menu-buttons">Perks and Discounts</div>

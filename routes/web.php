@@ -13,3 +13,7 @@ Route::get('/admin/login', function () {
 Route::get('/admin/dashboard', function () {
     return view('admin_dashboard');
 });
+
+Route::get('/admin/directory', function () {
+    return view('admin_directory');
+});
