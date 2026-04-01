@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+.perks-panel {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    margin-right: 15px;
+    height: auto;
+    width: auto; /* Full height minus nav */
+    background-color: #EBEBEB;
+    font-family: 'Poppins', sans-serif;
+    flex: 7;
+    padding: 15px;
+    border-radius: 18px;
+}
+
+.add-perks-container {
+    margin-top: 25px;
+    margin-bottom: 25px;
+}
+
+.add-perks-button {
+    background-color: #32418c;
+    color: #fbd117;
+    font-weight: 500;
+    width: 250px;
+    height: auto;
+    padding: 10px;
+    padding-left: 25px;
+    padding-right: 25px;
+    margin-bottom: 15px;
+    text-decoration: none;
+    border-radius: 20px;
+}
+
+.perks-container {
+    background-color: #FFFFFF;
+    border-radius: 18px;
+    padding: 15px;
+    margin-bottom: 15px;
+
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
+    gap: 20px;
+}
+
+.perks-title-description {
+    font-family: 'Poppins', sans-serif;
+    color: #32418c;
+    padding-right: 25px;
+    width: 350px;
+}
+
+.perks-image-container {
+    background-color: #F9F9F9;
+    height: 300px;
+    width: 300px;
+    flex: 0 0 300px;
+
+    border-radius: 18px;
+    border: 1px solid #ccc;
+    padding: 15px;
+}
+
+.perks-tools {
+    flex: 0 0 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+}
+
+
+/* Buttons */
+.edit-btn {
+    background: #FFD733;
+    border: none;
+    padding: 10px;
+    border-radius: 12px;
+}
+
+.archive-btn {
+    background: #C4C4C4;
+    border: none;
+    padding: 10px;
+    border-radius: 12px;
+}
+
+
+.sample {
+    background-color: #32418c;
+    border-radius: 18px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+

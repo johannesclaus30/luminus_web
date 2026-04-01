@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PerksController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -26,9 +27,10 @@ Route::get('/admin/events', function () {
     return view('admin_events');
 });
 
-Route::get('/admin/perks', function () {
-    return view('admin_perks');
-});
+// PERKS
+Route::get('/admin/perks', [PerksController::class, 'index']);
+    // ->middleware(['auth']);
+
 
 Route::get('/admin/alumni_tracer', function () {
     return view('admin_alumni_tracer');
@@ -45,3 +47,7 @@ Route::get('/admin/settings', function () {
 Route::get('/admin/testing', function () {
     return view('admin_testing');
 });
+
+// Route::get('/login', function () {
+//     return view('admin_login');
+// })->name('login');

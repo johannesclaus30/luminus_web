@@ -6,6 +6,7 @@
     <title>Events</title>
 
     <link rel="stylesheet" href="/css/admin_dashboard.css">
+    <link rel="stylesheet" href="/css/perks.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 
 </head>
@@ -33,8 +34,53 @@
 
             <a href="login" class="admin-menu-signout">Sign Out</a>
         </div>
-        <div class="div-dashboard-container">
-            <h1>Admin Perks and Discounts</h1>
+        <div class="perks-panel">
+            <div class="add-perks-container">
+                <a href="add_perk" class="add-perks-button">Add New Perks hehe</a>
+            </div>
+                
+            {{-- <div class="py-12">
+                <div class=" max-w-7xl mx-auto sm:px-6 lg:px-8">
+                    @forelse ($perks as $perk)
+                        <div class="perks-container">
+                            <div class="">
+                                <h2 class="">{{ $perk->PerkTitle }}</h2>
+                                <p class="">{{ $perk->PerkDescription }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <p>No perks available.</p>
+                    @endforelse
+                </div>
+            </div> --}}
+
+            <div>
+                @forelse ($perks as $perk)
+                    <div class="perks-container">
+                        <div class="perks-title-description">
+                            <h2 class="">{{ $perk->PerkTitle }}</h2>
+                            <p class="">{{ $perk->PerkDescription }}</p>
+                        </div>
+                        <div class="perks-image-container">
+                            <p>image here</p>
+                        </div>
+                        <!-- RIGHT COLUMN -->
+                        <div class="perks-tools">
+                            <div class="analytics">
+                                <span>Analytics</span>
+                                <p>👁 1.2k</p>
+                            </div>
+
+                            <button class="edit-btn">Edit</button>
+                            <button class="archive-btn">Archive</button>
+                        </div>
+                    </div>
+                @empty
+                    <p>No perks available.</p>
+                @endforelse
+            </div>
+
+
         </div>
     </div>
 
