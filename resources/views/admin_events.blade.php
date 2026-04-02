@@ -11,7 +11,7 @@
 </head>
 <body>
     
-    <nav>
+    <nav class="nav-main">
         <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape.png" alt="LumiNUs Logo">
     </nav>
 

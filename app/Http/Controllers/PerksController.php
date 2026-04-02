@@ -12,7 +12,7 @@ class PerksController extends Controller
      */
     public function index()
     {
-        $perks = Perks::orderBy('created_at', 'desc')->get();
+        $perks = Perks::orderBy('created_at', 'desc')->paginate(2);
 
         return view('admin_perks', compact('perks'));
     }

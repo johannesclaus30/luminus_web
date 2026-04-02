@@ -6,13 +6,14 @@
     <title>Events</title>
 
     <link rel="stylesheet" href="/css/admin_dashboard.css">
+    <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/perks.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 
 </head>
 <body>
     
-    <nav>
+    <nav class="nav-main">
         <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape.png" alt="LumiNUs Logo">
     </nav>
 
@@ -34,7 +35,7 @@
 
             <a href="login" class="admin-menu-signout">Sign Out</a>
         </div>
-        <div class="perks-panel">
+        <div class="perks-panel admin-scrollable">
             <div class="add-perks-container">
                 <a href="add_perk" class="add-perks-button">Add New Perks hehe</a>
             </div>
@@ -58,15 +59,17 @@
                 @forelse ($perks as $perk)
                     <div class="perks-container">
                         <div class="perks-title-description">
-                            <h2 class="">{{ $perk->PerkTitle }}</h2>
-                            <p class="">{{ $perk->PerkDescription }}</p>
+                            <p class="perks-title-text">{{ $perk->PerkTitle }}</p>
+                            <p class="perks-description-text">{{ $perk->PerkDescription }}</p>
+                            <p class="perks-description-text">{{ \Carbon\Carbon::parse($perk->PerkValidity)->format('F d, Y') }}</p>
                         </div>
                         <div class="perks-image-container">
-                            <p>image here</p>
+                            <p class="perks-image-text">Attachments:</p>
+                            <img src="/assets/FINAL-NULIPA.jpg" alt="attachment" class="perk-image">
                         </div>
                         <!-- RIGHT COLUMN -->
                         <div class="perks-tools">
-                            <div class="analytics">
+                            <div class="perks-tools-analytics">
                                 <span>Analytics</span>
                                 <p>👁 1.2k</p>
                             </div>
@@ -78,6 +81,11 @@
                 @empty
                     <p>No perks available.</p>
                 @endforelse
+
+                <div class="pagination-container">
+                    {{ $perks->links() }}
+                </div>
+
             </div>
 
 
