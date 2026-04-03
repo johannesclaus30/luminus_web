@@ -77,8 +77,8 @@
                                 <p>👁 No Data Yet</p>
                             </div>
 
-                            <button class="edit-btn">Edit</button>
-                            <button class="archive-btn">Archive</button>
+                            <a href="{{ route('perks.edit', $perk->id) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
+                            <a href="" class="perk-edit-archive-btn archive-btn">Archive</a>
                         </div>
                     </div>
                 @empty

@@ -62,17 +62,37 @@ class PerksController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(Perks $perk)
     {
-        //
+        return view('perks.edit', compact('perk'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Perks $perk)
     {
-        //
+        $request->validate([
+            'PerkTitle' => 'required|string|max:255',
+            'PerkDescription' => 'required|string',
+            'PerkValidity' => 'required|date',
+            'PerkImage' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        if ($request->hasFile('PerkImage')) {
+            $path = $request->file('PerkImage')->store('perks', 'public');
+            $perk->PerkImage = $path;
+        }
+
+        $perk->update([
+            'PerkTitle' => $request->PerkTitle,
+            'PerkDescription' => $request->PerkDescription,
+            'PerkValidity' => $request->PerkValidity,
+        ]);
+
+        return redirect()
+            ->route('perks.index')
+            ->with('success', 'Perk updated successfully.');
     }
 
     /**

@@ -14,4 +14,10 @@ class Perks extends Model
         'PerkValidity',
         'PerkImage'
     ];
+
+    
+    protected $casts = [
+        'PerkValidity' => 'date',
+    ];
+
 }

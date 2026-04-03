@@ -38,6 +38,12 @@ Route::get('/admin/perks/create', [PerksController::class, 'create'])
 Route::post('/admin/perks', [PerksController::class, 'store'])
     ->name('perks.store');
 
+Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
+    ->name('perks.edit');
+    
+Route::put('/perks/{perk}', [PerksController::class, 'update'])
+    ->name('perks.update');
+
 // OTHER
 
 Route::get('/admin/alumni_tracer', function () {
