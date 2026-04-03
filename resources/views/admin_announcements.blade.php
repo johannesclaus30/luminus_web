@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Announcements</title>
 
-    <link rel="stylesheet" href="/css/admin_dashboard.css">
+    <link rel="stylesheet" href="/css/admin.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 </head>
 <body>

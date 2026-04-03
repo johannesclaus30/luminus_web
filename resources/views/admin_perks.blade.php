@@ -37,23 +37,9 @@
         </div>
         <div class="perks-panel admin-scrollable">
             <div class="add-perks-container">
-                <a href="add_perk" class="add-perks-button">Add New Perks hehe</a>
+                <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
             </div>
-                
-            {{-- <div class="py-12">
-                <div class=" max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    @forelse ($perks as $perk)
-                        <div class="perks-container">
-                            <div class="">
-                                <h2 class="">{{ $perk->PerkTitle }}</h2>
-                                <p class="">{{ $perk->PerkDescription }}</p>
-                            </div>
-                        </div>
-                    @empty
-                        <p>No perks available.</p>
-                    @endforelse
-                </div>
-            </div> --}}
+    
 
             <div>
                 @forelse ($perks as $perk)
@@ -71,7 +57,7 @@
                         <div class="perks-tools">
                             <div class="perks-tools-analytics">
                                 <span>Analytics</span>
-                                <p>👁 1.2k</p>
+                                <p>👁 No Data Yet</p>
                             </div>
 
                             <button class="edit-btn">Edit</button>

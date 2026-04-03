@@ -6,6 +6,7 @@
     <title>Admin Directory</title>
 
     <link rel="stylesheet" href="/css/admin_directory.css">
+    <link rel="stylesheet" href="/css/admin.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 
 </head>

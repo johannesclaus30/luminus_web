@@ -27,10 +27,18 @@ Route::get('/admin/events', function () {
     return view('admin_events');
 });
 
-// PERKS
-Route::get('/admin/perks', [PerksController::class, 'index']);
-    // ->middleware(['auth']);
 
+// PERKS
+Route::get('/admin/perks', [PerksController::class, 'index'])
+    ->name('perks.index');
+
+Route::get('/admin/perks/create', [PerksController::class, 'create'])
+    ->name('perks.create');
+
+Route::post('/admin/perks', [PerksController::class, 'store'])
+    ->name('perks.store');
+
+// OTHER
 
 Route::get('/admin/alumni_tracer', function () {
     return view('admin_alumni_tracer');
