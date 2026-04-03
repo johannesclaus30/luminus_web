@@ -11,6 +11,7 @@ class Perks extends Model
     protected $fillable = [
         'PerkTitle',
         'PerkDescription',
-        'PerkValidity'
+        'PerkValidity',
+        'PerkImage'
     ];
 }

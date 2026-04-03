@@ -12,7 +12,7 @@ class PerksController extends Controller
      */
     public function index()
     {
-        $perks = Perks::orderBy('created_at', 'desc')->paginate(2);
+        $perks = Perks::orderBy('created_at', 'desc')->paginate(5);
         return view('admin_perks', compact('perks'));
     }
 
@@ -32,13 +32,20 @@ class PerksController extends Controller
         $request->validate([
             'PerkTitle' => 'required|string|max:255',
             'PerkDescription' => 'required|string',
-            'PerkValidity' => 'required|date'
+            'PerkValidity' => 'required|date',
+            'PerkImage' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
+
+        $imagePath = null;
+        if ($request->hasFile('PerkImage')) {
+            $imagePath = $request->file('PerkImage')->store('perks', 'public');
+        }
 
         Perks::create([
             'PerkTitle' => $request->PerkTitle,
             'PerkDescription' => $request->PerkDescription,
-            'PerkValidity' => $request->PerkValidity
+            'PerkValidity' => $request->PerkValidity,
+            'PerkImage' => $imagePath
         ]);
 
         return redirect()->route('perks.index')->with('success', 'Perk created successfully.');

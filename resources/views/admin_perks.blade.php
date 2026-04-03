@@ -36,23 +36,40 @@
             <a href="login" class="admin-menu-signout">Sign Out</a>
         </div>
         <div class="perks-panel admin-scrollable">
-            <div class="add-perks-container">
-                <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
+            <div class="perks-panel-header">
+                <div class="add-perks-container">
+                    <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
+                </div>
+                <div class="pagination-container">
+                    {{ $perks->links() }}
+                </div>
             </div>
-    
-
+            
             <div>
                 @forelse ($perks as $perk)
                     <div class="perks-container">
                         <div class="perks-title-description">
                             <p class="perks-title-text">{{ $perk->PerkTitle }}</p>
                             <p class="perks-description-text">{{ $perk->PerkDescription }}</p>
-                            <p class="perks-description-text">{{ \Carbon\Carbon::parse($perk->PerkValidity)->format('F d, Y') }}</p>
+                            <p class="perks-description-text">Valid until {{ \Carbon\Carbon::parse($perk->PerkValidity)->format('F d, Y') }}</p>
                         </div>
                         <div class="perks-image-container">
-                            <p class="perks-image-text">Attachments:</p>
-                            <img src="/assets/FINAL-NULIPA.jpg" alt="attachment" class="perk-image">
-                        </div>
+                        <p class="perks-image-text">Attachments:</p>
+
+                        @if (!empty($perk->PerkImage))
+                            <img
+                                src="{{ asset('storage/' . $perk->PerkImage) }}"
+                                alt="Perk Image"
+                                class="perk-image"
+                            >
+                        @else
+                            <img
+                                src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
+                                alt="No attachment available"
+                                class="perk-image"
+                            >
+                        @endif
+                    </div>
                         <!-- RIGHT COLUMN -->
                         <div class="perks-tools">
                             <div class="perks-tools-analytics">
@@ -68,13 +85,10 @@
                     <p>No perks available.</p>
                 @endforelse
 
-                <div class="pagination-container">
+                <div class="pagination-container bottom-pagination">
                     {{ $perks->links() }}
                 </div>
-
             </div>
-
-
         </div>
     </div>
 

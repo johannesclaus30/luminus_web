@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('PerkTitle');
             $table->text('PerkDescription')->nullable();
             $table->date('PerkValidity')->nullable();
+            $table->string('PerkImage')->nullable();
             $table->timestamps();
         });
     }
