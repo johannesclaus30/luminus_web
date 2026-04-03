@@ -2,3 +2,109 @@
 
 /* OTHER CODES */
 
+.directory-container {
+    height: auto;
+    width: auto; 
+    background-color: #EBEBEB;
+    font-family: 'Poppins', sans-serif;
+    flex: 1;
+    /* CHANGE THIS: */
+    padding-right: 15px;
+    margin: 15px;
+    margin-left: 0px;
+    border-radius: 10px;
+    box-sizing: border-box; /* Ensures padding doesn't increase the total width */
+
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden;
+}
+
+.search-container {
+   width: 100%;
+   justify-content: flex-end;
+}
+
+.search-bar {
+    
+    font-family: 'Poppins', sans-serif;
+    background-color: #FFFFFF;
+    width: 100%; /* This will now stay within the 15px padding */
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    box-sizing: border-box; /* Always good practice for inputs */
+}
+
+.user-container {
+    width: 100%;
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Space between user boxes */
+}
+.user-box {
+    font-family: 'Poppins', sans-serif;
+    background-color: #FFFFFF;
+    width: 100%;
+    height: 90px;
+    /* padding: 10px; */
+    padding-left: 20px;
+    padding-right: 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    box-sizing: border-box; /* Always good practice for inputs */
+
+    align-items: center;
+    
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 25px; /* Space between photo and details */
+}
+.primary-info {
+    height: auto;
+    width: 400px;
+    color: #444242;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0px !important;
+    gap: 0px; 
+}
+.name {
+    width: 100%;
+    font-weight: 600;
+    font-size: 20px;
+    margin: 0; 
+}
+.program {
+    width: 100%;
+    font-weight: 400;
+    font-size: 14px;
+    margin: 0; 
+}
+.email {
+    width: 330px;
+    font-weight: 400;
+    font-size: 14px;
+    color: #444242;
+}
+.user-photo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 100%;
+
+    border-width: 3px;
+    border-style: solid;   /* <--- This is the missing piece! */
+    border-color: #fbd117;
+}
+
+.tools-container {
+    color: #32418c;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
