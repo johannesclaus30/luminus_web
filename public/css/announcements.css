@@ -7,159 +7,51 @@ button {
     box-sizing: border-box;
 }
 
-.perks-panel-header .pagination-container {
-    margin: 0 !important;
-    margin-bottom: 0px !important;
-    justify-content: flex-end;
+label {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
 }
 
-.bottom-pagination {
-    margin-bottom: 50px;
-}
-
-.perks-panel {
-    margin-top: 15px;
-    margin-bottom: 15px;
-    margin-right: 15px;
-    height: 100%;
-    width: auto; /* Full height minus nav */
-    background-color: #EBEBEB;
+.announcements-create-container {
     font-family: 'Poppins', sans-serif;
     flex: 7;
-    padding-top: 15px;
-    padding-right: 15px;
-    border-radius: 18px;
-    overflow-y: auto; /* Enable vertical scrolling */
-    overflow-x: hidden;
-}
-
-.perks-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.add-perks-container {
-    margin-top: 0px;
-}
-
-.add-perks-button {
-    background-color: #32418c;
-    color: #fbd117;
-    font-weight: 500;
-    width: 250px;
-    height: auto;
     padding: 10px;
-    padding-left: 25px;
-    padding-right: 25px;
-    text-decoration: none;
-    border-radius: 20px;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+}
+.announcements-create-container h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #32418c;
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 
-.perks-container {
-    background-color: #FFFFFF;
-    border-radius: 18px;
-    padding: 15px;
-    margin-bottom: 15px;
-
+.announcements-details {
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
-    gap: 20px;
+    gap: 10px;
+    align-items: flex-start;
+    width: 90%;
+    padding: 0px;
 }
-
-.perks-title-description {
-    padding-top: 0px;
-    margin-top: 0px;
-    padding-left: 15px;
-    width: 350px;
-}
-
-.perks-title-text {
-    font-family: 'Poppins', sans-serif;
-    color: #444242;
-    font-size: 24px;
-    font-weight: 600;
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-.perks-description-text {
-    width: 340px;
-    font-family: 'Poppins', sans-serif;
-    color: #696969;
-    font-size: 16px;
-    font-weight: 400;
-    margin-bottom: 10px;
-}
-
-.perks-image-container {
-    background-color: #F9F9F9;
-    height: 280px;
-    width: 380px;
-    /* flex: 0 0 300px; */
-
-    border-radius: 18px;
-    border: 1px solid #ccc;
-    padding: 15px;
-}
-.perks-image-text {
-    width: 340px;
-    font-family: 'Poppins', sans-serif;
-    color: #444242;
-    font-size: 16px;
-    font-weight: 500;
-    margin-top: 0px;
-    margin-bottom: 10px;
-}
-.perk-image {
-    width: 150px;
-    height: auto;
-    border-radius: 12px;
-}
-
-.perks-tools {
+.new-announcements-title-desc {
     padding-right: 5px;
     margin-top: 0px;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    width: 60%;
 }
-.perks-tools-analytics {
-    background-color: #F9F9F9;
-    height: 130px;
-    width: 180px;
-    border-radius: 18px;
-    border: 1px solid #ccc;
-    padding: 15px;
-}
-
-/* CSS FOR CREATE OR ADD NEW PERKS */
-
-.perks-create-container {
-    font-family: 'Poppins', sans-serif;
-    flex: 7;
-    padding: 10px;
-    border-radius: 18px;
+.new-announcements-image {
+    padding-right: 5px;
+    padding-left: 20px;
+    margin-top: 0px;
     display: flex;
     flex-direction: column;
-  
-}
-
-.perks-create-container h2 {
-    font-size: 28px;
-    font-weight: 700;
-    color: #32418c;
-    margin-top: 0px;
-    /* margin-bottom: 20px; */
-}
-
-label {
-    font-size: 18px;
-    font-weight: 600;
-    color: #444242;
-    margin-top: 15px;
-    margin-bottom: 5px;
+    gap: 5px;
+    width: 40%;
 }
 
 .textarea-style {
@@ -173,63 +65,6 @@ label {
 }
 .textarea-description {
     height: 300px;
-}
-
-.perks-details {
-    display: flex;
-    flex-direction: row;
-    gap: 20px;
-    padding: 0px;
-}
-
-.new-perks-title-description {
-    padding-right: 5px;
-    margin-top: 0px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 500px;
-}
-
-.date-image-container {
-    padding-right: 5px;
-    margin-top: 0px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 350px;
-}
-
-.date-input-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-.date-input-wrapper input[type="date"] {
-    font-family: 'Poppins', sans-serif;
-    font-size: 16px;
-    color: #444242;
-
-    padding: 12px 45px 12px 18px;
-    border-radius: 25px;
-    border: 1px solid #B4B2B2;
-    width: 100%;
-    background-color: #ffffff;
-}
-
-.date-input-wrapper input[type="date"]:focus {
-    outline: none;
-    border-color: #32418c;
-}
-
-.calendar-icon {
-    position: absolute;
-    right: 18px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    font-size: 18px;
-    color: #777;
 }
 
 .image-upload-box {
@@ -251,75 +86,162 @@ label {
     position: relative;
     width: 100%;
 }
-.perk-image {
-    max-width: 100%;
-    max-height: 180px;
-    object-fit: contain;
-    border-radius: 12px;
-    display: block;
-}
 
-.perk-submit-btn {
+/* BUTTONS */
+.announcements-submit-btn {
     background-color: #32418c;
     color: #fbd117;
-    width: 415px;
+    width: 100%;
     height: auto;
-
     font-family: 'Poppins', sans-serif;
     font-size: 16px;
     font-weight: 600;
-
     padding: 12px 28px;
     border-radius: 25px;
-
     cursor: pointer;
     text-align: center;
-
     align-self: flex-start; /* ✅ prevents stretching */
 }
 
-.perk-submit-btn:hover {
-    opacity: 0.9;
+/* Modal Background */
+.custom-modal {
+    display: none; 
+    position: fixed; 
+    z-index: 9999; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    background-color: rgba(0,0,0,0.8);
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
 }
 
-.perk-submit-btn:active {
-    transform: scale(0.98);
+/* The Image itself */
+.modal-content {
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    cursor: default;
 }
 
-.perk-edit-archive-btn {
-    background-color: #32418c;
-    color: #fbd117;
-    width: 160px;
-    height: auto;
-
-    font-family: 'Poppins', sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-
-    padding: 12px 28px;
-    border-radius: 25px;
-
+/* Close Button */
+.close-modal {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 40px;
+    font-weight: bold;
     cursor: pointer;
-    text-align: center;
-
-    align-self: flex-start; /* ✅ prevents stretching */
-}
-.perk-edit-archive-btn:hover {
-    opacity: 0.9;
-}
-.perk-edit-archive-btn:active {
-    transform: scale(0.98);
 }
 
-/* Buttons */
-.edit-btn {
-    color: #32418c;
-    background: #fbd117;
-    text-decoration: none;
-}
+.image-upload-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            min-height: 140px; 
+            cursor: pointer;
+            border: 2px dashed #ccc;
+            gap: 10px;
+            position: relative;
+        }
 
-.archive-btn {
-    color: #FFFFFF;
-    background: #818181;
-    text-decoration: none;
-}
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .preview-item {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .video-preview {
+            max-width: 120px; 
+            max-height: 100px; /* CRITICAL: Prevents vertical video overlap */
+            height: auto;
+            border-radius: 4px;
+            background: #000;
+        }
+
+        /* Status & Warning Text */
+        .upload-status {
+            font-size: 0.75rem;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+        .status-default { color: #666; }
+        .status-error { color: #dc3545; }
+        .status-success { color: #28a745; }
+
+        .has-files .upload-prompt-text {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        /* --- Edit Page Media Management --- */
+
+        /* Container for each existing image/video item */
+        .existing-item-container {
+            position: relative;
+            display: inline-block;
+            margin: 8px;
+            vertical-align: top;
+        }
+
+        /* The red "X" delete button */
+        .remove-media-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 20;
+            padding: 0;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .remove-media-btn:hover {
+            background: #cc0000;
+            transform: scale(1.1);
+        }
+
+        /* Text label for existing items */
+        .current-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #777;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Ensuring previews look consistent */
+        .preview-item, .video-preview {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }

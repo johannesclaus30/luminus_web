@@ -65,21 +65,52 @@
                         <div class="perks-image-container">
                             <p class="perks-image-text">Attachments:</p>
 
-                            @if ($announcement->images->count() > 0)
-                                @foreach ($announcement->images as $image)
-                                    <img
-                                        src="{{ asset('storage/' . $image->ImagePath) }}"
-                                        alt="Announcement Image"
+                            {{-- A simplified grid that contains both images and videos --}}
+                            <div class="attachment-preview-wrapper" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start;">
+                                
+                                {{-- Iterate through all attachments from the hasMany relation --}}
+                                @forelse ($announcement->images as $attachment)
+                                    {{-- File Type Detection logic: get the extension --}}
+                                    @php
+                                        $path = $attachment->ImagePath;
+                                        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                                        
+                                        // Define allowed extensions for broader compatibility
+                                        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
+                                        $videoExtensions = ['mp4', 'webm', 'ogg'];
+                                    @endphp
+
+                                    {{-- 1. Display as an Image if it is an image --}}
+                                    @if (in_array($extension, $imageExtensions))
+                                        <img
+                                            src="{{ asset('storage/' . $path) }}"
+                                            alt="Announcement"
+                                            class="perk-image" {{-- The JS looks for this class --}}
+                                            style="width: 80px; height: 80px; object-fit: cover; border-radius: 5px; border: 1px solid #eee;"
+                                        >
+                                    
+                                    {{-- 2. Display as a Video if it is a video --}}
+                                    @elseif (in_array($extension, $videoExtensions))
+                                        <div class="video-wrapper">
+                                            <video 
+                                                style="max-width: 150px; max-height: 200px; width: auto; border-radius: 5px; background: #000; border: 1px solid #ddd;" 
+                                                controls>
+                                                <source src="{{ asset('storage/' . $path) }}" type="video/{{ $extension }}">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        </div>
+                                    @endif
+
+                                @empty
+                                    {{-- Default fallback if NO attachments exist in the list --}}
+                                    {{-- <img
+                                        src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
+                                        alt="No attachment available"
                                         class="perk-image"
-                                    >
-                                @endforeach
-                            @else
-                                <img
-                                    src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
-                                    alt="No attachment available"
-                                    class="perk-image"
-                                >
-                            @endif
+                                        style="width: 80px; height: 80px; object-fit: cover; opacity: 0.5;"
+                                    > --}}
+                                @endforelse
+                            </div>
                         </div>
 
                         <!-- RIGHT COLUMN -->
@@ -89,7 +120,7 @@
                                 <p>👁 No Data Yet</p>
                             </div>
 
-                            <a href="#" class="perk-edit-archive-btn edit-btn">Edit</a>
+                            <a href="{{ route('announcements.edit', $announcement->Announcement_ID) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
                             <a href="#" class="perk-edit-archive-btn archive-btn">Archive</a>
                         </div>
                     </div>
@@ -103,6 +134,35 @@
             </div>
         </div>
     </div>
+
+<div id="imageModal" class="custom-modal" onclick="closeModal()">
+    <span class="close-modal">&times;</span>
+    <img class="modal-content" id="enlargedImage">
+</div>
+
+<script>
+        function openModal(src) {
+        const modal = document.getElementById("imageModal");
+        const modalImg = document.getElementById("enlargedImage");
+        modal.style.display = "flex";
+        modalImg.src = src;
+    }
+
+    function closeModal() {
+        document.getElementById("imageModal").style.display = "none";
+    }
+
+    // Attach click event to all perk images
+    document.addEventListener("DOMContentLoaded", function() {
+        const images = document.querySelectorAll(".perk-image");
+        images.forEach(img => {
+            img.style.cursor = "zoom-in"; // Change cursor to show it's clickable
+            img.onclick = function() {
+                openModal(this.src);
+            };
+        });
+    });
+</script>
 
 </body>
 </html>

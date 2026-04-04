@@ -30,6 +30,14 @@ Route::get('/admin/announcements/create', [AnnouncementController::class, 'creat
 Route::post('/admin/announcements', [AnnouncementController::class, 'store'])
     ->name('announcements.store');
 
+    // Show the edit form
+Route::get('/admin/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])
+    ->name('announcements.edit');
+
+// Process the update (use PUT or PATCH)
+Route::put('/admin/announcements/{announcement}', [AnnouncementController::class, 'update'])
+    ->name('announcements.update');
+
 
     // OTHER
 

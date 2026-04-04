@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/perks.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
-
 </head>
 <body>
     
@@ -21,7 +20,6 @@
         <div class="admin-menu">
             <div>
                 <p class="text-titles">Admin Menu</p>
-
                 <a href="dashboard" class="admin-menu-buttons">Admin Dashboard</a>
                 <a href="directory" class="admin-menu-buttons">Alumni Directory</a>
                 <a href="announcements" class="admin-menu-buttons">Announcement Editor</a>
@@ -32,9 +30,9 @@
                 <a href="settings" class="admin-menu-buttons">Settings</a>
                 <a href="testing" class="admin-menu-buttons">Users Testing</a>
             </div>
-
             <a href="login" class="admin-menu-signout">Sign Out</a>
         </div>
+
         <div class="perks-panel admin-scrollable">
             <div class="perks-panel-header">
                 <div class="add-perks-container">
@@ -54,29 +52,30 @@
                             <p class="perks-description-text">Valid until {{ \Carbon\Carbon::parse($perk->PerkValidity)->format('F d, Y') }}</p>
                         </div>
                         <div class="perks-image-container">
-                        <p class="perks-image-text">Attachments:</p>
+                            <p class="perks-image-text">Attachments:</p>
 
-                        @if (!empty($perk->PerkImage))
-                            <img
-                                src="{{ asset('storage/' . $perk->PerkImage) }}"
-                                alt="Perk Image"
-                                class="perk-image"
-                            >
-                        @else
-                            <img
-                                src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
-                                alt="No attachment available"
-                                class="perk-image"
-                            >
-                        @endif
-                    </div>
-                        <!-- RIGHT COLUMN -->
+                            @if (!empty($perk->PerkImage))
+                                <img
+                                    src="{{ asset('storage/' . $perk->PerkImage) }}"
+                                    alt="Perk Image"
+                                    class="perk-image"
+                                    onclick="openModal(this.src)"
+                                >
+                            @else
+                                <img
+                                    src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
+                                    alt="No attachment available"
+                                    class="perk-image"
+                                    onclick="openModal(this.src)"
+                                >
+                            @endif
+                        </div>
+                        
                         <div class="perks-tools">
                             <div class="perks-tools-analytics">
                                 <span>Analytics</span>
                                 <p>👁 No Data Yet</p>
                             </div>
-
                             <a href="{{ route('perks.edit', $perk->id) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
                             <a href="" class="perk-edit-archive-btn archive-btn">Archive</a>
                         </div>
@@ -91,6 +90,31 @@
             </div>
         </div>
     </div>
+
+    <div id="imageModal" class="custom-modal" onclick="closeModal()">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="enlargedImage">
+    </div>
+
+    <script>
+        function openModal(src) {
+            const modal = document.getElementById("imageModal");
+            const modalImg = document.getElementById("enlargedImage");
+            modal.style.display = "flex";
+            modalImg.src = src;
+        }
+
+        function closeModal() {
+            document.getElementById("imageModal").style.display = "none";
+        }
+
+        // Close on 'Esc' key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeModal();
+            }
+        });
+    </script>
 
 </body>
 </html>
