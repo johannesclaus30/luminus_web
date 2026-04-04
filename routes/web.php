@@ -2,31 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PerksController;
-
-Route::get('/', function () {
-    return view('welcome');
-});
-
-Route::get('/admin/login', function () {
-    return view('admin_login');
-});
-
-Route::get('/admin/dashboard', function () {
-    return view('admin_dashboard');
-});
-
-Route::get('/admin/directory', function () {
-    return view('admin_directory');
-});
-
-Route::get('/admin/announcements', function () {
-    return view('admin_announcements');
-});
-
-Route::get('/admin/events', function () {
-    return view('admin_events');
-});
-
+use App\Http\Controllers\AnnouncementController;
 
 // PERKS
 Route::get('/admin/perks', [PerksController::class, 'index'])
@@ -44,7 +20,38 @@ Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
 Route::put('/perks/{perk}', [PerksController::class, 'update'])
     ->name('perks.update');
 
-// OTHER
+// ANNOUNCEMENTS
+Route::get('/admin/announcements', [AnnouncementController::class, 'index'])
+    ->name('announcements.index');
+
+Route::get('/admin/announcements/create', [AnnouncementController::class, 'create'])
+    ->name('announcements.create');
+
+Route::post('/admin/announcements', [AnnouncementController::class, 'store'])
+    ->name('announcements.store');
+
+
+    // OTHER
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::get('/admin/login', function () {
+    return view('admin_login');
+});
+
+Route::get('/admin/dashboard', function () {
+    return view('admin_dashboard');
+});
+
+Route::get('/admin/directory', function () {
+    return view('admin_directory');
+});
+
+Route::get('/admin/events', function () {
+    return view('admin_events');
+});
 
 Route::get('/admin/alumni_tracer', function () {
     return view('admin_alumni_tracer');
@@ -62,6 +69,3 @@ Route::get('/admin/testing', function () {
     return view('admin_testing');
 });
 
-// Route::get('/login', function () {
-//     return view('admin_login');
-// })->name('login');

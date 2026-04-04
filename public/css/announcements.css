@@ -1,0 +1,325 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* OTHER CODES */
+
+button {
+    all: unset;
+    box-sizing: border-box;
+}
+
+.perks-panel-header .pagination-container {
+    margin: 0 !important;
+    margin-bottom: 0px !important;
+    justify-content: flex-end;
+}
+
+.bottom-pagination {
+    margin-bottom: 50px;
+}
+
+.perks-panel {
+    margin-top: 15px;
+    margin-bottom: 15px;
+    margin-right: 15px;
+    height: 100%;
+    width: auto; /* Full height minus nav */
+    background-color: #EBEBEB;
+    font-family: 'Poppins', sans-serif;
+    flex: 7;
+    padding-top: 15px;
+    padding-right: 15px;
+    border-radius: 18px;
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden;
+}
+
+.perks-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.add-perks-container {
+    margin-top: 0px;
+}
+
+.add-perks-button {
+    background-color: #32418c;
+    color: #fbd117;
+    font-weight: 500;
+    width: 250px;
+    height: auto;
+    padding: 10px;
+    padding-left: 25px;
+    padding-right: 25px;
+    text-decoration: none;
+    border-radius: 20px;
+}
+
+.perks-container {
+    background-color: #FFFFFF;
+    border-radius: 18px;
+    padding: 15px;
+    margin-bottom: 15px;
+
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
+    gap: 20px;
+}
+
+.perks-title-description {
+    padding-top: 0px;
+    margin-top: 0px;
+    padding-left: 15px;
+    width: 350px;
+}
+
+.perks-title-text {
+    font-family: 'Poppins', sans-serif;
+    color: #444242;
+    font-size: 24px;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+.perks-description-text {
+    width: 340px;
+    font-family: 'Poppins', sans-serif;
+    color: #696969;
+    font-size: 16px;
+    font-weight: 400;
+    margin-bottom: 10px;
+}
+
+.perks-image-container {
+    background-color: #F9F9F9;
+    height: 280px;
+    width: 380px;
+    /* flex: 0 0 300px; */
+
+    border-radius: 18px;
+    border: 1px solid #ccc;
+    padding: 15px;
+}
+.perks-image-text {
+    width: 340px;
+    font-family: 'Poppins', sans-serif;
+    color: #444242;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 0px;
+    margin-bottom: 10px;
+}
+.perk-image {
+    width: 150px;
+    height: auto;
+    border-radius: 12px;
+}
+
+.perks-tools {
+    padding-right: 5px;
+    margin-top: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.perks-tools-analytics {
+    background-color: #F9F9F9;
+    height: 130px;
+    width: 180px;
+    border-radius: 18px;
+    border: 1px solid #ccc;
+    padding: 15px;
+}
+
+/* CSS FOR CREATE OR ADD NEW PERKS */
+
+.perks-create-container {
+    font-family: 'Poppins', sans-serif;
+    flex: 7;
+    padding: 10px;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+  
+}
+
+.perks-create-container h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #32418c;
+    margin-top: 0px;
+    /* margin-bottom: 20px; */
+}
+
+label {
+    font-size: 18px;
+    font-weight: 600;
+    color: #444242;
+    margin-top: 15px;
+    margin-bottom: 5px;
+}
+
+.textarea-style {
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    color: #444242;
+    padding: 10px;
+    border-radius: 25px;
+    border: 1px solid #B4B2B2;
+    resize: vertical;
+}
+.textarea-description {
+    height: 300px;
+}
+
+.perks-details {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    padding: 0px;
+}
+
+.new-perks-title-description {
+    padding-right: 5px;
+    margin-top: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 500px;
+}
+
+.date-image-container {
+    padding-right: 5px;
+    margin-top: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 350px;
+}
+
+.date-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.date-input-wrapper input[type="date"] {
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    color: #444242;
+
+    padding: 12px 45px 12px 18px;
+    border-radius: 25px;
+    border: 1px solid #B4B2B2;
+    width: 100%;
+    background-color: #ffffff;
+}
+
+.date-input-wrapper input[type="date"]:focus {
+    outline: none;
+    border-color: #32418c;
+}
+
+.calendar-icon {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 18px;
+    color: #777;
+}
+
+.image-upload-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    height: 200px;
+    border: 1px dashed #B4B2B2;
+    border-radius: 18px;
+
+    cursor: pointer;
+    background-color: #F9F9F9;
+
+    font-size: 14px;
+    color: #666;
+    text-align: center;
+
+    position: relative;
+    width: 100%;
+}
+.perk-image {
+    max-width: 100%;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: 12px;
+    display: block;
+}
+
+.perk-submit-btn {
+    background-color: #32418c;
+    color: #fbd117;
+    width: 415px;
+    height: auto;
+
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+
+    padding: 12px 28px;
+    border-radius: 25px;
+
+    cursor: pointer;
+    text-align: center;
+
+    align-self: flex-start; /* ✅ prevents stretching */
+}
+
+.perk-submit-btn:hover {
+    opacity: 0.9;
+}
+
+.perk-submit-btn:active {
+    transform: scale(0.98);
+}
+
+.perk-edit-archive-btn {
+    background-color: #32418c;
+    color: #fbd117;
+    width: 160px;
+    height: auto;
+
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+
+    padding: 12px 28px;
+    border-radius: 25px;
+
+    cursor: pointer;
+    text-align: center;
+
+    align-self: flex-start; /* ✅ prevents stretching */
+}
+.perk-edit-archive-btn:hover {
+    opacity: 0.9;
+}
+.perk-edit-archive-btn:active {
+    transform: scale(0.98);
+}
+
+/* Buttons */
+.edit-btn {
+    color: #32418c;
+    background: #fbd117;
+    text-decoration: none;
+}
+
+.archive-btn {
+    color: #FFFFFF;
+    background: #818181;
+    text-decoration: none;
+}
