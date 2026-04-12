@@ -125,7 +125,9 @@
                         </div>
                     </div>
                 @empty
-                    <p class="perks-description-text">No announcements available.</p>
+                    <div class="announcements-container" style="justify-content: center;">
+                        <p class="announcements-description-text">No announcements available.</p>
+                    </div>
                 @endforelse
 
                 <div class="pagination-container bottom-pagination">

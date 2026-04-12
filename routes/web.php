@@ -3,6 +3,27 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PerksController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\EventController;
+
+// EVENTS
+Route::get('/admin/events', [EventController::class, 'index'])
+    ->name('events.index');
+
+Route::get('/admin/events/create', [EventController::class, 'create'])
+    ->name('events.create');
+
+Route::post('/admin/events', [EventController::class, 'store'])
+    ->name('events.store');
+
+Route::get('/admin/events/{event}/edit', [EventController::class, 'edit'])
+    ->name('events.edit');
+
+Route::put('/admin/events/{event}', [EventController::class, 'update'])
+    ->name('events.update');
+
+// Add this specific line to enable the "Archive" button
+Route::delete('/admin/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
+    
 
 // PERKS
 Route::get('/admin/perks', [PerksController::class, 'index'])
@@ -55,10 +76,6 @@ Route::get('/admin/dashboard', function () {
 
 Route::get('/admin/directory', function () {
     return view('admin_directory');
-});
-
-Route::get('/admin/events', function () {
-    return view('admin_events');
 });
 
 Route::get('/admin/alumni_tracer', function () {

@@ -81,7 +81,9 @@
                         </div>
                     </div>
                 @empty
-                    <p>No perks available.</p>
+                    <div class="perks-container" style="justify-content: center;">
+                        <p class="perks-description-text">No perks available.</p>
+                    </div>
                 @endforelse
 
                 <div class="pagination-container bottom-pagination">
