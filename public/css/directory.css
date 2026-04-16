@@ -22,13 +22,15 @@
 .search-container {
    width: 100%;
    justify-content: flex-end;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
 }
 
 .search-bar {
-    
     font-family: 'Poppins', sans-serif;
     background-color: #FFFFFF;
-    width: 100%; /* This will now stay within the 15px padding */
+    width: 80%; /* This will now stay within the 15px padding */
     padding: 10px;
     border: none;
     border-radius: 10px;
@@ -107,4 +109,204 @@
     display: flex;
     flex-direction: row;
     gap: 20px;
+}
+
+/* Create button and modal styles */
+.create-button {
+    margin-left: 12px;
+    background-color: #32418c;
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 20%;
+}
+.create-button:hover { opacity: 0.95; }
+
+.btn { padding: 8px 12px; border-radius: 8px; cursor: pointer; border: none; }
+.btn-primary { background: #32418c; color:#fff; }
+.btn-secondary { background: #f1f1f1; color:#333; }
+
+/* 1. Modal Overlay */
+.modal {
+    display: none; /* Controlled by JS: change to 'flex' to show */
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100vh; /* Use vh to ensure it covers the viewport height */
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    
+    /* The centering magic */
+    align-items: center; 
+    justify-content: center;
+    
+    /* Allows the modal to scroll if the content is too tall for the screen */
+    overflow-y: auto; 
+    padding: 20px; /* Buffer for small screens */
+}
+
+/* 2. Content Container */
+.modal-content {
+    background: #fff;
+    border-radius: 20px;
+    width: 550px;
+    max-width: 100%; /* Changed from 90% to 100% since parent has padding */
+    padding: 35px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+    font-family: 'Poppins', sans-serif;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.05);
+    
+    /* Reset margins to let Flexbox handle the centering */
+    margin: 0; 
+}
+
+/* 3. Close Button Style */
+.close-button {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    background: #f1f1f1;
+    border: none;
+    font-size: 22px;
+    color: #888;
+    cursor: pointer;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    background: #32418c;
+    color: #fff;
+}
+
+/* 4. Enhanced Inputs */
+.modal-body input[type="text"], 
+.modal-body input[type="email"] {
+    width: 100%;
+    padding: 14px 22px;
+    border-radius: 25px;
+    border: 2px solid #EBEBEB; /* Thicker, lighter border */
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+    margin-bottom: 5px;
+}
+
+.modal-body input:focus {
+    outline: none;
+    border-color: #32418c;
+    background-color: #fff;
+    box-shadow: 0 0 0 4px rgba(50, 65, 140, 0.1); /* Subtle glow */
+}
+
+/* 5. Action Buttons */
+.btn {
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(50, 65, 140, 0.2);
+}
+
+.btn-secondary:hover {
+    background-color: #f9f9f9;
+    border-color: #32418c;
+}
+
+/* 6. Custom File Upload Button */
+.bulk-import input[type="file"]::file-selector-button {
+    background-color: #32418c;
+    color: #fbd117;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 15px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.bulk-import input[type="file"]::file-selector-button:hover {
+    opacity: 0.9;
+}
+
+/* Small responsive tweaks */
+@media (max-width:600px) {
+    .primary-info { width: 200px; }
+    .email { display: none; }
+}
+
+/* 1. Force the containers to stack correctly */
+.modal-body form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* 2. Fix the Label Chaos - Force them above the inputs */
+.modal-body label {
+    display: block !important; /* Forces label to its own line */
+    width: 100%;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* 3. Fix the Input Chaos - Force them to fill the container */
+.modal-body input[type="text"], 
+.modal-body input[type="email"],
+.modal-body input:not([type="file"]) {
+    display: block !important;
+    width: 100% !important; /* Occupy full width of the parent div */
+    box-sizing: border-box; /* Includes padding in width calculation */
+    padding: 12px 20px;
+    border-radius: 25px;
+    border: 1px solid #B4B2B2;
+}
+
+/* 4. Fix the Side-by-Side Row (Program & Email) */
+.modal-row {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+}
+
+.modal-row > div {
+    flex: 1; /* Ensures both halves are equal width */
+    min-width: 0; /* Prevents flex items from overflowing */
+}
+
+/* 5. Improve the Buttons */
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+    justify-content: flex-start;
+}
+
+.modal-actions .btn {
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
 }
