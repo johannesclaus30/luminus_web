@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Events</title>
+    <title>LumiNUs | Perks Directory</title>
 
     <link rel="stylesheet" href="/css/admin_dashboard.css">
     <link rel="stylesheet" href="/css/admin.css">
@@ -13,30 +13,31 @@
 <body>
     
     <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape.png" alt="LumiNUs Logo">
+        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
     </nav>
 
     <div class="layout-wrapper">
         <div class="admin-menu">
-            <div>
+                <div>
                 <p class="text-titles">Admin Menu</p>
-                <a href="dashboard" class="admin-menu-buttons">Admin Dashboard</a>
-                <a href="directory" class="admin-menu-buttons">Alumni Directory</a>
-                <a href="announcements" class="admin-menu-buttons">Announcement Editor</a>
-                <a href="events" class="admin-menu-buttons">Event Organizer</a>
-                <a href="perks" class="admin-menu-current">Perks and Discounts</a>
-                <a href="alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
-                <a href="messages" class="admin-menu-buttons">Messages</a>
-                <a href="settings" class="admin-menu-buttons">Settings</a>
-                <a href="testing" class="admin-menu-buttons">Users Testing</a>
+                <a href="/admin/dashboard" class="admin-menu-buttons">Admin Dashboard</a>
+                <a href="/admin/directory" class="admin-menu-buttons">Alumni Directory</a>
+                <a href="/admin/announcements" class="admin-menu-buttons">Announcement Editor</a>
+                <a href="/admin/events" class="admin-menu-buttons">Event Organizer</a>
+                <a href="/admin/perks" class="admin-menu-current">Perks and Discounts</a>
+                <a href="/admin/alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
+                <a href="/admin/messages" class="admin-menu-buttons">Messages</a>
+                <a href="/admin/settings" class="admin-menu-buttons">Settings</a>
+                <a href="/admin/testing" class="admin-menu-buttons">Users Testing</a>
             </div>
-            <a href="login" class="admin-menu-signout">Sign Out</a>
+            <a href="/admin/login" class="admin-menu-signout">Sign Out</a>
         </div>
 
         <div class="perks-panel admin-scrollable">
             <div class="perks-panel-header">
                 <div class="add-perks-container">
                     <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
+                    <a id="archiveToggleBtn" href="{{ route('perks.archived') }}" class="add-perks-button archived-toggle" style="margin-left:8px;">Archived Perks</a>
                 </div>
                 <div class="pagination-container">
                     {{ $perks->links() }}
@@ -47,28 +48,37 @@
                 @forelse ($perks as $perk)
                     <div class="perks-container">
                         <div class="perks-title-description">
-                            <p class="perks-title-text">{{ $perk->PerkTitle }}</p>
-                            <p class="perks-description-text">{{ $perk->PerkDescription }}</p>
-                            <p class="perks-description-text">Valid until {{ \Carbon\Carbon::parse($perk->PerkValidity)->format('F d, Y') }}</p>
+                            <p class="perks-title-text">{{ $perk->title }}</p>
+                            <p class="perks-description-text">{{ $perk->description }}</p>
+                            
+                            <p class="perks-description-text">
+                                <i class="fa-solid fa-calendar-day"></i> 
+                                Valid until {{ $perk->valid_until->format('F d, Y') }}
+                            </p>
                         </div>
-                        <div class="perks-image-container">
-                            <p class="perks-image-text">Attachments:</p>
 
-                            @if (!empty($perk->PerkImage))
-                                <img
-                                    src="{{ asset('storage/' . $perk->PerkImage) }}"
-                                    alt="Perk Image"
-                                    class="perk-image"
-                                    onclick="openModal(this.src)"
-                                >
-                            @else
-                                <img
-                                    src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
-                                    alt="No attachment available"
-                                    class="perk-image"
-                                    onclick="openModal(this.src)"
-                                >
-                            @endif
+                        <div class="perks-image-container">
+                            <p class="perks-image-text">Attachments (Gallery):</p>
+                            <div class="perks-gallery" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                @if ($perk->images->isNotEmpty())
+                                    @foreach ($perk->images as $image)
+                                        <img
+                                            src="{{ asset('storage/' . $image->image_path) }}"
+                                            alt="Perk Image"
+                                            class="perk-image"
+                                            style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
+                                            onclick="openModal(this.src)"
+                                        >
+                                    @endforeach
+                                @else
+                                    <img
+                                        src="{{ asset('assets/FINAL-NULIPA.jpg') }}"
+                                        alt="No attachment available"
+                                        class="perk-image"
+                                        onclick="openModal(this.src)"
+                                    >
+                                @endif
+                            </div>
                         </div>
                         
                         <div class="perks-tools">
@@ -76,8 +86,22 @@
                                 <span>Analytics</span>
                                 <p>👁 No Data Yet</p>
                             </div>
-                            <a href="{{ route('perks.edit', $perk->id) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
-                            <a href="" class="perk-edit-archive-btn archive-btn">Archive</a>
+                            <div class="perk-action-buttons">
+                                @if ($perk->status !== 'archived')
+                                    <a href="{{ route('perks.edit', $perk->id) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
+                                    <form action="{{ route('perks.destroy', $perk->id) }}" method="POST" onsubmit="return confirm('Archive this perk?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="perk-edit-archive-btn archive-btn">Archive</button>
+                                    </form>
+                                @else
+                                    <form action="{{ route('perks.restore', $perk->id) }}" method="POST" onsubmit="return confirm('Unarchive this perk?')">
+                                        @csrf
+                                        @method('PUT')
+                                        <button type="submit" class="perk-edit-archive-btn perk-unarchive-btn">Unarchive</button>
+                                    </form>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @empty
@@ -99,6 +123,26 @@
     </div>
 
     <script>
+        // Toggle archived button label/color based on current URL
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById('archiveToggleBtn');
+            if (!btn) return;
+            const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
+            const currentPath = window.location.pathname.replace(/\/$/, '');
+
+            if (currentPath === archivedPath) {
+                // We're on the archived page — make button active and link back to active perks
+                btn.classList.add('active');
+                btn.textContent = 'View Active Perks';
+                btn.href = '{{ route('perks.index') }}';
+            } else {
+                // Ensure default state
+                btn.classList.remove('active');
+                btn.textContent = 'Archived Perks';
+                btn.href = '{{ route('perks.archived') }}';
+            }
+        });
+
         function openModal(src) {
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("enlargedImage");
@@ -110,11 +154,8 @@
             document.getElementById("imageModal").style.display = "none";
         }
 
-        // Close on 'Esc' key
         document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") {
-                closeModal();
-            }
+            if (event.key === "Escape") { closeModal(); }
         });
     </script>
 

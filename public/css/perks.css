@@ -57,6 +57,16 @@ button {
     border-radius: 20px;
 }
 
+/* Archived toggle button styles */
+.archived-toggle {
+    background-color: #ff7a59; /* initial archived button color (orange) */
+    color: #ffffff;
+}
+.archived-toggle.active {
+    background-color: #28a745; /* active state when viewing archived (green) */
+    color: #ffffff;
+}
+
 .perks-container {
     background-color: #FFFFFF;
     border-radius: 18px;
@@ -95,13 +105,16 @@ button {
 
 .perks-image-container {
     background-color: #F9F9F9;
-    height: 280px;
+    /* allow the container to grow with its content and stack items vertically */
+    min-height: 220px;
+    height: auto;
     width: 380px;
-    /* flex: 0 0 300px; */
-
     border-radius: 18px;
     border: 1px solid #ccc;
     padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 .perks-image-text {
     width: 340px;
@@ -112,9 +125,11 @@ button {
     margin-top: 0px;
     margin-bottom: 10px;
 }
-.perk-image {
-    width: 150px;
-    height: auto;
+.perks-container .perk-image {
+    /* small gallery thumbnails inside the perks list */
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
     border-radius: 12px;
 }
 
@@ -124,11 +139,12 @@ button {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    width: 180px;
 }
 .perks-tools-analytics {
     background-color: #F9F9F9;
     height: 130px;
-    width: 180px;
+    
     border-radius: 18px;
     border: 1px solid #ccc;
     padding: 15px;
@@ -173,6 +189,8 @@ label {
 }
 .textarea-description {
     height: 300px;
+    max-height: 320px; /* prevent it from growing too large */
+    overflow: auto; /* allow internal scroll instead of pushing layout */
 }
 
 .perks-details {
@@ -180,6 +198,7 @@ label {
     flex-direction: row;
     gap: 20px;
     padding: 0px;
+    align-items: flex-start; /* keep columns aligned to top to avoid overlap */
 }
 
 .new-perks-title-description {
@@ -187,7 +206,7 @@ label {
     margin-top: 0px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 5px;
     width: 500px;
 }
 
@@ -237,7 +256,8 @@ label {
     justify-content: center;
     align-items: center;
 
-    height: 200px;
+    /* keep a minimum size but allow internal scrolling so previews don't overlap other content */
+    min-height: 220px;
     border: 1px dashed #B4B2B2;
     border-radius: 18px;
 
@@ -250,8 +270,14 @@ label {
 
     position: relative;
     width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
 }
-.perk-image {
+.image-upload-box {
+    padding: 12px; /* keep inner contents away from dashed border */
+}
+.image-upload-box .perk-image {
+    /* preview images inside the upload box */
     max-width: 100%;
     max-height: 180px;
     object-fit: contain;
@@ -259,23 +285,85 @@ label {
     display: block;
 }
 
+.perk-images-preview {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 8px;
+    overflow: auto;
+    width: 100%;
+    box-sizing: border-box;
+    max-height: 140px; /* keep previews contained and scrollable */
+}
+
+/* Center placeholder text when there are no previews */
+#uploadPlaceholder {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -10%);
+    color: #666;
+    text-align: center;
+    pointer-events: none;
+    width: calc(100% - 24px);
+}
+
+/* Ensure preview container keeps some min-height so layout stays stable */
+.perk-images-preview {
+    min-height: 120px;
+    align-items: center;
+}
+
+.preview-item { display:inline-block; margin-right:8px; }
+.preview-item img { display:block; border-radius:8px; }
+
+.attachment-counter {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: #ffffffcc;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #333;
+    border: 1px solid #e0e0e0;
+}
+
+
+/* Make status select match the date input width inside the right column */
+.date-image-container select.textarea-style {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Action buttons in forms */
+.form-action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-direction: row; /* place buttons in a row */
+    width: 100%;
+    margin-top: 8px;
+    align-items: center;
+}
+
 .perk-submit-btn {
     background-color: #32418c;
     color: #fbd117;
-    width: 415px;
+    width: 100%; /* compact button to stay visible */
     height: auto;
 
     font-family: 'Poppins', sans-serif;
     font-size: 16px;
     font-weight: 600;
 
-    padding: 12px 28px;
+    padding: 12px 20px;
     border-radius: 25px;
 
     cursor: pointer;
     text-align: center;
 
-    align-self: flex-start; /* ✅ prevents stretching */
+    align-self: flex-start; /* prevents stretching */
 }
 
 .perk-submit-btn:hover {
@@ -304,6 +392,49 @@ label {
 
     align-self: flex-start; /* ✅ prevents stretching */
 }
+
+.perk-action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%; /* Match parent width */
+    align-items: center; /* Center the buttons within the column */
+}
+
+.perk-action-buttons .perk-edit-archive-btn {
+    /* Remove margin-left: 15px and the complex width calc */
+    width: 100%; 
+    margin-left: 0; 
+    display: block;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* Ensure the form doesn't shrink the button inside it */
+.perk-action-buttons form { 
+    margin: 0; 
+    width: 100%; 
+}
+
+.perk-unarchive-btn {
+    background-color: #6c757d; /* grey for unarchive button */
+    color: #ffffff;
+}
+.discard-btn {
+    background: #fff;
+    color: #32418c;
+    border: 1px solid #B4B2B2;
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+}
+
+.discard-btn:hover { opacity: 0.95; }
 .perk-edit-archive-btn:hover {
     opacity: 0.9;
 }
@@ -316,12 +447,14 @@ label {
     color: #32418c;
     background: #fbd117;
     text-decoration: none;
+    width: 100%;
 }
 
 .archive-btn {
     color: #FFFFFF;
     background: #818181;
     text-decoration: none;
+    width: 100%;
 }
 
 /* Lightbox/Modal Styles */

@@ -4,6 +4,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PerksController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\AdminController;
+
+// ADMINS
+Route::get('/admin/directory', [AdminController::class, 'index']);
 
 // EVENTS
 Route::get('/admin/events', [EventController::class, 'index'])
@@ -34,6 +38,18 @@ Route::get('/admin/perks/create', [PerksController::class, 'create'])
 
 Route::post('/admin/perks', [PerksController::class, 'store'])
     ->name('perks.store');
+
+// View archived perks
+Route::get('/admin/perks/archived', [PerksController::class, 'archived'])
+    ->name('perks.archived');
+
+// Restore (unarchive) a perk
+Route::put('/admin/perks/{perk}/restore', [PerksController::class, 'restore'])
+    ->name('perks.restore');
+
+// Delete (archive) a perk
+Route::delete('/admin/perks/{perk}', [PerksController::class, 'destroy'])
+    ->name('perks.destroy');
 
 Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
     ->name('perks.edit');
@@ -74,9 +90,9 @@ Route::get('/admin/dashboard', function () {
     return view('admin_dashboard');
 });
 
-Route::get('/admin/directory', function () {
-    return view('admin_directory');
-});
+// Route::get('/admin/directory', function () {
+//     return view('admin_directory');
+// });
 
 Route::get('/admin/alumni_tracer', function () {
     return view('admin_alumni_tracer');

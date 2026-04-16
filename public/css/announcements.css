@@ -12,6 +12,26 @@ label {
     font-weight: 600;
 }
 
+.announcements-container {
+    background-color: #FFFFFF;
+    border-radius: 18px;
+    padding: 15px;
+    margin-bottom: 15px;
+
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
+    gap: 20px;
+}
+.announcements-description-text {
+    width: 340px;
+    font-family: 'Poppins', sans-serif;
+    color: #696969;
+    font-size: 16px;
+    font-weight: 400;
+    margin-bottom: 10px;
+}
+
 .announcements-create-container {
     font-family: 'Poppins', sans-serif;
     flex: 7;

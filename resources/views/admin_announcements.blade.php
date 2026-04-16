@@ -14,7 +14,7 @@
 <body>
     
     <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape.png" alt="LumiNUs Logo">
+        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
     </nav>
 
     <div class="layout-wrapper">
@@ -126,7 +126,7 @@
                     </div>
                 @empty
                     <div class="announcements-container" style="justify-content: center;">
-                        <p class="announcements-description-text">No announcements available.</p>
+                        <p class="announcements-description-text">No announcements yet!</p>
                     </div>
                 @endforelse
 

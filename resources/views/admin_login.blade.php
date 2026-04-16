@@ -19,7 +19,7 @@
     <div class="login-container">
         <div class="login-container-content">
 
-            <img class="luminus-logo" src="/assets/logos/LumiNUs_Logo_Landscape.png" alt="LumiNUs Logo">
+            <img class="luminus-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
             <p class="subtitle">Admin Account</p>
 
             <label>Email</label>
