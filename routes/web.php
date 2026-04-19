@@ -9,6 +9,9 @@ use App\Http\Controllers\AdminController;
 // ADMINS
 Route::get('/admin/directory', [AdminController::class, 'index']);
 
+Route::post('/admin/settings', [AdminController::class, 'store'])
+    ->name('admin.settings.store');
+
 // EVENTS
 Route::get('/admin/events', [EventController::class, 'index'])
     ->name('events.index');
@@ -104,7 +107,7 @@ Route::get('/admin/messages', function () {
 
 Route::get('/admin/settings', function () {
     return view('admin_settings');
-});
+})->name('admin.settings');
 
 Route::get('/admin/testing', function () {
     return view('admin_testing');

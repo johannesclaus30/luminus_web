@@ -8,19 +8,6 @@
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/settings.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
-    
-    <style>
-        /* Ensuring the right sidebar matches the layout logic */
-        .settings-right-sidebar { 
-            flex: 0 0 280px; /* Lock width to 280px, same as Admin Menu */
-            margin: 15px 15px 15px 0;
-            background-color: #ffffff;
-            border-radius: 18px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-        }
-    </style>
 </head>
 <body>
     
@@ -45,28 +32,102 @@
             <a href="login" class="admin-menu-signout">Sign Out</a>
         </div>
 
-        <div class="div-dashboard-container admin-scrollable">
+        <div class="div-dashboard-container admin-scrollable settings-main-panel">
             @php
                 $section = request()->query('section', 'account');
+
+                $sectionMeta = [
+                    'account' => [
+                        'eyebrow' => 'Admin account',
+                        'title' => 'Account Information',
+                        'description' => 'Update the profile details shown across the admin workspace.',
+                        'status' => 'Profile ready',
+                    ],
+                    'security' => [
+                        'eyebrow' => 'Admin account',
+                        'title' => 'Security',
+                        'description' => 'Protect the dashboard with stronger credentials and multi-factor access.',
+                        'status' => 'Security controls',
+                    ],
+                    'roles' => [
+                        'eyebrow' => 'Admin control',
+                        'title' => 'Admin Roles',
+                        'description' => 'Review the people who can manage content, users, and system settings.',
+                        'status' => '2 active roles',
+                    ],
+                    'add-admin' => [
+                        'eyebrow' => 'Admin control',
+                        'title' => 'Add New Admin',
+                        'description' => 'Invite a new administrator and assign the appropriate access level.',
+                        'status' => 'Invitation flow',
+                    ],
+                    'notifications' => [
+                        'eyebrow' => 'System settings',
+                        'title' => 'Notification Settings',
+                        'description' => 'Choose how the team receives updates about platform activity.',
+                        'status' => 'Delivery preferences',
+                    ],
+                    'download' => [
+                        'eyebrow' => 'System settings',
+                        'title' => 'Download Data',
+                        'description' => 'Export records for reporting, archiving, or offline review.',
+                        'status' => 'Export tools',
+                    ],
+                ];
+
+                $activeMeta = $sectionMeta[$section] ?? $sectionMeta['account'];
             @endphp
+
+            <div class="settings-page-header">
+                <div>
+                    <p class="settings-eyebrow">{{ $activeMeta['eyebrow'] }}</p>
+                    <h1 class="page-title">{{ $activeMeta['title'] }}</h1>
+                    <p class="settings-page-description">{{ $activeMeta['description'] }}</p>
+                </div>
+                <div class="settings-status-card">
+                    <span class="settings-status-label">Active area</span>
+                    <strong>{{ $activeMeta['status'] }}</strong>
+                    <span class="settings-status-note">Use the sidebar to switch between account, admin, and system settings.</span>
+                </div>
+            </div>
+
+            @if (session('status'))
+                <div class="settings-alert settings-alert-success">
+                    <strong>{{ session('status') }}</strong>
+                    @if (session('temporary_password'))
+                        <span>Temporary password: {{ session('temporary_password') }}</span>
+                    @endif
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div class="settings-alert settings-alert-error">
+                    <strong>Please review the form.</strong>
+                    <span>{{ $errors->first() }}</span>
+                </div>
+            @endif
 
             @switch($section)
                 @case('security')
-                    <h1 class="page-title">Security</h1>
-                    <div class="card">
-                        <h3>Change Password</h3>
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Change Password</h3>
+                                <p>Keep the admin account protected with a strong, unique password.</p>
+                            </div>
+                        </div>
                         <form id="change-password-form" class="settings-form-grid">
                             <div class="form-group full-width">
                                 <label>Current Password</label>
-                                <input type="password" name="current_password">
+                                <input type="password" name="current_password" placeholder="Enter current password">
                             </div>
                             <div class="form-group">
                                 <label>New Password</label>
-                                <input type="password" name="password">
+                                <input type="password" name="password" placeholder="Enter new password">
                             </div>
                             <div class="form-group">
                                 <label>Confirm New Password</label>
-                                <input type="password" name="password_confirmation">
+                                <input type="password" name="password_confirmation" placeholder="Repeat new password">
                             </div>
                             <div class="form-footer full-width">
                                 <button type="button" class="btn-discard" onclick="resetForm('change-password-form')">Reset</button>
@@ -75,17 +136,25 @@
                         </form>
                     </div>
 
-                    <div class="card" style="margin-top:16px;">
-                        <h3>Two-Factor Authentication</h3>
-                        <p>Enhance account security by enabling 2FA.</p>
-                        <div class="form-group">
-                            <label class="toggle-label">Enable 2FA</label>
+                    <div class="settings-card settings-card-spaced">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Two-Factor Authentication</h3>
+                                <p>Add a second layer of login verification for sensitive admin work.</p>
+                            </div>
+                            <span class="settings-badge">Recommended</span>
+                        </div>
+                        <div class="settings-toggle-row">
+                            <div>
+                                <strong>Enable 2FA</strong>
+                                <p>Require a verification code when signing in.</p>
+                            </div>
                             <label class="switch">
                                 <input type="checkbox" id="toggle-2fa">
                                 <span class="slider round"></span>
                             </label>
                         </div>
-                        <div id="2fa-settings" style="display:none; margin-top:12px;">
+                        <div id="2fa-settings" class="settings-reveal-panel" style="display:none;">
                             <div class="form-group full-width">
                                 <label>Authentication Method</label>
                                 <select>
@@ -94,115 +163,159 @@
                                 </select>
                             </div>
                             <div class="form-footer full-width">
-                                <button class="btn-discard" onclick="fakeSave('2FA disabled')">Disable</button>
-                                <button class="btn-save" onclick="fakeSave('2FA enabled')">Enable</button>
+                                <button type="button" class="btn-discard" onclick="fakeSave('2FA disabled')">Disable</button>
+                                <button type="button" class="btn-save" onclick="fakeSave('2FA enabled')">Enable</button>
                             </div>
                         </div>
                     </div>
                 @break
 
                 @case('roles')
-                    <h1 class="page-title">Admin Roles</h1>
-                    <p>Manage admin accounts and their roles.</p>
-                    <div class="card">
-                        <table class="table-simple">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Cristine Maranan</td>
-                                    <td>marananc@nu-lipa.edu.ph</td>
-                                    <td>Super Admin</td>
-                                    <td>
-                                        <button class="btn-small">Edit</button>
-                                        <button class="btn-small btn-danger">Remove</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Juan Dela Cruz</td>
-                                    <td>juan@example.com</td>
-                                    <td>Editor</td>
-                                    <td>
-                                        <button class="btn-small">Edit</button>
-                                        <button class="btn-small btn-danger">Remove</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Admin Accounts</h3>
+                                <p>Track who has access to the admin tools and what they can change.</p>
+                            </div>
+                            <span class="settings-badge settings-badge-muted">Read only preview</span>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table-simple settings-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Cristine Maranan</td>
+                                        <td>marananc@nu-lipa.edu.ph</td>
+                                        <td><span class="role-chip role-chip-primary">Super Admin</span></td>
+                                        <td>
+                                            <button type="button" class="btn-small">Edit</button>
+                                            <button type="button" class="btn-small btn-danger">Remove</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Juan Dela Cruz</td>
+                                        <td>juan@example.com</td>
+                                        <td><span class="role-chip">Editor</span></td>
+                                        <td>
+                                            <button type="button" class="btn-small">Edit</button>
+                                            <button type="button" class="btn-small btn-danger">Remove</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 @break
 
                 @case('add-admin')
-                    <h1 class="page-title">Add New Admin</h1>
-                    <div class="card">
-                        <form id="add-admin-form" class="settings-form-grid">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Invite Admin</h3>
+                                <p>Fill in the contact details and assign an access level before sending the invitation.</p>
+                            </div>
+                        </div>
+                        <form id="add-admin-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.store') }}" enctype="multipart/form-data">
+                            @csrf
                             <div class="form-group">
                                 <label>First Name</label>
-                                <input type="text" name="first_name">
+                                <input type="text" name="admin_first_name" value="{{ old('admin_first_name') }}" placeholder="First name">
+                            </div>
+                            <div class="form-group">
+                                <label>Middle Name</label>
+                                <input type="text" name="admin_middle_name" value="{{ old('admin_middle_name') }}" placeholder="Middle name">
                             </div>
                             <div class="form-group">
                                 <label>Last Name</label>
-                                <input type="text" name="last_name">
+                                <input type="text" name="admin_last_name" value="{{ old('admin_last_name') }}" placeholder="Last name">
                             </div>
                             <div class="form-group full-width">
                                 <label>Email</label>
-                                <input type="email" name="email">
+                                <input type="email" name="admin_email" value="{{ old('admin_email') }}" placeholder="name@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="text" name="phone_number" value="{{ old('phone_number') }}" placeholder="09xx xxx xxxx">
                             </div>
                             <div class="form-group">
                                 <label>Role</label>
-                                <select name="role">
-                                    <option>Editor</option>
-                                    <option>Moderator</option>
-                                    <option>Super Admin</option>
+                                <select name="admin_role">
+                                    <option value="super_admin" @selected(old('admin_role') === 'super_admin')>Super Admin</option>
+                                    <option value="moderator" @selected(old('admin_role') === 'moderator')>Moderator</option>
+                                    <option value="event_coordinator" @selected(old('admin_role') === 'event_coordinator')>Event Coordinator</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label>Send Invitation</label>
-                                <input type="checkbox" name="invite" checked>
+                            <div class="form-group full-width settings-form-note">
+                                <strong>Temporary password</strong>
+                                <p>A secure password will be generated automatically after saving.</p>
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label>Photo</label>
+                                <input type="file" name="photo" accept="image/*">
                             </div>
 
                             <div class="form-footer full-width">
                                 <button type="button" class="btn-discard" onclick="resetForm('add-admin-form')">Clear</button>
-                                <button type="button" class="btn-save" onclick="fakeSave('Admin invited')">Add Admin</button>
+                                <button type="submit" class="btn-save">Add Admin</button>
                             </div>
                         </form>
                     </div>
                 @break
 
                 @case('notifications')
-                    <h1 class="page-title">Notification Settings</h1>
-                    <div class="card">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Notification Channels</h3>
+                                <p>Select which alerts should reach the team in real time.</p>
+                            </div>
+                        </div>
                         <form id="notifications-form" class="settings-form-grid">
-                            <div class="form-group full-width">
-                                <label>Email Notifications</label>
+                            <div class="form-group full-width settings-option-row">
+                                <div>
+                                    <label>Email Notifications</label>
+                                    <p>Send important updates to the admin inbox.</p>
+                                </div>
                                 <input type="checkbox" name="email_notifications" checked>
                             </div>
-                            <div class="form-group full-width">
-                                <label>SMS Notifications</label>
+                            <div class="form-group full-width settings-option-row">
+                                <div>
+                                    <label>SMS Notifications</label>
+                                    <p>Push urgent alerts to registered phone numbers.</p>
+                                </div>
                                 <input type="checkbox" name="sms_notifications">
                             </div>
-                            <div class="form-group full-width">
-                                <label>System Alerts</label>
+                            <div class="form-group full-width settings-option-row">
+                                <div>
+                                    <label>System Alerts</label>
+                                    <p>Track issues, warnings, and maintenance events.</p>
+                                </div>
                                 <input type="checkbox" name="system_alerts" checked>
                             </div>
                             <div class="form-footer full-width">
-                                <button class="btn-discard" onclick="resetForm('notifications-form')">Reset</button>
-                                <button class="btn-save" onclick="fakeSave('Notification settings saved')">Save</button>
+                                <button type="button" class="btn-discard" onclick="resetForm('notifications-form')">Reset</button>
+                                <button type="button" class="btn-save" onclick="fakeSave('Notification settings saved')">Save</button>
                             </div>
                         </form>
                     </div>
                 @break
 
                 @case('download')
-                    <h1 class="page-title">Download Data</h1>
-                    <div class="card">
-                        <p>Select which data to export.</p>
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Export Options</h3>
+                                <p>Generate a file for reporting, audits, or offline review.</p>
+                            </div>
+                        </div>
                         <form class="settings-form-grid">
                             <div class="form-group full-width">
                                 <label>Export</label>
@@ -212,47 +325,66 @@
                                     <option>Events</option>
                                 </select>
                             </div>
+                            <div class="download-note full-width">
+                                The export will be prepared using the latest available records.
+                            </div>
                             <div class="form-footer full-width">
-                                <button class="btn-save" onclick="fakeSave('Preparing download...')">Download</button>
+                                <button type="button" class="btn-save" onclick="fakeSave('Preparing download...')">Download</button>
                             </div>
                         </form>
                     </div>
                 @break
 
                 @default
-                    <h1 class="page-title">Account Information</h1>
-                    <div class="profile-pic-section">
-                        <img src="/assets/avatar-placeholder.png" alt="Profile">
-                        <button class="upload-btn">Upload New Photo</button>
-                        <button class="remove-btn">Remove Photo</button>
+                    <div class="settings-card settings-profile-card">
+                        <div class="profile-pic-section">
+                            <img src="/assets/avatar-placeholder.png" alt="Profile">
+                            <div class="profile-pic-copy">
+                                <h3>Profile Photo</h3>
+                                <p>Use a clear headshot so the admin profile is recognizable across the system.</p>
+                                <div class="profile-action-row">
+                                    <button type="button" class="upload-btn">Upload New Photo</button>
+                                    <button type="button" class="remove-btn">Remove Photo</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <form id="account-form" class="settings-form-grid">
-                        <div class="form-group">
-                            <label>Last Name</label>
-                            <input type="text" name="last_name" value="Maranan">
+                    <div class="settings-card settings-card-spaced">
+                        <div class="settings-card-header">
+                            <div>
+                                <h3>Personal Details</h3>
+                                <p>These details appear in the admin profile and internal references.</p>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>First Name</label>
-                            <input type="text" name="first_name" value="Cristine">
-                        </div>
-                        <div class="form-group">
-                            <label>Middle Name</label>
-                            <input type="text" name="middle_name" value="Reyes">
-                        </div>
-                        <div class="form-group">
-                            <label>Mobile Number</label>
-                            <input type="text" name="mobile" value="0912 259 5288">
-                        </div>
-                        <div class="form-group full-width">
-                            <label>Email</label>
-                            <input type="email" name="email" value="marananc@nu-lipa.edu.ph">
-                        </div>
-                    </form>
 
-                    <div class="form-footer">
-                        <button class="btn-discard" onclick="resetForm('account-form')">Discard Changes</button>
-                        <button class="btn-save" onclick="fakeSave('Profile saved')">Save Profile Information</button>
+                        <form id="account-form" class="settings-form-grid">
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" name="last_name" value="Maranan">
+                            </div>
+                            <div class="form-group">
+                                <label>First Name</label>
+                                <input type="text" name="first_name" value="Cristine">
+                            </div>
+                            <div class="form-group">
+                                <label>Middle Name</label>
+                                <input type="text" name="middle_name" value="Reyes">
+                            </div>
+                            <div class="form-group">
+                                <label>Mobile Number</label>
+                                <input type="text" name="mobile" value="0912 259 5288">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Email</label>
+                                <input type="email" name="email" value="marananc@nu-lipa.edu.ph">
+                            </div>
+                        </form>
+
+                        <div class="form-footer">
+                            <button type="button" class="btn-discard" onclick="resetForm('account-form')">Discard Changes</button>
+                            <button type="button" class="btn-save" onclick="fakeSave('Profile saved')">Save Profile Information</button>
+                        </div>
                     </div>
             @endswitch
         </div>
@@ -285,7 +417,6 @@
             </a>
         </div>
     </div>
-</div>
 
     <script>
         // Toggle 2FA settings visibility
