@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Admin; // Import the Model
+use App\Models\Alumni;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
@@ -15,12 +17,16 @@ class AdminController extends Controller
      */
     public function index()
     {
-        // 1. Fetch all admins from the 'admins' table
-        $admins = Admin::all();
+        $alumni = Alumni::query()->latest('created_at')->get();
 
-        // 2. Pass the variable to the view
-        // Make sure the view name matches your file: 'admin_directory'
-        return view('admin_directory', compact('admins'));
+        return view('admin_directory', compact('alumni'));
+    }
+
+    public function settings()
+    {
+        $admins = Admin::query()->latest('created_at')->get();
+
+        return view('admin_settings', compact('admins'));
     }
 
     /**
@@ -68,6 +74,57 @@ class AdminController extends Controller
             ->route('admin.settings', ['section' => 'add-admin'])
             ->with('status', 'Admin account created successfully.')
             ->with('temporary_password', $temporaryPassword);
+    }
+
+    public function storeAlumni(Request $request)
+    {
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'date_of_birth' => ['nullable', 'date'],
+            'sex' => ['nullable', 'string', 'max:50'],
+            'year_graduated' => ['nullable', 'date'],
+            'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')],
+            'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')],
+            'phone_number' => ['required', 'string', 'max:50'],
+            'program' => ['required', 'string', 'max:255'],
+            'card_photo' => ['nullable', 'image', 'max:4096'],
+        ]);
+
+        $cardPhotoPath = null;
+
+        if ($request->hasFile('card_photo')) {
+            $storedPath = $request->file('card_photo')->store('card_photo', 's3');
+
+            if (! $storedPath) {
+                throw ValidationException::withMessages([
+                    'card_photo' => 'The card photo could not be uploaded to Supabase.',
+                ]);
+            }
+
+            $cardPhotoPath = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
+        }
+
+        Alumni::create([
+            'first_name' => $validated['first_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
+            'last_name' => $validated['last_name'],
+            'date_of_birth' => $validated['date_of_birth'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'year_graduated' => $validated['year_graduated'] ?? null,
+            'student_id_number' => $validated['student_id_number'],
+            'email' => $validated['email'],
+            'phone_number' => $validated['phone_number'],
+            'password_hash' => 'password123',
+            'verification_status' => 'pending',
+            'program' => $validated['program'],
+            'card_photo' => $cardPhotoPath,
+        ]);
+
+        return redirect()
+            ->route('admin.directory')
+            ->with('status', 'Alumni account created successfully.');
     }
 
     /**

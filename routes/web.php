@@ -7,7 +7,11 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 
 // ADMINS
-Route::get('/admin/directory', [AdminController::class, 'index']);
+Route::get('/admin/directory', [AdminController::class, 'index'])
+    ->name('admin.directory');
+
+Route::post('/admin/alumni', [AdminController::class, 'storeAlumni'])
+    ->name('admin.alumni.store');
 
 Route::post('/admin/settings', [AdminController::class, 'store'])
     ->name('admin.settings.store');
@@ -105,9 +109,8 @@ Route::get('/admin/messages', function () {
     return view('admin_messages');
 });
 
-Route::get('/admin/settings', function () {
-    return view('admin_settings');
-})->name('admin.settings');
+Route::get('/admin/settings', [AdminController::class, 'settings'])
+    ->name('admin.settings');
 
 Route::get('/admin/testing', function () {
     return view('admin_testing');

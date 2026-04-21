@@ -177,7 +177,7 @@
                                 <h3>Admin Accounts</h3>
                                 <p>Track who has access to the admin tools and what they can change.</p>
                             </div>
-                            <span class="settings-badge settings-badge-muted">Read only preview</span>
+                            <span class="settings-badge settings-badge-muted">Live data</span>
                         </div>
                         <div class="table-wrap">
                             <table class="table-simple settings-table">
@@ -190,24 +190,34 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>Cristine Maranan</td>
-                                        <td>marananc@nu-lipa.edu.ph</td>
-                                        <td><span class="role-chip role-chip-primary">Super Admin</span></td>
-                                        <td>
-                                            <button type="button" class="btn-small">Edit</button>
-                                            <button type="button" class="btn-small btn-danger">Remove</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Juan Dela Cruz</td>
-                                        <td>juan@example.com</td>
-                                        <td><span class="role-chip">Editor</span></td>
-                                        <td>
-                                            <button type="button" class="btn-small">Edit</button>
-                                            <button type="button" class="btn-small btn-danger">Remove</button>
-                                        </td>
-                                    </tr>
+                                    @forelse ($admins as $admin)
+                                        @php
+                                            $firstName = $admin->admin_first_name ?? $admin->AdminFirstName ?? '';
+                                            $middleName = $admin->admin_middle_name ?? $admin->AdminMiddleName ?? '';
+                                            $lastName = $admin->admin_last_name ?? $admin->AdminLastName ?? '';
+                                            $email = $admin->admin_email ?? $admin->AdminEmail ?? '';
+                                            $roleValue = $admin->admin_role ?? $admin->AdminRole ?? '';
+                                            $displayName = trim($firstName . ' ' . ($middleName ? $middleName . ' ' : '') . $lastName);
+                                            $roleLabel = $roleValue !== '' ? ucwords(str_replace(['_', '-'], ' ', $roleValue)) : 'Unassigned';
+                                        @endphp
+                                        <tr>
+                                            <td>{{ $displayName ?: 'Unnamed Admin' }}</td>
+                                            <td>{{ $email ?: 'No email provided' }}</td>
+                                            <td>
+                                                <span class="role-chip {{ $roleValue === 'super_admin' || $roleValue === 'SuperAdmin' ? 'role-chip-primary' : '' }}">
+                                                    {{ $roleLabel }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn-small">Edit</button>
+                                                <button type="button" class="btn-small btn-danger">Remove</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4">No admin accounts have been created yet.</td>
+                                        </tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>
