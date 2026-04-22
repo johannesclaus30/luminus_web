@@ -238,3 +238,62 @@ label {
         padding: 12px;
     }
 }
+
+/* ===== ERROR ALERT ===== */
+.error-alert {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #fee2e2;
+    color: #b91c1c;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 5px solid #dc2626;
+}
+
+.error-icon {
+    flex-shrink: 0;
+}
+
+/* ===== PASSWORD FIELD WITH EYE TOGGLE ===== */
+.password-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 18px;
+}
+
+.password-wrapper .login-textfield {
+    margin-bottom: 0;  /* margin handled by wrapper */
+    padding-right: 50px; /* space for the eye button */
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 5px;
+    cursor: pointer;
+    color: #32418c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.toggle-password:hover {
+    opacity: 1;
+}
+
+.toggle-password:focus {
+    outline: 2px solid #fbd117;
+    outline-offset: 2px;
+}
