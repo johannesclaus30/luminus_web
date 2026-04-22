@@ -27,10 +27,9 @@
                 <a href="{{ url('admin/alumni_tracer') }}" class="admin-menu-buttons">NU Alumni Tracer</a>
                 <a href="{{ url('admin/messages') }}" class="admin-menu-buttons">Messages</a>
                 <a href="{{ url('admin/settings') }}" class="admin-menu-buttons">Settings</a>
-                <a href="{{ url('admin/testing') }}" class="admin-menu-buttons">Users Testing</a>
             </div>
 
-            <a href="{{ url('admin/login') }}" class="admin-menu-signout">Sign Out</a>
+            <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
         </div>
 
         <div class="events-panel admin-scrollable">

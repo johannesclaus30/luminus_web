@@ -28,10 +28,9 @@
                 <a href="alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
                 <a href="messages" class="admin-menu-buttons">Messages</a>
                 <a href="settings" class="admin-menu-buttons">Settings</a>
-                <a href="testing" class="admin-menu-current">Users Testing</a>
             </div>
 
-            <a href="login" class="admin-menu-signout">Sign Out</a>
+            <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
         </div>
         <div class="div-dashboard-container">
             <h1>Admin Testing</h1>

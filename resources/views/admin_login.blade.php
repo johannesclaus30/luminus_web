@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="/css/admin_login.css">
 
 </head>
-<body background="/assets/admin_login_background.jpg">
+{{-- <body background="/assets/admin_login_background.jpg"> --}}
+<body>
     
 <div class="layout-wrapper">
 
@@ -22,13 +23,17 @@
             <img class="luminus-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
             <p class="subtitle">Admin Account</p>
 
-            <label>Email</label>
-            <input class="login-textfield" type="email" placeholder="Enter Your Admin Email Address">
+            <form id="admin-login-form" method="POST" action="{{ route('admin.login.attempt') }}">
+                @csrf
+                <label>Email</label>
+                <input class="login-textfield" type="email" name="admin_email" value="{{ old('admin_email') }}" placeholder="Enter Your Admin Email Address" required>
 
-            <label>Password</label>
-            <input class="login-textfield" type="password" placeholder="Enter Your Password">
+                <label>Password</label>
+                <input class="login-textfield" type="password" name="password" placeholder="Enter Your Password" required>
 
-            <a href="/admin/dashboard" class="login-btn">Sign In</a>
+                <button type="submit" style="display:none;" aria-hidden="true" tabindex="-1"></button>
+                <a href="#" class="login-btn" onclick="event.preventDefault(); document.getElementById('admin-login-form').submit();">Sign In</a>
+            </form>
             
 
         </div>

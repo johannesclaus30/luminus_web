@@ -27,9 +27,8 @@
                 <a href="alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
                 <a href="messages" class="admin-menu-buttons">Messages</a>
                 <a href="settings" class="admin-menu-current">Settings</a>
-                <a href="testing" class="admin-menu-buttons">Users Testing</a>
             </div>
-            <a href="login" class="admin-menu-signout">Sign Out</a>
+            <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
         </div>
 
         <div class="div-dashboard-container admin-scrollable settings-main-panel">
@@ -267,9 +266,10 @@
                                 <p>A secure password will be generated automatically after saving.</p>
                             </div>
 
-                            <div class="form-group full-width">
+                            <div class="form-group full-width settings-file-group">
                                 <label>Photo</label>
-                                <input type="file" name="photo" accept="image/*">
+                                <input type="file" name="photo" accept="image/*" class="settings-file-input">
+                                <p class="settings-file-hint">Choose a profile photo in JPG, PNG, or WEBP format.</p>
                             </div>
 
                             <div class="form-footer full-width">
@@ -348,13 +348,12 @@
                 @default
                     <div class="settings-card settings-profile-card">
                         <div class="profile-pic-section">
-                            <img src="/assets/avatar-placeholder.png" alt="Profile">
+                            <img src="{{ $currentAdminPhotoUrl ?: '/assets/avatar-placeholder.png' }}" alt="Profile">
                             <div class="profile-pic-copy">
                                 <h3>Profile Photo</h3>
                                 <p>Use a clear headshot so the admin profile is recognizable across the system.</p>
                                 <div class="profile-action-row">
-                                    <button type="button" class="upload-btn">Upload New Photo</button>
-                                    <button type="button" class="remove-btn">Remove Photo</button>
+                                    <label class="upload-btn" for="account-photo-input">Upload New Photo</label>
                                 </div>
                             </div>
                         </div>
@@ -368,33 +367,39 @@
                             </div>
                         </div>
 
-                        <form id="account-form" class="settings-form-grid">
+                        <form id="account-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
+                            @csrf
+                            @method('PUT')
                             <div class="form-group">
                                 <label>Last Name</label>
-                                <input type="text" name="last_name" value="Maranan">
+                                <input type="text" name="admin_last_name" value="{{ old('admin_last_name', $currentAdmin->admin_last_name ?? '') }}">
                             </div>
                             <div class="form-group">
                                 <label>First Name</label>
-                                <input type="text" name="first_name" value="Cristine">
+                                <input type="text" name="admin_first_name" value="{{ old('admin_first_name', $currentAdmin->admin_first_name ?? '') }}">
                             </div>
                             <div class="form-group">
                                 <label>Middle Name</label>
-                                <input type="text" name="middle_name" value="Reyes">
+                                <input type="text" name="admin_middle_name" value="{{ old('admin_middle_name', $currentAdmin->admin_middle_name ?? '') }}">
                             </div>
                             <div class="form-group">
                                 <label>Mobile Number</label>
-                                <input type="text" name="mobile" value="0912 259 5288">
+                                <input type="text" name="phone_number" value="{{ old('phone_number', $currentAdmin->phone_number ?? '') }}">
                             </div>
                             <div class="form-group full-width">
                                 <label>Email</label>
-                                <input type="email" name="email" value="marananc@nu-lipa.edu.ph">
+                                <input type="email" name="admin_email" value="{{ old('admin_email', $currentAdmin->admin_email ?? '') }}">
+                            </div>
+                            <div class="form-group full-width settings-file-group">
+                                <label>Profile Photo</label>
+                                <input id="account-photo-input" type="file" name="photo" accept="image/*" class="settings-file-input">
+                                <p class="settings-file-hint">Uploading a new photo will replace the current admin photo in Supabase.</p>
+                            </div>
+                            <div class="form-footer full-width">
+                                <button type="button" class="btn-discard" onclick="resetForm('account-form')">Discard Changes</button>
+                                <button type="submit" class="btn-save">Save Profile Information</button>
                             </div>
                         </form>
-
-                        <div class="form-footer">
-                            <button type="button" class="btn-discard" onclick="resetForm('account-form')">Discard Changes</button>
-                            <button type="button" class="btn-save" onclick="fakeSave('Profile saved')">Save Profile Information</button>
-                        </div>
                     </div>
             @endswitch
         </div>

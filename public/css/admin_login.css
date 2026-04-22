@@ -2,7 +2,13 @@
 
 body {
     font-family: 'Poppins', sans-serif !important;
-    background-color: #34218c;
+
+    background-image: url("/assets/admin_login_background.jpg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover; /* ✅ BEST OPTION */
+    background-color: #ffffff;
+
     display: flex;
     justify-content: center;
     align-items: center;
@@ -45,21 +51,31 @@ body {
     align-items: center;
 }
 
+/* Changed from .admin-login-form to #admin-login-form to match your HTML */
+#admin-login-form {
+    width: 85%; /* Sets a consistent width for the form container */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Aligns text left */
+    margin: 0 auto; /* Centers the form itself */
+}
+
 /* LABEL */
 label {
     color: #ffffff;
     font-size: 20px;
-    margin: 5px auto 10px;
-    width: 85%;
+    margin: 5px 0 10px 0; /* Removed auto margins so it aligns left */
+    width: 100%;
     display: block;
     font-weight: 500;
 }
 
 /* TEXT FIELD */
 .login-textfield {
-    width: 80%;
+    width: 100%;
+    box-sizing: border-box; /* CRITICAL: Keeps padding inside the 100% width */
     padding: 14px 16px;
-    margin: 0 auto 18px;
+    margin: 0 0 18px 0; /* Removed auto margins */
     border: none;
     border-radius: 10px;
     background-color: #ffffff;
@@ -78,9 +94,10 @@ label {
 
 /* BUTTON */
 .login-btn {
-    width: 80%;
+    width: 100%;
+    box-sizing: border-box; /* CRITICAL: Keeps padding inside the 100% width */
     padding: 14px;
-    margin: 25px auto 0;
+    margin: 25px 0 0 0; /* Removed auto margins */
     background-color: #fbd117;
     color: #32418c;
     border-radius: 10px;
@@ -88,15 +105,13 @@ label {
     font-family: 'Poppins', sans-serif;
     font-weight: 700;
     cursor: pointer;
-    display: block;
     box-shadow: 0px 3px 6px rgba(0,0,0,0.15);
     transition: 0.2s;
-    
     text-decoration: none;
     text-align: center;
     display: block;
-
 }
+
 .login-btn:hover {
     background-color: #e0bd0c;
 }
@@ -212,13 +227,13 @@ label {
     }
 
     .login-textfield {
-        width: 90%;
+        width: 94%;
         font-size: 16px;
         padding: 12px;
     }
 
     .login-btn {
-        width: 92%;
+        width: 94%;
         font-size: 18px;
         padding: 12px;
     }

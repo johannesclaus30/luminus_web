@@ -6,113 +6,107 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 
-// ADMINS
-Route::get('/admin/directory', [AdminController::class, 'index'])
-    ->name('admin.directory');
+Route::prefix('admin')->group(function () {
+    Route::get('/login', [AdminController::class, 'showLogin'])
+        ->name('admin.login');
 
-Route::post('/admin/alumni', [AdminController::class, 'storeAlumni'])
-    ->name('admin.alumni.store');
+    Route::post('/login', [AdminController::class, 'authenticate'])
+        ->name('admin.login.attempt');
 
-Route::post('/admin/settings', [AdminController::class, 'store'])
-    ->name('admin.settings.store');
+    Route::get('/logout', [AdminController::class, 'logout'])
+        ->name('admin.logout');
 
-// EVENTS
-Route::get('/admin/events', [EventController::class, 'index'])
-    ->name('events.index');
+    Route::middleware('admin.auth')->group(function () {
+        Route::get('/directory', [AdminController::class, 'index'])
+            ->name('admin.directory');
 
-Route::get('/admin/events/create', [EventController::class, 'create'])
-    ->name('events.create');
+        Route::post('/alumni', [AdminController::class, 'storeAlumni'])
+            ->name('admin.alumni.store');
 
-Route::post('/admin/events', [EventController::class, 'store'])
-    ->name('events.store');
+        Route::post('/settings', [AdminController::class, 'store'])
+            ->name('admin.settings.store');
 
-Route::get('/admin/events/{event}/edit', [EventController::class, 'edit'])
-    ->name('events.edit');
+        Route::put('/settings', [AdminController::class, 'updateProfile'])
+            ->name('admin.settings.update');
 
-Route::put('/admin/events/{event}', [EventController::class, 'update'])
-    ->name('events.update');
+        Route::get('/events', [EventController::class, 'index'])
+            ->name('events.index');
 
-// Add this specific line to enable the "Archive" button
-Route::delete('/admin/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
-    
+        Route::get('/events/create', [EventController::class, 'create'])
+            ->name('events.create');
 
-// PERKS
-Route::get('/admin/perks', [PerksController::class, 'index'])
-    ->name('perks.index');
+        Route::post('/events', [EventController::class, 'store'])
+            ->name('events.store');
 
-Route::get('/admin/perks/create', [PerksController::class, 'create'])
-    ->name('perks.create');
+        Route::get('/events/{event}/edit', [EventController::class, 'edit'])
+            ->name('events.edit');
 
-Route::post('/admin/perks', [PerksController::class, 'store'])
-    ->name('perks.store');
+        Route::put('/events/{event}', [EventController::class, 'update'])
+            ->name('events.update');
 
-// View archived perks
-Route::get('/admin/perks/archived', [PerksController::class, 'archived'])
-    ->name('perks.archived');
+        Route::delete('/events/{event}', [EventController::class, 'destroy'])
+            ->name('events.destroy');
 
-// Restore (unarchive) a perk
-Route::put('/admin/perks/{perk}/restore', [PerksController::class, 'restore'])
-    ->name('perks.restore');
+        Route::get('/perks', [PerksController::class, 'index'])
+            ->name('perks.index');
 
-// Delete (archive) a perk
-Route::delete('/admin/perks/{perk}', [PerksController::class, 'destroy'])
-    ->name('perks.destroy');
+        Route::get('/perks/create', [PerksController::class, 'create'])
+            ->name('perks.create');
 
-Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
-    ->name('perks.edit');
-    
-Route::put('/perks/{perk}', [PerksController::class, 'update'])
-    ->name('perks.update');
+        Route::post('/perks', [PerksController::class, 'store'])
+            ->name('perks.store');
 
-// ANNOUNCEMENTS
-Route::get('/admin/announcements', [AnnouncementController::class, 'index'])
-    ->name('announcements.index');
+        Route::get('/perks/archived', [PerksController::class, 'archived'])
+            ->name('perks.archived');
 
-Route::get('/admin/announcements/create', [AnnouncementController::class, 'create'])
-    ->name('announcements.create');
+        Route::put('/perks/{perk}/restore', [PerksController::class, 'restore'])
+            ->name('perks.restore');
 
-Route::post('/admin/announcements', [AnnouncementController::class, 'store'])
-    ->name('announcements.store');
+        Route::delete('/perks/{perk}', [PerksController::class, 'destroy'])
+            ->name('perks.destroy');
 
-    // Show the edit form
-Route::get('/admin/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])
-    ->name('announcements.edit');
+        Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
+            ->name('perks.edit');
 
-// Process the update (use PUT or PATCH)
-Route::put('/admin/announcements/{announcement}', [AnnouncementController::class, 'update'])
-    ->name('announcements.update');
+        Route::put('/perks/{perk}', [PerksController::class, 'update'])
+            ->name('perks.update');
 
+        Route::get('/announcements', [AnnouncementController::class, 'index'])
+            ->name('announcements.index');
 
-    // OTHER
+        Route::get('/announcements/create', [AnnouncementController::class, 'create'])
+            ->name('announcements.create');
+
+        Route::post('/announcements', [AnnouncementController::class, 'store'])
+            ->name('announcements.store');
+
+        Route::get('/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])
+            ->name('announcements.edit');
+
+        Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])
+            ->name('announcements.update');
+
+        Route::get('/dashboard', function () {
+            return view('admin_dashboard');
+        });
+
+        Route::get('/alumni_tracer', function () {
+            return view('admin_alumni_tracer');
+        });
+
+        Route::get('/messages', function () {
+            return view('admin_messages');
+        });
+
+        Route::get('/settings', [AdminController::class, 'settings'])
+            ->name('admin.settings');
+
+    });
+});
+
+// OTHER
 
 Route::get('/', function () {
     return view('welcome');
-});
-
-Route::get('/admin/login', function () {
-    return view('admin_login');
-});
-
-Route::get('/admin/dashboard', function () {
-    return view('admin_dashboard');
-});
-
-// Route::get('/admin/directory', function () {
-//     return view('admin_directory');
-// });
-
-Route::get('/admin/alumni_tracer', function () {
-    return view('admin_alumni_tracer');
-});
-
-Route::get('/admin/messages', function () {
-    return view('admin_messages');
-});
-
-Route::get('/admin/settings', [AdminController::class, 'settings'])
-    ->name('admin.settings');
-
-Route::get('/admin/testing', function () {
-    return view('admin_testing');
 });
 
