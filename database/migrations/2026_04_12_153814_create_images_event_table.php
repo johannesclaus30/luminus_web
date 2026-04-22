@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('images_event', function (Blueprint $table) {
-            $table->id('ImgEvent_ID'); // Primary Key from ERD
-            $table->foreignId('Events_ID')->constrained('events', 'Events_ID')->onDelete('cascade');
-            $table->string('ImagePath');
-            $table->timestamp('CreatedAt')->useCurrent(); // Matches your CreatedAt: TIMESTAMP
+        Schema::create('images_events', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('event_id')->constrained('events')->cascadeOnDelete();
+            $table->string('image_path');
+            $table->timestamps();
         });
     }
 
@@ -24,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('images_event');
+        Schema::dropIfExists('images_events');
     }
 };

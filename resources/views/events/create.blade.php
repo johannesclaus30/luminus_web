@@ -2,44 +2,7 @@
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/events.css') }}">
-    <style>
-        .capacity-col { flex: 0.8; display: flex; flex-direction: column; min-width: 0; }
-        
-        /* Grid layout for neat, organized previews */
-        #attachment-preview-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); 
-            gap: 10px; 
-            margin-bottom: 15px; 
-            width: 100%;
-        }
-
-        .attachment-item { 
-            position: relative; 
-            width: 80px; 
-            height: 80px; 
-            border-radius: 8px; 
-            overflow: hidden; 
-            border: 1px solid #ddd;
-            background-color: #f9f9f9;
-        }
-
-        .attachment-img { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; /* Prevents distortion */
-        }
-
-        .remove-attachment-btn {
-            position: absolute; top: 4px; right: 4px; background: rgba(255,0,0,0.9); color: white;
-            border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;
-            z-index: 10;
-        }
-        
-        .remove-attachment-btn:hover { background: red; }
-        .file-limit-info { font-size: 12px; color: #666; margin-top: 5px; }
-    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 @endpush
 
 @section('content')
@@ -73,7 +36,7 @@
                 </div>
             @endif
 
-            <form action="{{ $event->exists ? route('events.update', $event->Events_ID) : route('events.store') }}" 
+            <form action="{{ $event->exists ? route('events.update', $event) : route('events.store') }}" 
                   method="POST" 
                   enctype="multipart/form-data" 
                   id="eventForm">
@@ -81,45 +44,122 @@
                 @if($event->exists) @method('PUT') @endif
                 
                 <div id="deleted-media-container"></div>
+
+                <div class="form-notes">
+                    <div><strong>Required:</strong> event title, event mode, event dates, max capacity, and description.</div>
+                    <div><strong>On-site / hybrid:</strong> fill in the venue address and pin it on the map. Suggestions will appear as you type.</div>
+                    <div><strong>Online / hybrid:</strong> choose the platform and add the platform URL if needed.</div>
+                </div>
                 
                 <div class="events-details-layout">
                     <div class="form-left-panel">
                         <label>Event Title</label>
-                        <input type="text" name="Title" class="textarea-style" value="{{ old('Title', $event->Title) }}" required>
-                        
-                        <div class="location-date-row">
+                        <input type="text" name="title" class="textarea-style" value="{{ old('title', $event->title) }}" required>
+                        <div class="field-note">Use the official event title shown to attendees.</div>
+
+                        <div class="location-date-row equal-columns-row">
                             <div class="location-col">
-                                <label>Event Location</label>
-                                <div class="input-with-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                                    <input type="text" name="Location" class="textarea-style pl-icon" placeholder="Select Location" value="{{ old('Location', $event->Location) }}" required>
-                                </div>
+                                <label>Event Mode</label>
+                                @php
+                                    $selectedEventType = old('event_type', $event->event_type);
+                                @endphp
+                                <select name="event_type" class="textarea-style" required>
+                                    <option value="" disabled {{ $selectedEventType ? '' : 'selected' }}>Choose event mode</option>
+                                    @foreach (['In-Person' => 'On-Site / Face to Face', 'Online' => 'Online / Virtual', 'Hybrid' => 'Hybrid'] as $eventValue => $eventLabel)
+                                        <option value="{{ $eventValue }}" {{ $selectedEventType === $eventValue ? 'selected' : '' }}>{{ $eventLabel }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             <div class="capacity-col">
                                 <label>Max Capacity</label>
-                                <input type="number" name="MaxCapacity" class="textarea-style" placeholder="e.g. 100" min="1" value="{{ old('MaxCapacity', $event->MaxCapacity) }}" required style="padding: 10px 15px !important; box-sizing: border-box !important;">
+                                <input type="number" name="max_capacity" class="textarea-style" placeholder="e.g. 100" min="1" value="{{ old('max_capacity', $event->max_capacity) }}" required style="padding: 10px 15px !important; box-sizing: border-box !important;">
                             </div>
                         </div>
-
+                        
                         <div class="location-date-row">
                             <div class="date-col">
                                 <label>Event Date</label>
                                 <div class="date-inputs-row">
                                     <p>From</p>
                                     <div class="date-input-wrapper">
-                                        <input type="date" name="StartDate" value="{{ old('StartDate', $event->StartDate ? \Carbon\Carbon::parse($event->StartDate)->format('Y-m-d') : '') }}" required>
+                                        <input type="date" name="start_date" value="{{ old('start_date', $event->start_date ? $event->start_date->format('Y-m-d') : '') }}" required>
                                     </div>
                                     <p>To</p>
                                     <div class="date-input-wrapper">
-                                        <input type="date" name="EndDate" value="{{ old('EndDate', $event->EndDate ? \Carbon\Carbon::parse($event->EndDate)->format('Y-m-d') : '') }}" required>
+                                        <input type="date" name="end_date" value="{{ old('end_date', $event->end_date ? $event->end_date->format('Y-m-d') : '') }}" required>
                                     </div>
+                                </div>
+                                <div class="field-note">Choose the start and end dates for the event schedule.</div>
+                            </div>
+                        </div>
+
+                        <div class="section-card form-section venue-card" id="venueSection">
+                            <div class="venue-card-header">
+                                <div>
+                                    <h3 class="section-card-title">On-Site Venue</h3>
+                                    <p class="section-card-subtitle">Use this for face-to-face or hybrid events. The map and address stay synced.</p>
+                                </div>
+                            </div>
+
+                            <div class="venue-input-wrap">
+                                <label for="venueAddress">Venue Address</label>
+                                <input
+                                    type="text"
+                                    name="venue_address"
+                                    id="venueAddress"
+                                    class="textarea-style"
+                                    placeholder="Start typing a location or exact address"
+                                    value="{{ old('venue_address', optional($event->venue)->address) }}"
+                                >
+                                <div class="field-note">Type a place name or exact address to search nearby results.</div>
+                                <div id="venueSuggestions" class="venue-suggestions hidden-section"></div>
+                            </div>
+
+                            <label for="venueName">Venue Name</label>
+                            <input
+                                type="text"
+                                name="venue_name"
+                                id="venueName"
+                                class="textarea-style"
+                                placeholder="Optional venue name"
+                                value="{{ old('venue_name', optional($event->venue)->name) }}"
+                            >
+                            <div class="field-note">Please set the actual name of the event venue. This will not auto-fill.</div>
+
+                            <input type="hidden" name="venue_latitude" id="venueLatitude" value="{{ old('venue_latitude', optional($event->venue)->latitude) }}">
+                            <input type="hidden" name="venue_longitude" id="venueLongitude" value="{{ old('venue_longitude', optional($event->venue)->longitude) }}">
+
+                            <div id="venueMap" class="venue-map"></div>
+                            <div class="venue-status" id="venueStatus">Search an address or click the map to pin the venue.</div>
+                        </div>
+
+                        <div class="section-card form-section hidden-section" id="onlineSection">
+                            <div class="section-card-header">
+                                <div>
+                                    <h3 class="section-card-title">Online Details</h3>
+                                    <p class="section-card-subtitle">Use this for virtual events. Hidden when the event is on-site only.</p>
+                                </div>
+                            </div>
+
+                            <div class="location-date-row equal-columns-row">
+                                <div class="location-col">
+                                    <label>Platform</label>
+                                    <input type="text" name="platform" id="platformField" class="textarea-style" placeholder="Zoom, Google Meet, Facebook Live, and so on" value="{{ old('platform', $event->platform) }}">
+                                    <div class="field-note">Select the online service or channel where the event will happen.</div>
+                                </div>
+
+                                <div class="capacity-col">
+                                    <label>Platform URL</label>
+                                    <input type="url" name="platform_url" id="platformUrlField" class="textarea-style" placeholder="https://..." value="{{ old('platform_url', $event->platform_url) }}">
+                                    <div class="field-note">Add the meeting link, livestream URL, or event page if available.</div>
                                 </div>
                             </div>
                         </div>
 
                         <label>Content</label>
-                        <textarea name="Description" class="textarea-style textarea-description event-content" required>{{ old('Description', $event->Description) }}</textarea>
+                        <textarea name="description" class="textarea-style textarea-description event-content" required>{{ old('description', $event->description) }}</textarea>
+                        <div class="field-note">Provide the event description, agenda, or important instructions for attendees.</div>
                     </div>
 
                     <div class="form-right-panel">
@@ -127,11 +167,11 @@
                             <h3 class="attachments-title">Attachments (Max 5)</h3>
                             
                             <div id="attachment-preview-container">
-                                @if($event->images)
+                                @if($event->exists && $event->images)
                                     @foreach($event->images as $image)
                                         <div class="attachment-item existing-image">
-                                            <img src="{{ asset('storage/' . $image->ImagePath) }}" class="attachment-img">
-                                            <button type="button" class="remove-attachment-btn" onclick="removeExistingImage(this, {{ $image->ImgEvent_ID }})">&times;</button>
+                                            <img src="{{ $image->image_url }}" class="attachment-img">
+                                            <button type="button" class="remove-attachment-btn" onclick="removeExistingImage(this, {{ $image->id }})">&times;</button>
                                         </div>
                                     @endforeach
                                 @endif
@@ -159,6 +199,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     // 1. Handles removing images already in the database
     function removeExistingImage(buttonElement, imageId) {
@@ -177,6 +218,125 @@
         const previewContainer = document.getElementById('attachment-preview-container');
         const MAX_FILES = 5;
         const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+        const eventTypeField = document.querySelector('[name="event_type"]');
+        const venueAddressField = document.getElementById('venueAddress');
+        const venueNameField = document.getElementById('venueName');
+        const venueLatitudeField = document.getElementById('venueLatitude');
+        const venueLongitudeField = document.getElementById('venueLongitude');
+        const venueSuggestions = document.getElementById('venueSuggestions');
+        const venueSection = document.getElementById('venueSection');
+        const onlineSection = document.getElementById('onlineSection');
+        const platformField = document.getElementById('platformField');
+        const platformUrlField = document.getElementById('platformUrlField');
+        const venueStatus = document.getElementById('venueStatus');
+        const venueMapElement = document.getElementById('venueMap');
+        const defaultCenter = [14.5995, 120.9842];
+        const existingLatitude = parseFloat(venueLatitudeField?.value || '');
+        const existingLongitude = parseFloat(venueLongitudeField?.value || '');
+        const existingAddress = (venueAddressField?.value || '').trim();
+        let venueMap = null;
+        let venueMarker = null;
+        let addressDebounce = null;
+        let suggestionDebounce = null;
+        let lastSuggestionQuery = '';
+
+        const setSectionVisibility = () => {
+            const mode = eventTypeField?.value;
+            const showVenue = ['In-Person', 'Hybrid'].includes(mode);
+            const showOnline = ['Online', 'Hybrid'].includes(mode);
+
+            venueSection?.classList.toggle('hidden-section', !showVenue);
+            onlineSection?.classList.toggle('hidden-section', !showOnline);
+
+            if (venueAddressField) {
+                venueAddressField.required = showVenue;
+                venueAddressField.disabled = !showVenue;
+            }
+
+            if (venueNameField) {
+                venueNameField.disabled = !showVenue;
+            }
+
+            if (platformField) {
+                platformField.required = showOnline;
+                platformField.disabled = !showOnline;
+            }
+
+            if (platformUrlField) {
+                platformUrlField.disabled = !showOnline;
+            }
+
+            if (venueMapElement) {
+                venueMapElement.style.display = showVenue ? 'block' : 'none';
+            }
+
+            if (!showVenue) {
+                venueSuggestions?.classList.add('hidden-section');
+                venueSuggestions.innerHTML = '';
+            }
+
+            venueStatus.textContent = showVenue
+                ? 'Search an address or click the map to pin the venue.'
+                : 'Venue details are hidden for this event mode.';
+        };
+
+        const renderVenueSuggestions = (items) => {
+            if (!venueSuggestions) {
+                return;
+            }
+
+            venueSuggestions.innerHTML = '';
+
+            if (!items.length) {
+                venueSuggestions.classList.add('hidden-section');
+                return;
+            }
+
+            items.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'venue-suggestion-item';
+                row.textContent = item.display_name;
+                row.dataset.lat = item.lat;
+                row.dataset.lon = item.lon;
+                row.dataset.name = item.display_name;
+
+                row.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    venueAddressField.value = item.display_name;
+                    venueNameField.value = venueNameField.value.trim() || item.display_name;
+                    venueSuggestions.classList.add('hidden-section');
+                    venueSuggestions.innerHTML = '';
+                    setVenuePoint(parseFloat(item.lat), parseFloat(item.lon), false);
+                    venueStatus.textContent = 'Venue selected from suggestions.';
+                });
+
+                venueSuggestions.appendChild(row);
+            });
+
+            venueSuggestions.classList.remove('hidden-section');
+        };
+
+        const searchVenueSuggestions = (query) => {
+            const trimmedQuery = query.trim();
+
+            if (!trimmedQuery || trimmedQuery.length < 2 || trimmedQuery === lastSuggestionQuery) {
+                if (!trimmedQuery) {
+                    venueSuggestions?.classList.add('hidden-section');
+                    venueSuggestions.innerHTML = '';
+                }
+
+                return;
+            }
+
+            lastSuggestionQuery = trimmedQuery;
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmedQuery)}`)
+                .then((response) => response.json())
+                .then((results) => renderVenueSuggestions(results))
+                .catch(() => {
+                    venueSuggestions?.classList.add('hidden-section');
+                });
+        };
 
         if (triggerBtn && fileInput) {
             triggerBtn.addEventListener('click', function(e) {
@@ -221,6 +381,127 @@
                 reader.readAsDataURL(file);
             });
         });
+
+        if (venueMapElement && window.L) {
+            const mapCenter = Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)
+                ? [existingLatitude, existingLongitude]
+                : defaultCenter;
+
+            venueMap = L.map('venueMap').setView(mapCenter, Number.isFinite(existingLatitude) ? 16 : 11);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors',
+            }).addTo(venueMap);
+
+            venueMarker = L.marker(mapCenter, { draggable: true }).addTo(venueMap);
+
+            const setVenuePoint = (lat, lng, updateAddress = true) => {
+                venueLatitudeField.value = lat.toFixed(6);
+                venueLongitudeField.value = lng.toFixed(6);
+                venueMarker.setLatLng([lat, lng]);
+                venueMap.setView([lat, lng], 16);
+
+                if (updateAddress) {
+                    venueStatus.textContent = 'Resolving address from map pin...';
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`)
+                        .then((response) => response.json())
+                        .then((data) => {
+                            const address = data.display_name || '';
+                            if (address) {
+                                venueAddressField.value = address;
+                                venueStatus.textContent = 'Address updated from map pin.';
+                            } else {
+                                venueStatus.textContent = 'Unable to resolve an address for that pin.';
+                            }
+                        })
+                        .catch(() => {
+                            venueStatus.textContent = 'Address lookup failed. You can still type the exact address manually.';
+                        });
+                }
+            };
+
+            const geocodeAddress = (address) => {
+                const query = address.trim();
+
+                if (!query) {
+                    return;
+                }
+
+                venueStatus.textContent = 'Looking up the typed address...';
+
+                fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`)
+                    .then((response) => response.json())
+                    .then((results) => {
+                        if (!results.length) {
+                            venueStatus.textContent = 'No map result found for that address. Try a more exact address.';
+                            return;
+                        }
+
+                        const place = results[0];
+                        const lat = parseFloat(place.lat);
+                        const lng = parseFloat(place.lon);
+                        venueAddressField.value = place.display_name;
+                        venueStatus.textContent = 'Map updated from typed address.';
+                        setVenuePoint(lat, lng, false);
+                    })
+                    .catch(() => {
+                        venueStatus.textContent = 'Address lookup failed. The venue can still be submitted with the typed address.';
+                    });
+            };
+
+            venueMarker.on('dragend', () => {
+                const { lat, lng } = venueMarker.getLatLng();
+                setVenuePoint(lat, lng, true);
+            });
+
+            venueMap.on('click', (event) => {
+                setVenuePoint(event.latlng.lat, event.latlng.lng, true);
+            });
+
+            venueAddressField?.addEventListener('blur', () => {
+                const currentType = eventTypeField?.value;
+
+                if (['In-Person', 'Hybrid'].includes(currentType)) {
+                    clearTimeout(addressDebounce);
+                    addressDebounce = setTimeout(() => geocodeAddress(venueAddressField.value), 300);
+                }
+            });
+
+            venueAddressField?.addEventListener('input', () => {
+                clearTimeout(suggestionDebounce);
+                const currentType = eventTypeField?.value;
+
+                if (!['In-Person', 'Hybrid'].includes(currentType)) {
+                    venueSuggestions?.classList.add('hidden-section');
+                    venueSuggestions.innerHTML = '';
+                    return;
+                }
+
+                suggestionDebounce = setTimeout(() => searchVenueSuggestions(venueAddressField.value), 300);
+            });
+
+            venueAddressField?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    geocodeAddress(venueAddressField.value);
+                }
+            });
+
+            if (Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)) {
+                venueMarker.setLatLng([existingLatitude, existingLongitude]);
+                venueMap.setView([existingLatitude, existingLongitude], 16);
+            } else if (existingAddress) {
+                geocodeAddress(existingAddress);
+            }
+        }
+
+        const syncVenueRequirement = () => {
+            setSectionVisibility();
+        };
+
+        eventTypeField?.addEventListener('change', syncVenueRequirement);
+        syncVenueRequirement();
     });
 </script>
 @endpush

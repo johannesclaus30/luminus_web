@@ -6,20 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class ImagesEvent extends Model
 {
-    // 1. Tell Laravel the exact table name from your ERD
-    protected $table = 'images_event';
+    protected $table = 'images_events';
 
-    // 2. Define the custom Primary Key
-    protected $primaryKey = 'ImgEvent_ID';
-
-    // 3. Disable standard timestamps since you're using a manual 'CreatedAt'
-    public $timestamps = false;
-
-    // 4. List the columns that are allowed to be filled
     protected $fillable = [
-        'Events_ID',
-        'ImagePath',
-        'CreatedAt'
+        'event_id',
+        'image_path',
+    ];
+
+    protected $casts = [
+        'event_id' => 'integer',
     ];
 
     /**
@@ -27,6 +22,21 @@ class ImagesEvent extends Model
      */
     public function event()
     {
-        return $this->belongsTo(Event::class, 'Events_ID', 'Events_ID');
+        return $this->belongsTo(Event::class, 'event_id', 'id');
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        $baseUrl = rtrim((string) config('filesystems.disks.supabase_admin.url'), '/');
+
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        return $baseUrl . '/' . ltrim($this->image_path, '/');
     }
 }

@@ -47,18 +47,34 @@
                     <div class="events-container">
                         <div class="events-title-description">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <p class="events-title-text" style="margin: 0;">{{ $event->Title }}</p>
+                                <p class="events-title-text" style="margin: 0;">{{ $event->title }}</p>
                                 <i>
-                                    <span class="status-badge {{ $event->Status == 'Active' ? 'badge-active' : 'badge-archived' }}">
-                                    {{ $event->Status }}
+                                    <span class="status-badge {{ $event->status == 'Active' ? 'badge-active' : 'badge-archived' }}">
+                                    {{ $event->status }}
                                 </span>
                                 </i>
                                 
                             </div>
 
                             <p class="events-description-text">
-                                <strong>Location:</strong> {{ $event->Location }} <br>
-                                <strong>Date:</strong> {{ \Carbon\Carbon::parse($event->StartDate)->format('F d, Y') }}
+                                <strong>Type:</strong> {{ $event->event_type }} <br>
+                                <strong>Platform:</strong> {{ $event->platform ?: 'N/A' }} <br>
+                                <strong>Platform URL:</strong> {{ $event->platform_url ?: 'N/A' }} <br>
+                                <strong>Venue:</strong>
+                                @if ($event->venue)
+                                    {{ $event->venue->name }}<br>
+                                    {{ $event->venue->address }}<br>
+                                    <small>{{ $event->venue->latitude }}, {{ $event->venue->longitude }}</small>
+                                @else
+                                    N/A
+                                @endif
+                                <br>
+                                <strong>Date:</strong> {{ $event->start_date ? $event->start_date->format('F d, Y') : 'N/A' }} <br>
+                                <strong>Uploaded by:</strong>
+                                @if ($event->admin)
+                                    {{ $event->admin->AdminFirstName }} {{ $event->admin->AdminLastName }}
+                                @endif
+                                (Admin ID: {{ $event->admin_id }})
                             </p>
                             </div>
                         
@@ -66,7 +82,7 @@
                             <p class="events-image-text">Attachments:</p>
                             <div class="attachment-preview-wrapper" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start;">
                                 @foreach($event->images as $image)
-                                    <img src="{{ asset('storage/' . $image->ImagePath) }}" 
+                                    <img src="{{ $image->image_url }}" 
                                          alt="Event Image" 
                                          style="width: 80px; height: 80px; object-fit: cover; border-radius: 5px; cursor: pointer;"
                                          onclick="openModal(this.src)">
@@ -77,13 +93,13 @@
                         <div class="events-tools">
                             <div class="events-tools-analytics">
                                 <span>Capacity</span>
-                                <p>👥 {{ $event->MaxCapacity }} Max</p>
+                                <p>👥 {{ $event->max_capacity }} Max</p>
                             </div>
 
-                            <a href="{{ route('events.edit', $event->Events_ID) }}" class="events-edit-archive-btn edit-btn">Edit</a>
+                            <a href="{{ route('events.edit', $event) }}" class="events-edit-archive-btn edit-btn">Edit</a>
                             <a href="#" class="events-edit-archive-btn manage-btn">Attendees</a>
                             
-                            <form action="{{ route('events.destroy', $event->Events_ID) }}" method="POST" onsubmit="return confirm('Archive this event?');">
+                            <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Archive this event?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="events-edit-archive-btn archive-btn" style="width: 100%; border: none; cursor: pointer;">Archive</button>
