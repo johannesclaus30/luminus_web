@@ -24,7 +24,15 @@
         <div class="announcements-create-container">
             <h2>Edit Announcement</h2>
 
-            <form action="{{ route('announcements.update', $announcement->Announcement_ID) }}" method="POST" enctype="multipart/form-data" id="announcementForm">
+            @if ($errors->any())
+                <div class="upload-status status-error" style="margin-bottom: 16px;">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
+
+            <form action="{{ route('announcements.update', $announcement->id) }}" method="POST" enctype="multipart/form-data" id="announcementForm">
                 @csrf
                 @method('PUT')
 
@@ -33,10 +41,14 @@
                 <div class="announcements-details">
                     <div class="new-announcements-title-desc">
                         <label>Announcement Title</label>
-                        <input type="text" name="AnnouncementTitle" class="textarea-style" value="{{ old('AnnouncementTitle', $announcement->AnnouncementTitle) }}" required>
+                        <input type="text" name="title" class="textarea-style" value="{{ old('title', $announcement->title) }}" required>
                         
                         <label>Announcement Description</label>
-                        <textarea name="AnnouncementDescription" class="textarea-style textarea-description" required>{{ old('AnnouncementDescription', $announcement->AnnouncementDescription) }}</textarea>
+                        <textarea name="announcement_description" class="textarea-style textarea-description" required>{{ old('announcement_description', $announcement->announcement_description) }}</textarea>
+
+                        <label>Schedule Post (optional)</label>
+                        <input type="datetime-local" name="scheduled_post_at" class="textarea-style" value="{{ old('scheduled_post_at', optional($announcement->scheduled_post_at)->format('Y-m-d\TH:i')) }}">
+                        <small style="display:block; margin-top:6px; color:#666;">Leave blank to keep this announcement unscheduled.</small>
                         
                         <button type="submit" class="announcements-submit-btn">Update Announcement</button>
                         <a href="{{ route('announcements.index') }}" style="display:block; text-align:center; margin-top:10px; color:#666; text-decoration:none;">Cancel</a>
@@ -44,20 +56,19 @@
 
                     <div class="new-announcements-image">
                         
-                        {{-- 1. IMAGES SECTION --}}
-                        <label>Attach New Images (up to 5 total)</label>
+                        <label>Attach New Images Only (up to 5 total, max 5MB each)</label>
                         <label class="image-upload-box" id="image-box">
                             @php
-                                $existingImages = $announcement->images->filter(fn($i) => in_array(strtolower(pathinfo($i->ImagePath, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp']));
+                                $existingImages = $announcement->images->filter(fn($i) => in_array(strtolower(pathinfo($i->image_path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']));
                             @endphp
                             
                             @if($existingImages->count() > 0)
                                 <span class="current-label">Currently Uploaded (Click 'x' to remove):</span>
                                 <div class="preview-container" style="margin-bottom: 10px; pointer-events: auto;">
                                     @foreach($existingImages as $img)
-                                        <div class="existing-item-container" id="media-{{ $img->ImgAnnouncement_ID }}">
-                                            <img src="{{ asset('storage/' . $img->ImagePath) }}" class="preview-item" style="width:60px; height:60px; object-fit:cover;">
-                                            <button type="button" class="remove-media-btn" onclick="removeExistingMedia(event, {{ $img->ImgAnnouncement_ID }})">&times;</button>
+                                        <div class="existing-item-container" id="media-{{ $img->id }}">
+                                            <img src="{{ asset('storage/' . $img->image_path) }}" class="preview-item" style="width:60px; height:60px; object-fit:cover;">
+                                            <button type="button" class="remove-media-btn" onclick="removeExistingMedia(event, {{ $img->id }})">&times;</button>
                                         </div>
                                     @endforeach
                                 </div>
@@ -70,32 +81,6 @@
                                 <div id="image-status" class="upload-status status-default">0 new items selected</div>
                             </div>
                             <div id="image-preview-container" class="preview-container"></div>
-                        </label>
-
-                        {{-- 2. VIDEO SECTION --}}
-                        <label style="margin-top: 20px; display: block;">Attach New Video (1 only)</label>
-                        <label class="image-upload-box" id="video-box">
-                            @php
-                                $existingVideo = $announcement->images->filter(fn($i) => in_array(strtolower(pathinfo($i->ImagePath, PATHINFO_EXTENSION)), ['mp4', 'webm', 'ogg']))->first();
-                            @endphp
-
-                            @if($existingVideo)
-                                <div class="existing-item-container" id="media-{{ $existingVideo->ImgAnnouncement_ID }}">
-                                    <span class="current-label">Current Video:</span>
-                                    <video class="video-preview" style="max-width:120px; max-height:80px;">
-                                        <source src="{{ asset('storage/' . $existingVideo->ImagePath) }}">
-                                    </video>
-                                    <button type="button" class="remove-media-btn" onclick="removeExistingMedia(event, {{ $existingVideo->ImgAnnouncement_ID }})">&times;</button>
-                                </div>
-                                <hr style="width:100%; border:0; border-top:1px solid #eee;">
-                            @endif
-
-                            <div class="image-upload-box-content">
-                                <span class="upload-prompt-text">Click to change video</span>
-                                <input type="file" id="video-input" name="video" accept="video/mp4,video/webm,video/ogg" hidden>
-                                <div id="video-status" class="upload-status status-default">No new video selected</div>
-                            </div>
-                            <div id="video-preview-container" class="preview-container"></div>
                         </label>
 
                     </div>
@@ -165,18 +150,8 @@
         statusId: 'image-status',
         maxCount: 5,
         existingCount: {{ $existingImages->count() }},
-        maxSizeMB: 2,
+        maxSizeMB: 5,
         isVideo: false
-    });
-
-    handleFilePreview({
-        inputId: 'video-input',
-        containerId: 'video-preview-container',
-        statusId: 'video-status',
-        maxCount: 1,
-        existingCount: {{ $existingVideo ? 1 : 0 }},
-        maxSizeMB: 20,
-        isVideo: true
     });
 
     // Mark Existing Media for Deletion

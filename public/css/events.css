@@ -65,7 +65,8 @@ button {
 
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 20px;
 }
 
@@ -73,7 +74,9 @@ button {
     padding-top: 0px;
     margin-top: 0px;
     padding-left: 15px;
-    width: 350px;
+    flex: 1 1 320px;
+    min-width: 0;
+    width: auto;
 }
 
 .events-title-text {
@@ -96,12 +99,15 @@ button {
 .events-image-container {
     background-color: #F9F9F9;
     height: 300px;
-    width: 380px;
-    /* flex: 0 0 300px; */
+    flex: 1 1 320px;
+    min-width: 280px;
+    max-width: 100%;
+    width: auto;
 
     border-radius: 18px;
     border: 1px solid #ccc;
     padding: 15px;
+    box-sizing: border-box;
 }
 .events-image-text {
     width: 340px;
@@ -124,14 +130,18 @@ button {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 0 0 180px;
+    width: 180px;
+    min-width: 180px;
 }
 .events-tools-analytics {
     background-color: #F9F9F9;
     height: 130px;
-    width: 180px;
+    width: 100%;
     border-radius: 18px;
     border: 1px solid #ccc;
     padding: 15px;
+    box-sizing: border-box;
 }
 
 /* CSS FOR CREATE OR ADD NEW EVENTS */
@@ -493,6 +503,8 @@ label {
     text-align: center;
 
     align-self: flex-start; /* ✅ prevents stretching */
+    box-sizing: border-box;
+    display: block;
 }
 .events-edit-archive-btn:hover {
     opacity: 0.9;
@@ -516,6 +528,37 @@ label {
     color: #FFFFFF;
     background: #818181;
     text-decoration: none;
+}
+
+.events-tools .events-edit-archive-btn,
+.events-tools form {
+    width: 100%;
+}
+
+.events-tools form {
+    margin: 0;
+}
+
+.events-tools form .events-edit-archive-btn {
+    box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+    .events-container {
+        flex-direction: column;
+    }
+
+    .events-title-description,
+    .events-image-container,
+    .events-tools {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 100%;
+    }
+
+    .events-tools {
+        flex-basis: auto;
+    }
 }
 
 /* Lightbox/Modal Styles */

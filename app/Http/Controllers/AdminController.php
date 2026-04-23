@@ -175,13 +175,20 @@ class AdminController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'date_of_birth' => ['nullable', 'date'],
-            'sex' => ['nullable', 'string', 'max:50'],
-            'year_graduated' => ['nullable', 'date'],
             'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')],
             'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')],
-            'phone_number' => ['required', 'string', 'max:50'],
-            'program' => ['required', 'string', 'max:255'],
+            
+            // These two are missing from the Excel file, so they MUST be nullable
+            'date_of_birth' => ['nullable', 'date'],
+            'sex' => ['nullable', 'string', 'max:50'],
+            
+            // This is provided in the Excel file as "Graduation Period"
+            'year_graduated' => ['required', 'date'], 
+            
+            // Made these nullable as a safety net in case a student's row is missing them in the Excel file
+            'phone_number' => ['nullable', 'string', 'max:50'],
+            'program' => ['nullable', 'string', 'max:255'],
+            
             'card_photo' => ['nullable', 'image', 'max:4096'],
         ]);
 
@@ -205,13 +212,13 @@ class AdminController extends Controller
             'last_name' => $validated['last_name'],
             'date_of_birth' => $validated['date_of_birth'] ?? null,
             'sex' => $validated['sex'] ?? null,
-            'year_graduated' => $validated['year_graduated'] ?? null,
+            'year_graduated' => $validated['year_graduated'], // Now saving the exact date from Excel
             'student_id_number' => $validated['student_id_number'],
             'email' => $validated['email'],
-            'phone_number' => $validated['phone_number'],
+            'phone_number' => $validated['phone_number'] ?? null,
             'password_hash' => 'password123',
             'verification_status' => 'pending',
-            'program' => $validated['program'],
+            'program' => $validated['program'] ?? null,
             'card_photo' => $cardPhotoPath,
         ]);
 

@@ -32,6 +32,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/events', [EventController::class, 'index'])
             ->name('events.index');
 
+        Route::get('/events/archived', [EventController::class, 'archived'])
+            ->name('events.archived');
+
         Route::get('/events/create', [EventController::class, 'create'])
             ->name('events.create');
 
@@ -46,6 +49,9 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/events/{event}', [EventController::class, 'destroy'])
             ->name('events.destroy');
+
+        Route::put('/events/{event}/restore', [EventController::class, 'restore'])
+            ->name('events.restore');
 
         Route::get('/perks', [PerksController::class, 'index'])
             ->name('perks.index');
@@ -74,6 +80,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/announcements', [AnnouncementController::class, 'index'])
             ->name('announcements.index');
 
+        Route::get('/announcements/archived', [AnnouncementController::class, 'archived'])
+            ->name('announcements.archived');
+
         Route::get('/announcements/create', [AnnouncementController::class, 'create'])
             ->name('announcements.create');
 
@@ -85,6 +94,12 @@ Route::prefix('admin')->group(function () {
 
         Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])
             ->name('announcements.update');
+
+        Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])
+            ->name('announcements.destroy');
+
+        Route::put('/announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])
+            ->name('announcements.restore');
 
         Route::get('/dashboard', function () {
             return view('admin_dashboard');

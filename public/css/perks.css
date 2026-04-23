@@ -75,7 +75,8 @@ button {
 
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;  /* <-- THIS FIXES YOUR LAYOUT */
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 20px;
 }
 
@@ -83,7 +84,9 @@ button {
     padding-top: 0px;
     margin-top: 0px;
     padding-left: 15px;
-    width: 350px;
+    flex: 1 1 320px;
+    min-width: 0;
+    width: auto;
 }
 
 .perks-title-text {
@@ -95,7 +98,7 @@ button {
     margin-bottom: 10px;
 }
 .perks-description-text {
-    width: 340px;
+    width: 100%;
     font-family: 'Poppins', sans-serif;
     color: #696969;
     font-size: 16px;
@@ -108,7 +111,9 @@ button {
     /* allow the container to grow with its content and stack items vertically */
     min-height: 220px;
     height: auto;
-    width: 380px;
+    width: auto;
+    flex: 1 1 320px;
+    min-width: 280px;
     border-radius: 18px;
     border: 1px solid #ccc;
     padding: 15px;
@@ -117,7 +122,7 @@ button {
     gap: 10px;
 }
 .perks-image-text {
-    width: 340px;
+    width: 100%;
     font-family: 'Poppins', sans-serif;
     color: #444242;
     font-size: 16px;
@@ -140,6 +145,8 @@ button {
     flex-direction: column;
     gap: 10px;
     width: 180px;
+    flex: 0 0 180px;
+    min-width: 180px;
 }
 .perks-tools-analytics {
     background-color: #F9F9F9;
@@ -414,6 +421,29 @@ label {
 .perk-action-buttons form { 
     margin: 0; 
     width: 100%; 
+}
+
+@media (max-width: 1100px) {
+    .perks-container {
+        flex-direction: column;
+    }
+
+    .perks-title-description,
+    .perks-image-container,
+    .perks-tools {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 100%;
+    }
+
+    .perks-tools {
+        flex-basis: auto;
+    }
+
+    .perk-edit-archive-btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
 }
 
 .perk-unarchive-btn {

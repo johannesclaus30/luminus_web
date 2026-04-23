@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Directory</title>
+    <title>Directory | LumiNUs Admin</title>
 
     <link rel="stylesheet" href="/css/directory.css">
     <link rel="stylesheet" href="/css/admin.css">
@@ -61,6 +61,7 @@
                         $lastName = $alumnus->last_name ?? '';
                         $email = $alumnus->email ?? '';
                         $program = $alumnus->program ?? '';
+                        $graduationYear = optional($alumnus->year_graduated)->format('Y') ?: 'N/A';
                         $middleInitial = $middleName !== '' ? strtoupper(mb_substr(trim($middleName), 0, 1)) . '.' : '';
                         $photoPath = trim((string) ($alumnus->alumni_photo ?: $alumnus->card_photo));
 
@@ -85,10 +86,18 @@
                     <div class="user-box">
                         <img src="{{ $photoUrl }}" alt="{{ $displayName ?: 'Alumni photo' }}" class="user-photo">
                         <div class="primary-info">
+                            <p class="field-label">User Information and Details</p>
                             <h1 class="name">{{ $displayName ?: 'Unnamed Alumni' }}</h1>
                             <p class="program">{{ $program ?: 'Program not specified' }}</p>
                         </div>
-                        <p class="email">{{ $email ?: 'Email not provided' }}</p>
+                        <div class="graduation-info">
+                            <p class="field-label">Year<br>Graduated</p>
+                            <p class="graduation-year">{{ $graduationYear }}</p>
+                        </div>
+                        <div class="contact-info">
+                            <p class="field-label">Email</p>
+                            <p class="email">{{ $email ?: 'Email not provided' }}</p>
+                        </div>
                         <div class="tools-container">
                             <div class="tools-container">
                                 <a href="#" class="tools-button" title="Message">
@@ -239,175 +248,171 @@
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script>
-        // Basic search filter by name or email
-        function filterUsers() {
-            const q = document.getElementById('searchInput').value.toLowerCase().trim();
-            document.querySelectorAll('.user-box').forEach(box => {
-                const name = (box.querySelector('.name')?.textContent || '').toLowerCase();
-                const email = (box.querySelector('.email')?.textContent || '').toLowerCase();
-                const visible = !q || name.includes(q) || email.includes(q);
-                box.style.display = visible ? 'flex' : 'none';
-            });
+<script>
+    // Basic search filter by name or email
+    function filterUsers() {
+        const q = document.getElementById('searchInput').value.toLowerCase().trim();
+        document.querySelectorAll('.user-box').forEach(box => {
+            const name = (box.querySelector('.name')?.textContent || '').toLowerCase();
+            const email = (box.querySelector('.email')?.textContent || '').toLowerCase();
+            const visible = !q || name.includes(q) || email.includes(q);
+            box.style.display = visible ? 'flex' : 'none';
+        });
+    }
+
+    function showModal() {
+        document.getElementById('createModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideModal() {
+        document.getElementById('createModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    function switchModalMode(mode) {
+        document.querySelectorAll('[data-modal-tab]').forEach((tab) => {
+            tab.classList.toggle('active', tab.dataset.modalTab === mode);
+        });
+
+        document.querySelectorAll('[data-modal-section]').forEach((section) => {
+            section.classList.toggle('modal-section-active', section.dataset.modalSection === mode);
+        });
+
+        if (mode === 'bulk') {
+            const status = document.getElementById('bulkImportStatus');
+            if (status && status.textContent === 'No file selected yet.') {
+                status.textContent = 'No file selected yet.';
+            }
+        }
+    }
+
+    // Maps the specific AAO Excel columns to our database fields
+    function normalizeBulkRow(row) {
+        return {
+            first_name: row['First Name'] || row.first_name || '',
+            middle_name: row['Middle Name'] || row.middle_name || '',
+            last_name: row['Last Name'] || row.last_name || '',
+            student_id_number: row['Student ID'] || row.student_id_number || '',
+            program: row['Strand'] || row.program || '', // Mapping Strand to Program
+            email: row['Personal Email'] || row['Official Email'] || row.email || '',
+            phone_number: row['Mobile No'] || row.phone_number || '',
+            year_graduated: row['Graduation Period'] || row.year_graduated || '',
+            date_of_birth: '', // Intentionally left blank for alumni to fill later
+            sex: '',           // Intentionally left blank for alumni to fill later
+        };
+    }
+
+    async function createAlumniRecord(record) {
+        const formData = new FormData();
+        formData.append('_token', '{{ csrf_token() }}');
+        
+        Object.keys(record).forEach(key => {
+            formData.append(key, record[key]);
+        });
+
+        const response = await fetch('{{ route('admin.alumni.store') }}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            const message = payload?.message || 'Unable to import one or more alumni records.';
+            throw new Error(message);
+        }
+    }
+
+    async function handleBulkImport() {
+        const fileInput = document.getElementById('bulkImportFile');
+        const status = document.getElementById('bulkImportStatus');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            status.textContent = 'Please choose a CSV or Excel file first.';
+            return;
         }
 
-        function showModal() {
-    // Correct way to trigger the centering
-    document.getElementById('createModal').style.display = 'flex';
-    
-    // Optional: Prevent the background page from scrolling while modal is open
-    document.body.style.overflow = 'hidden';
-}
+        status.textContent = 'Reading file...';
 
-function hideModal() {
-            document.getElementById('createModal').style.display = 'none';
-            document.body.style.overflow = 'auto';
+        if (!window.XLSX) {
+            status.textContent = 'Excel parsing library is unavailable right now.';
+            return;
         }
 
-        function switchModalMode(mode) {
-            document.querySelectorAll('[data-modal-tab]').forEach((tab) => {
-                tab.classList.toggle('active', tab.dataset.modalTab === mode);
-            });
+        try {
+            const buffer = await file.arrayBuffer();
+            // cellDates: true handles Excel's internal date formatting properly
+            const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            // 1. Convert to an array of arrays first to find the actual header row dynamically
+            const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+            let headerRowIndex = -1;
 
-            document.querySelectorAll('[data-modal-section]').forEach((section) => {
-                section.classList.toggle('modal-section-active', section.dataset.modalSection === mode);
-            });
-
-            if (mode === 'bulk') {
-                const status = document.getElementById('bulkImportStatus');
-                if (status && status.textContent === 'No file selected yet.') {
-                    status.textContent = 'No file selected yet.';
+            for (let i = 0; i < rawData.length; i++) {
+                const rowString = (rawData[i] || []).join(' ').toLowerCase();
+                // We identify the header row if it contains these two key columns
+                if (rowString.includes('student id') && rowString.includes('last name')) {
+                    headerRowIndex = i;
+                    break;
                 }
             }
-        }
 
-        function parseDelimitedText(text) {
-            const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-            if (!lines.length) {
-                return [];
-            }
-
-            const headers = lines[0].split(',').map((header) => header.trim().toLowerCase());
-            const records = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map((value) => value.trim());
-                const row = {};
-
-                headers.forEach((header, index) => {
-                    row[header] = values[index] ?? '';
-                });
-
-                records.push(row);
-            }
-
-            return records;
-        }
-
-        function normalizeBulkRow(row) {
-            return {
-                first_name: row.first_name || row.firstname || row['first name'] || '',
-                middle_name: row.middle_name || row.middlename || row['middle name'] || '',
-                last_name: row.last_name || row.lastname || row['last name'] || '',
-                date_of_birth: row.date_of_birth || row['date of birth'] || '',
-                sex: row.sex || '',
-                year_graduated: row.year_graduated || row['year graduated'] || '',
-                student_id_number: row.student_id_number || row['student id number'] || '',
-                email: row.email || '',
-                phone_number: row.phone_number || row['phone number'] || '',
-                program: row.program || '',
-            };
-        }
-
-        async function createAlumniRecord(record) {
-            const formData = new FormData();
-            formData.append('_token', '{{ csrf_token() }}');
-            formData.append('first_name', record.first_name);
-            formData.append('middle_name', record.middle_name);
-            formData.append('last_name', record.last_name);
-            formData.append('date_of_birth', record.date_of_birth);
-            formData.append('sex', record.sex);
-            formData.append('year_graduated', record.year_graduated);
-            formData.append('student_id_number', record.student_id_number);
-            formData.append('email', record.email);
-            formData.append('phone_number', record.phone_number);
-            formData.append('program', record.program);
-
-            const response = await fetch('{{ route('admin.alumni.store') }}', {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                const message = payload?.message || 'Unable to import one or more alumni records.';
-                throw new Error(message);
-            }
-        }
-
-        async function handleBulkImport() {
-            const fileInput = document.getElementById('bulkImportFile');
-            const status = document.getElementById('bulkImportStatus');
-            const file = fileInput.files[0];
-
-            if (!file) {
-                status.textContent = 'Please choose a CSV or Excel file first.';
+            if (headerRowIndex === -1) {
+                status.textContent = 'Error: Could not find standard headers (Student ID, Last Name) in the file.';
                 return;
             }
 
-            status.textContent = 'Reading file...';
-
-            let rows = [];
-
-            if (/\.csv$/i.test(file.name)) {
-                const text = await file.text();
-                rows = parseDelimitedText(text);
-            } else {
-                if (!window.XLSX) {
-                    status.textContent = 'Excel parsing is unavailable right now.';
-                    return;
-                }
-
-                const buffer = await file.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-            }
+            // 2. Parse the JSON properly, starting ONLY from the detected header row
+            const rows = XLSX.utils.sheet_to_json(sheet, { 
+                range: headerRowIndex, 
+                defval: '', 
+                raw: false,
+                dateNF: 'yyyy-mm-dd' // Forces dates like 'Graduation Period' to string formats
+            });
 
             const records = rows
                 .map(normalizeBulkRow)
-                .filter((record) => record.first_name && record.last_name && record.student_id_number && record.email && record.phone_number && record.program);
+                // Filter out empty rows to ensure we only process valid students
+                .filter((record) => record.first_name && record.last_name && record.student_id_number);
 
             if (!records.length) {
-                status.textContent = 'No valid alumni rows were found in the selected file.';
+                status.textContent = 'No valid alumni records were found below the headers.';
                 return;
             }
 
             let created = 0;
             let failed = 0;
 
-            status.textContent = `Importing ${records.length} alumni record(s)...`;
+            status.textContent = `Importing ${records.length} alumni record(s). Please do not close this window...`;
 
             for (const record of records) {
                 try {
                     await createAlumniRecord(record);
                     created += 1;
+                    status.textContent = `Progress: ${created}/${records.length} created...`;
                 } catch (error) {
                     failed += 1;
+                    console.error("Failed to import record:", record, error);
                 }
             }
 
             status.textContent = `Import complete: ${created} created${failed ? `, ${failed} failed` : ''}.`;
 
             if (created > 0) {
-                window.location.reload();
+                setTimeout(() => window.location.reload(), 1500);
             }
+        } catch (error) {
+            console.error(error);
+            status.textContent = 'An error occurred while reading the file. Make sure it is a valid Excel/CSV.';
         }
-    </script>
+    }
+</script>
 
 </body>
 </html>

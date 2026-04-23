@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Events</title>
+    <title>Digital Alumni Tracer | LumiNUs Admin</title>
 
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">

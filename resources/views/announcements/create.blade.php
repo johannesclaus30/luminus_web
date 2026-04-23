@@ -26,36 +26,38 @@
         <div class="announcements-create-container">
             <h2>Add New Announcement</h2>
 
+            @if ($errors->any())
+                <div class="upload-status status-error" style="margin-bottom: 16px;">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
+
             <form action="{{ route('announcements.store') }}" method="POST" enctype="multipart/form-data" id="announcementForm">
                 @csrf
                 <div class="announcements-details">
                     <div class="new-announcements-title-desc">
                         <label>Announcement Title</label>
-                        <input type="text" name="AnnouncementTitle" class="textarea-style" value="{{ old('AnnouncementTitle') }}" required>
+                        <input type="text" name="title" class="textarea-style" value="{{ old('title') }}" required>
                         
                         <label>Announcement Description</label>
-                        <textarea name="AnnouncementDescription" class="textarea-style textarea-description" required>{{ old('AnnouncementDescription') }}</textarea>
+                        <textarea name="announcement_description" class="textarea-style textarea-description" required>{{ old('announcement_description') }}</textarea>
+
+                        <label>Schedule Post (optional)</label>
+                        <input type="datetime-local" name="scheduled_post_at" class="textarea-style" value="{{ old('scheduled_post_at') }}">
+                        <small style="display:block; margin-top:6px; color:#666;">Leave blank to publish immediately.</small>
                         
                         <button type="submit" class="announcements-submit-btn">Publish Announcement</button>
                     </div>
 
                     <div class="new-announcements-image">
-                        {{-- IMAGES --}}
-                        <label>Attach Images (up to 5)</label>
+                        <label>Attach Images Only (up to 5, max 5MB each)</label>
                         <label class="image-upload-box" id="image-box">
                             <span class="upload-prompt-text">Click or drag images here</span>
                             <input type="file" id="image-input" name="images[]" multiple accept="image/*" hidden>
                             <div id="image-preview-container" class="preview-container"></div>
                             <div id="image-status" class="upload-status status-default">0 items attached</div>
-                        </label>
-
-                        {{-- VIDEO --}}
-                        <label style="margin-top: 15px; display: block;">Attach Video (1 only)</label>
-                        <label class="image-upload-box" id="video-box">
-                            <span class="upload-prompt-text">Click or drag video here</span>
-                            <input type="file" id="video-input" name="video" accept="video/mp4,video/webm,video/ogg" hidden>
-                            <div id="video-preview-container" class="preview-container"></div>
-                            <div id="video-status" class="upload-status status-default">No video attached</div>
                         </label>
                     </div>
                 </div>
@@ -126,17 +128,8 @@
         containerId: 'image-preview-container',
         statusId: 'image-status',
         maxCount: 5,
-        maxSizeMB: 2, // 2MB limit for images
+        maxSizeMB: 5,
         isVideo: false
-    });
-
-    handleFilePreview({
-        inputId: 'video-input',
-        containerId: 'video-preview-container',
-        statusId: 'video-status',
-        maxCount: 1,
-        maxSizeMB: 20, // 20MB limit for video
-        isVideo: true
     });
 </script>
 @endsection

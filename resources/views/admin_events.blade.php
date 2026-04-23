@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LumiNUs | Event Organizer</title>
+    <title>Events | LumiNUs Admin</title>
 
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/events.css">
@@ -36,6 +36,7 @@
             <div class="events-panel-header">
                 <div class="add-events-container">
                     <a href="{{ route('events.create') }}" class="add-events-button">Add New Event</a>
+                    <a id="archiveToggleBtn" href="{{ route('events.archived') }}" class="add-events-button" style="margin-left:8px; background-color:#818181; color:#ffffff; width:auto;">Archived Events</a>
                 </div>
                 <div class="pagination-container">
                     {{ $events->links() }}
@@ -96,14 +97,22 @@
                                 <p>👥 {{ $event->max_capacity }} Max</p>
                             </div>
 
-                            <a href="{{ route('events.edit', $event) }}" class="events-edit-archive-btn edit-btn">Edit</a>
-                            <a href="#" class="events-edit-archive-btn manage-btn">Attendees</a>
-                            
-                            <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Archive this event?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="events-edit-archive-btn archive-btn" style="width: 100%; border: none; cursor: pointer;">Archive</button>
-                            </form>
+                            @if ($event->status === 'Archived')
+                                <form action="{{ route('events.restore', $event) }}" method="POST" onsubmit="return confirm('Restore this event?');">
+                                    @csrf
+                                    @method('PUT')
+                                    <button type="submit" class="events-edit-archive-btn edit-btn">Restore</button>
+                                </form>
+                            @else
+                                <a href="{{ route('events.edit', $event) }}" class="events-edit-archive-btn edit-btn">Edit</a>
+                                <a href="#" class="events-edit-archive-btn manage-btn">Attendees</a>
+                                
+                                <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Archive this event?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="events-edit-archive-btn archive-btn" style="width: 100%; border: none; cursor: pointer;">Archive</button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                 @empty
@@ -132,6 +141,19 @@
         function closeModal() {
             document.getElementById('imageModal').style.display = "none";
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById('archiveToggleBtn');
+            if (!btn) return;
+
+            const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
+            const currentPath = window.location.pathname.replace(/\/$/, '');
+
+            if (currentPath === archivedPath) {
+                btn.textContent = 'View Active Events';
+                btn.href = '{{ route('events.index') }}';
+            }
+        });
     </script>
 </body>
 </html>

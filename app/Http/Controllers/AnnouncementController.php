@@ -3,18 +3,35 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class AnnouncementController extends Controller
 {
+    private const MAX_IMAGE_COUNT = 5;
+
+    private const MAX_IMAGE_SIZE_KB = 5120;
+
     public function index()
     {
-        // Added .with('images') to prevent N+1 query issues
         $announcements = Announcement::with('images')
-            ->orderBy('DatePosted', 'desc')
+            ->where(function ($query) {
+                $query->where('status', 1)->orWhereNull('status');
+            })
+            ->orderBy('date_posted', 'desc')
             ->paginate(5);
             
+        return view('admin_announcements', compact('announcements'));
+    }
+
+    public function archived()
+    {
+        $announcements = Announcement::with('images')
+            ->where('status', 0)
+            ->orderBy('date_posted', 'desc')
+            ->paginate(5);
+
         return view('admin_announcements', compact('announcements'));
     }
 
@@ -25,35 +42,44 @@ class AnnouncementController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'AnnouncementTitle' => 'required|string|max:255',
-            'AnnouncementDescription' => 'required|string|max:255',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/ogg|max:51200',
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'announcement_description' => 'required|string|max:255',
+            'scheduled_post_at' => 'nullable|date',
+            'images' => 'nullable|array|max:5',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:' . self::MAX_IMAGE_SIZE_KB,
         ]);
+
+        $uploadedImages = $this->normalizeUploadedImages($request->file('images'));
+
+        if (count($uploadedImages) > self::MAX_IMAGE_COUNT) {
+            throw ValidationException::withMessages([
+                'images' => 'You can attach up to ' . self::MAX_IMAGE_COUNT . ' images only.',
+            ]);
+        }
+
+        $adminId = $request->session()->get('admin_id');
+
+        if (! $adminId) {
+            abort(403);
+        }
 
         $announcement = Announcement::create([
-            'AnnouncementTitle' => $request->AnnouncementTitle,
-            'AnnouncementDescription' => $request->AnnouncementDescription,
-            'DatePosted' => now(),
+            'admin_id' => $adminId,
+            'title' => $validated['title'],
+            'announcement_description' => $validated['announcement_description'],
+            'date_posted' => now(),
+            'scheduled_post_at' => $validated['scheduled_post_at'] ?? null,
+            'status' => 1,
         ]);
 
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
+        if (! empty($uploadedImages)) {
+            foreach ($uploadedImages as $image) {
                 $path = $image->store('announcements', 'public');
                 $announcement->images()->create([
-                    'ImagePath' => $path,
-                    'UploadTime' => now(),
+                    'image_path' => $path,
                 ]);
             }
-        }
-        
-        if ($request->hasFile('video')) {
-            $videoPath = $request->file('video')->store('announcements/videos', 'public');
-            $announcement->images()->create([
-                'ImagePath' => $videoPath,
-                'UploadTime' => now(),
-            ]);
         }
 
         return redirect()->route('announcements.index')->with('success', 'Announcement created successfully!');
@@ -64,7 +90,8 @@ class AnnouncementController extends Controller
      */
     public function edit(Announcement $announcement)
     {
-        // No need to manual findOrFail, Laravel does it for you
+        $announcement->load('images');
+
         return view('announcements.edit', compact('announcement'));
     }
 
@@ -73,48 +100,57 @@ class AnnouncementController extends Controller
      */
     public function update(Request $request, Announcement $announcement)
     {
-        $request->validate([
-            'AnnouncementTitle' => 'required|string|max:255',
-            'AnnouncementDescription' => 'required|string|max:255',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-            'video' => 'nullable|file|mimetypes:video/mp4,video/webm,video/ogg|max:51200',
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'announcement_description' => 'required|string|max:255',
+            'scheduled_post_at' => 'nullable|date',
+            'deleted_media' => 'nullable|array',
+            'images' => 'nullable|array|max:5',
+            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:' . self::MAX_IMAGE_SIZE_KB,
         ]);
 
-        // 1. HANDLE DELETIONS FIRST (Clean house before adding new stuff)
-        if ($request->has('deleted_media')) {
-            foreach ($request->deleted_media as $mediaId) {
-                $media = $announcement->images()->find($mediaId);
-                if ($media) {
-                    Storage::disk('public')->delete($media->ImagePath);
-                    $media->delete();
-                }
+        $announcement->load('images');
+
+        $deletedMediaIds = collect($request->input('deleted_media', []))
+            ->map(fn ($value) => (int) $value)
+            ->filter()
+            ->all();
+
+        $remainingImageCount = $announcement->images
+            ->filter(fn ($attachment) => $this->isImageAttachment($attachment->image_path))
+            ->reject(fn ($attachment) => in_array((int) $attachment->id, $deletedMediaIds, true))
+            ->count();
+
+        $uploadedImages = $this->normalizeUploadedImages($request->file('images'));
+
+        if (($remainingImageCount + count($uploadedImages)) > self::MAX_IMAGE_COUNT) {
+            throw ValidationException::withMessages([
+                'images' => 'You can keep or upload up to ' . self::MAX_IMAGE_COUNT . ' images total.',
+            ]);
+        }
+
+        foreach ($deletedMediaIds as $mediaId) {
+            $media = $announcement->images->firstWhere('id', $mediaId);
+
+            if ($media) {
+                Storage::disk('public')->delete($media->image_path);
+                $media->delete();
             }
         }
 
-        // 2. UPDATE TEXT FIELDS
         $announcement->update([
-            'AnnouncementTitle' => $request->AnnouncementTitle,
-            'AnnouncementDescription' => $request->AnnouncementDescription,
+            'title' => $validated['title'],
+            'announcement_description' => $validated['announcement_description'],
+            'scheduled_post_at' => $validated['scheduled_post_at'] ?? null,
         ]);
 
-        // 3. ADD NEW IMAGES
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
+        if (! empty($uploadedImages)) {
+            foreach ($uploadedImages as $image) {
                 $path = $image->store('announcements', 'public');
                 $announcement->images()->create([
-                    'ImagePath' => $path,
-                    'UploadTime' => now(),
+                    'image_path' => $path,
                 ]);
             }
-        }
-        
-        // 4. ADD NEW VIDEO
-        if ($request->hasFile('video')) {
-            $videoPath = $request->file('video')->store('announcements/videos', 'public');
-            $announcement->images()->create([
-                'ImagePath' => $videoPath,
-                'UploadTime' => now(),
-            ]);
         }
 
         return redirect()
@@ -124,8 +160,39 @@ class AnnouncementController extends Controller
 
     public function destroy(Announcement $announcement)
     {
-        // You can implement deletion logic here later
-        $announcement->delete();
-        return redirect()->route('announcements.index')->with('success', 'Announcement deleted.');
+        $announcement->update(['status' => 0]);
+
+        return redirect()->route('announcements.index')->with('success', 'Announcement archived.');
+    }
+
+    public function restore(Announcement $announcement)
+    {
+        $announcement->update(['status' => 1]);
+
+        return redirect()->route('announcements.archived')->with('success', 'Announcement restored.');
+    }
+
+    private function normalizeUploadedImages(mixed $images): array
+    {
+        if (! $images) {
+            return [];
+        }
+
+        if (! is_array($images)) {
+            return [$images];
+        }
+
+        return array_values(array_filter($images));
+    }
+
+    private function isImageAttachment(?string $path): bool
+    {
+        if (! $path) {
+            return false;
+        }
+
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true);
     }
 }

@@ -8,20 +8,17 @@ class ImagesAnnouncement extends Model
 {
     protected $table = 'images_announcements';
 
-    protected $primaryKey = 'ImgAnnouncement_ID';
-
     protected $fillable = [
-        'Announcement_ID',
-        'ImagePath',   // ✅ THIS WAS MISSING
-        'UploadTime',
+        'announcement_id',
+        'image_path',
+    ];
+
+    protected $casts = [
+        'announcement_id' => 'integer',
     ];
 
     public function announcement()
     {
-        return $this->belongsTo(
-            Announcement::class,
-            'Announcement_ID',
-            'Announcement_ID'
-        );
+        return $this->belongsTo(Announcement::class, 'announcement_id', 'id');
     }
 }

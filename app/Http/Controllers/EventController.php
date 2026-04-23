@@ -14,9 +14,22 @@ class EventController extends Controller
     public function index()
     {
         $events = Event::with(['images', 'admin', 'venue'])
+            ->where(function ($query) {
+                $query->whereNull('status')->orWhere('status', '!=', 'Archived');
+            })
             ->orderByDesc('start_date')
             ->paginate(5);
             
+        return view('admin_events', compact('events'));
+    }
+
+    public function archived()
+    {
+        $events = Event::with(['images', 'admin', 'venue'])
+            ->where('status', 'Archived')
+            ->orderByDesc('start_date')
+            ->paginate(5);
+
         return view('admin_events', compact('events'));
     }
 
@@ -152,6 +165,13 @@ class EventController extends Controller
         $event->update(['status' => 'Archived']);
 
         return redirect()->route('events.index')->with('success', 'Event successfully archived!');
+    }
+
+    public function restore(Event $event)
+    {
+        $event->update(['status' => 'Active']);
+
+        return redirect()->route('events.archived')->with('success', 'Event restored.');
     }
 
     protected function syncVenue(Request $request, ?int $existingVenueId = null): ?int
