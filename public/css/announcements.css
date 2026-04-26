@@ -52,6 +52,28 @@ label {
     border-radius: 20px;
     display: inline-block;
     text-align: center;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.add-announcements-button:hover {
+    background-color: #28316e;
+}
+
+/* ---- Archived toggle button (matches perks page exactly) ---- */
+.archived-toggle {
+    background-color: #6c757d;        /* gray base */
+    color: #ffffff;
+    transition: background-color 0.3s ease;
+    margin: 0 0 0 8px; /* left margin only */
+}
+.archived-toggle:hover {
+    background-color: #5a6268;        /* darker gray */
+}
+.archived-toggle.active {
+    background-color: #28a745;        /* green */
+    color: #ffffff;
+}
+.archived-toggle.active:hover {
+    background-color: #218838;        /* darker green */
 }
 
 /* Container for each announcement card */

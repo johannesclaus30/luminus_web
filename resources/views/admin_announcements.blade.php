@@ -34,8 +34,14 @@
         <div class="announcements-panel admin-scrollable">
             <div class="announcements-panel-header">
                 <div class="add-announcements-container">
-                    <a href="{{ route('announcements.create') }}" class="add-announcements-button">Add New Announcement</a>
-                    <a id="archiveToggleBtn" href="{{ route('announcements.archived') }}" class="add-announcements-button" style="margin-left:8px; background-color:#818181; color:#ffffff; width:auto;">Archived Announcements</a>
+                    @if (!request()->routeIs('announcements.archived'))
+                        <a href="{{ route('announcements.create') }}" class="add-announcements-button">Add New Announcement</a>
+                    @endif
+                    <a id="archiveToggleBtn"
+                    href="{{ route('announcements.archived') }}"
+                    class="add-announcements-button archived-toggle">
+                        Archived Announcements
+                    </a>
                 </div>
                 <div class="pagination-container">
                     {{ $announcements->links() }}
@@ -162,8 +168,13 @@
         const currentPath = window.location.pathname.replace(/\/$/, '');
 
         if (currentPath === archivedPath) {
+            // We're on the archived page
             btn.textContent = 'View Active Announcements';
             btn.href = '{{ route('announcements.index') }}';
+            btn.classList.add('active');
+        } else {
+            // On the active page – ensure class is removed just in case
+            btn.classList.remove('active');
         }
     });
 
