@@ -42,8 +42,8 @@
 
                             <label>Status</label>
                             <select name="status" class="textarea-style">
-                                <option value="active" {{ (old('status', $perk->status) == 'active') ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ (old('status', $perk->status) == 'inactive') ? 'selected' : '' }}>Inactive</option>
+                                <option value="1" {{ old('status', (string) $perk->status) == '1' ? 'selected' : '' }}>Active</option>
+                                <option value="0" {{ old('status', (string) $perk->status) == '0' ? 'selected' : '' }}>Inactive</option>
                             </select>
                         </div>
                         <div class="date-image-container">
@@ -65,7 +65,7 @@
                                             @foreach($perk->images as $image)
                                                 <div class="preview-item existing" data-image-id="{{ $image->id }}" style="position:relative; display:inline-block;">
                                                     <img
-                                                        src="{{ asset('storage/' . $image->image_path) }}"
+                                                        src="{{ $image->image_url }}"
                                                         alt="Perk Image"
                                                         class="perk-image"
                                                         style="max-width:90px; max-height:90px; object-fit:cover; display:block;"

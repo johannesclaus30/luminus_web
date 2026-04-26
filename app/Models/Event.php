@@ -28,6 +28,7 @@ class Event extends Model
         'end_date' => 'date',
         'max_capacity' => 'integer',
         'venue_id' => 'integer',
+        'status' => 'integer',
     ];
 
     public function images()

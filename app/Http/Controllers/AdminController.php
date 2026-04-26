@@ -132,42 +132,49 @@ class AdminController extends Controller
     }
 
     public function updateProfile(Request $request)
-    {
-        $admin = $this->getAuthenticatedAdmin($request);
+{
+    $admin = $this->getAuthenticatedAdmin($request);
 
-        if (! $admin) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'admin_first_name' => ['required', 'string', 'max:255'],
-            'admin_middle_name' => ['nullable', 'string', 'max:255'],
-            'admin_last_name' => ['required', 'string', 'max:255'],
-            'admin_email' => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
-            'phone_number' => ['required', 'string', 'max:50'],
-            'photo' => ['nullable', 'image', 'max:4096'],
-        ]);
-
-        if ($request->hasFile('photo')) {
-            $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, $admin->photo);
-        }
-
-        $admin->admin_first_name = $validated['admin_first_name'];
-        $admin->admin_middle_name = $validated['admin_middle_name'] ?? null;
-        $admin->admin_last_name = $validated['admin_last_name'];
-        $admin->admin_email = $validated['admin_email'];
-        $admin->phone_number = $validated['phone_number'];
-        $admin->save();
-
-        $request->session()->put([
-            'admin_email' => $admin->admin_email,
-            'admin_name' => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
-        ]);
-
-        return redirect()
-            ->route('admin.settings', ['section' => 'account'])
-            ->with('status', 'Account information updated successfully.');
+    if (! $admin) {
+        abort(403);
     }
+
+    $validated = $request->validate([
+        'admin_first_name' => ['required', 'string', 'max:255'],
+        'admin_middle_name' => ['nullable', 'string', 'max:255'],
+        'admin_last_name'  => ['required', 'string', 'max:255'],
+        'admin_email'      => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
+        'phone_number'     => ['required', 'string', 'max:50'],
+        'photo'            => ['nullable', 'image', 'max:4096'],
+        'remove_photo'     => ['nullable', 'string'], // new validation rule
+    ]);
+
+    // Handle photo removal (priority over new upload)
+    if ($request->has('remove_photo') && $request->input('remove_photo') == '1') {
+        $this->deleteAdminPhoto($admin->photo);
+        $admin->photo = null;
+    } elseif ($request->hasFile('photo')) {
+        $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, $admin->photo);
+    }
+
+    // Update other fields
+    $admin->admin_first_name = $validated['admin_first_name'];
+    $admin->admin_middle_name = $validated['admin_middle_name'] ?? null;
+    $admin->admin_last_name  = $validated['admin_last_name'];
+    $admin->admin_email      = $validated['admin_email'];
+    $admin->phone_number     = $validated['phone_number'];
+    $admin->save();
+
+    // Update session data
+    $request->session()->put([
+        'admin_email' => $admin->admin_email,
+        'admin_name'  => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
+    ]);
+
+    return redirect()
+        ->route('admin.settings', ['section' => 'account'])
+        ->with('status', 'Account information updated successfully.');
+}
 
     public function storeAlumni(Request $request)
     {

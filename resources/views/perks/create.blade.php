@@ -42,8 +42,8 @@
 
                             <label>Status</label>
                             <select name="status" class="textarea-style">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
+                                <option value="1" {{ old('status', '1') == '1' ? 'selected' : '' }}>Active</option>
+                                <option value="0" {{ old('status') == '0' ? 'selected' : '' }}>Inactive</option>
                             </select>
                         </div>
                         <div class="date-image-container">

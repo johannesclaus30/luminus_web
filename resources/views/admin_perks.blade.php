@@ -12,9 +12,7 @@
 </head>
 <body>
     
-    <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
-    </nav>
+    @include('partials.admin-navbar')
 
     <div class="layout-wrapper">
         <div class="admin-menu">
@@ -35,8 +33,15 @@
         <div class="perks-panel admin-scrollable">
             <div class="perks-panel-header">
                 <div class="add-perks-container">
-                    <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
-                    <a id="archiveToggleBtn" href="{{ route('perks.archived') }}" class="add-perks-button archived-toggle" style="margin-left:8px;">Archived Perks</a>
+                    @if (!request()->routeIs('perks.archived'))
+                        <a href="{{ route('perks.create') }}" class="add-perks-button">Add New Perks</a>
+                    @endif
+                    <a id="archiveToggleBtn"
+                    href="{{ route('perks.archived') }}"
+                    class="add-perks-button archived-toggle"
+                    style="@if (!request()->routeIs('perks.archived')) margin-left:8px; @endif">
+                        Archived Perks
+                    </a>
                 </div>
                 <div class="pagination-container">
                     {{ $perks->links() }}
@@ -62,7 +67,7 @@
                                 @if ($perk->images->isNotEmpty())
                                     @foreach ($perk->images as $image)
                                         <img
-                                            src="{{ asset('storage/' . $image->image_path) }}"
+                                            src="{{ $image->image_url }}"
                                             alt="Perk Image"
                                             class="perk-image"
                                             style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
@@ -86,7 +91,7 @@
                                 <p>👁 No Data Yet</p>
                             </div>
                             <div class="perk-action-buttons">
-                                @if ($perk->status !== 'archived')
+                                @if ((int) $perk->status === 1 || is_null($perk->status))
                                     <a href="{{ route('perks.edit', $perk->id) }}" class="perk-edit-archive-btn edit-btn">Edit</a>
                                     <form action="{{ route('perks.destroy', $perk->id) }}" method="POST" onsubmit="return confirm('Archive this perk?')">
                                         @csrf

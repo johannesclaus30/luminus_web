@@ -23,6 +23,7 @@ class Perks extends Model
 
     protected $casts = [
         'valid_until' => 'date',
+        'status' => 'integer',
     ];
 
     protected $dates = [

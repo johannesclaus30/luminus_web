@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ImagesEvent extends Model
 {
@@ -31,12 +32,38 @@ class ImagesEvent extends Model
             return null;
         }
 
+        $path = trim((string) $this->image_path);
+
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            return '/' . $path;
+        }
+
+        if (str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            return asset('storage/' . $path);
+        }
+
         $baseUrl = rtrim((string) config('filesystems.disks.supabase_admin.url'), '/');
 
         if ($baseUrl === '') {
             return null;
         }
 
-        return $baseUrl . '/' . ltrim($this->image_path, '/');
+        return $baseUrl . '/' . ltrim($path, '/');
     }
 }

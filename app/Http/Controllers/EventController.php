@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Venue;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
@@ -15,7 +16,7 @@ class EventController extends Controller
     {
         $events = Event::with(['images', 'admin', 'venue'])
             ->where(function ($query) {
-                $query->whereNull('status')->orWhere('status', '!=', 'Archived');
+                $query->where('status', 1)->orWhereNull('status');
             })
             ->orderByDesc('start_date')
             ->paginate(5);
@@ -26,7 +27,7 @@ class EventController extends Controller
     public function archived()
     {
         $events = Event::with(['images', 'admin', 'venue'])
-            ->where('status', 'Archived')
+            ->where('status', 0)
             ->orderByDesc('start_date')
             ->paginate(5);
 
@@ -78,12 +79,12 @@ class EventController extends Controller
             'platform' => $request->platform,
             'platform_url' => $request->platform_url,
             'venue_id' => $venueId,
-            'status' => 'Active',
+            'status' => 1,
         ]);
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
-                $path = $this->storeEventImage($file);
+                $path = $this->storeEventImage($event, $file);
 
                 $event->images()->create([
                     'image_path' => $path,
@@ -126,7 +127,7 @@ class EventController extends Controller
             foreach ($request->deleted_media as $mediaId) {
                 $media = $event->images()->find($mediaId);
                 if ($media) {
-                    $this->deleteSupabaseObject($media->image_path);
+                    $this->deleteStoredImage($media->image_path);
                     $media->delete();
                 }
             }
@@ -148,7 +149,7 @@ class EventController extends Controller
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
-                $path = $this->storeEventImage($image);
+                $path = $this->storeEventImage($event, $image);
                 $event->images()->create([
                     'image_path' => $path,
                 ]);
@@ -162,14 +163,14 @@ class EventController extends Controller
 
     public function destroy(Event $event)
     {
-        $event->update(['status' => 'Archived']);
+        $event->update(['status' => 0]);
 
         return redirect()->route('events.index')->with('success', 'Event successfully archived!');
     }
 
     public function restore(Event $event)
     {
-        $event->update(['status' => 'Active']);
+        $event->update(['status' => 1]);
 
         return redirect()->route('events.archived')->with('success', 'Event restored.');
     }
@@ -224,133 +225,32 @@ class EventController extends Controller
         }
     }
 
-    protected function storeEventImage($file): string
+    protected function storeEventImage(Event $event, $file): string
     {
-        $objectKey = 'events_images/' . $this->buildEventImageFileName($file);
-        $body = file_get_contents($file->getRealPath());
+        $directory = 'events_images/' . $event->id;
+        $fileName = $this->buildEventImageFileName($file);
 
-        if ($body === false) {
-            throw ValidationException::withMessages([
-                'images' => 'Unable to read the uploaded event image.',
-            ]);
-        }
+        Storage::disk('supabase_admin')->putFileAs($directory, $file, $fileName, 'public');
 
-        $response = $this->putSupabaseObject($objectKey, $body, $file->getMimeType() ?: 'application/octet-stream');
-
-        if (! $response->successful()) {
-            throw ValidationException::withMessages([
-                'images' => 'Unable to upload event image to Supabase storage: ' . $this->extractSupabaseError($response->body()),
-            ]);
-        }
-
-        return $objectKey;
+        return $directory . '/' . $fileName;
     }
 
-    protected function deleteSupabaseObject(string $objectKey): void
+    protected function deleteStoredImage(?string $imagePath): void
     {
-        $response = $this->sendSupabaseRequest('DELETE', $objectKey, '', 'application/octet-stream');
+        $path = trim((string) $imagePath);
 
-        if (! $response->successful() && $response->status() !== 404) {
-            throw ValidationException::withMessages([
-                'images' => 'Unable to delete event image from Supabase storage: ' . $this->extractSupabaseError($response->body()),
-            ]);
-        }
-    }
-
-    protected function putSupabaseObject(string $objectKey, string $body, string $contentType)
-    {
-        return $this->sendSupabaseRequest('PUT', $objectKey, $body, $contentType);
-    }
-
-    protected function sendSupabaseRequest(string $method, string $objectKey, string $body, string $contentType)
-    {
-        $bucket = (string) env('SUPABASE_ADMIN_BUCKET', 'luminus_assets');
-        $endpoint = rtrim((string) env('AWS_ENDPOINT'), '/');
-        $accessKey = (string) env('AWS_ACCESS_KEY_ID');
-        $secretKey = (string) env('AWS_SECRET_ACCESS_KEY');
-        $region = (string) env('AWS_DEFAULT_REGION', 'us-east-1');
-
-        if ($endpoint === '' || $accessKey === '' || $secretKey === '') {
-            throw ValidationException::withMessages([
-                'images' => 'Supabase storage credentials are not configured.',
-            ]);
+        if ($path === '') {
+            return;
         }
 
-        $parsedEndpoint = parse_url($endpoint);
-        $host = $parsedEndpoint['host'] ?? '';
-        $endpointPath = trim((string) ($parsedEndpoint['path'] ?? ''), '/');
-        $canonicalPrefix = $endpointPath !== '' ? '/' . $endpointPath : '';
-        $url = $endpoint . '/' . rawurlencode($bucket) . '/' . $this->encodeSupabasePath($objectKey);
-        $amzDate = gmdate('Ymd\THis\Z');
-        $dateStamp = gmdate('Ymd');
-        $payloadHash = hash('sha256', $body);
-        $canonicalUri = $canonicalPrefix . '/' . rawurlencode($bucket) . '/' . $this->encodeSupabasePath($objectKey);
+        foreach (['public', 'supabase_admin'] as $diskName) {
+            $disk = Storage::disk($diskName);
 
-        $canonicalHeaders = [
-            'host:' . $host,
-            'x-amz-content-sha256:' . $payloadHash,
-            'x-amz-date:' . $amzDate,
-        ];
-
-        sort($canonicalHeaders);
-
-        $signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
-        $canonicalRequest = implode("\n", [
-            strtoupper($method),
-            $canonicalUri,
-            '',
-            implode("\n", $canonicalHeaders) . "\n",
-            $signedHeaders,
-            $payloadHash,
-        ]);
-
-        $credentialScope = $dateStamp . '/' . $region . '/s3/aws4_request';
-        $stringToSign = implode("\n", [
-            'AWS4-HMAC-SHA256',
-            $amzDate,
-            $credentialScope,
-            hash('sha256', $canonicalRequest),
-        ]);
-
-        $signingKey = $this->getAwsSignatureKey($secretKey, $dateStamp, $region, 's3');
-        $signature = hash_hmac('sha256', $stringToSign, $signingKey);
-
-        return Http::withHeaders([
-            'Host' => $host,
-            'x-amz-content-sha256' => $payloadHash,
-            'x-amz-date' => $amzDate,
-            'Authorization' => 'AWS4-HMAC-SHA256 Credential=' . $accessKey . '/' . $credentialScope . ', SignedHeaders=' . $signedHeaders . ', Signature=' . $signature,
-            'Content-Type' => $contentType,
-        ])->withBody($body, $contentType)->send($method, $url);
-    }
-
-    protected function getAwsSignatureKey(string $secretKey, string $dateStamp, string $regionName, string $serviceName): string
-    {
-        $kDate = hash_hmac('sha256', $dateStamp, 'AWS4' . $secretKey, true);
-        $kRegion = hash_hmac('sha256', $regionName, $kDate, true);
-        $kService = hash_hmac('sha256', $serviceName, $kRegion, true);
-
-        return hash_hmac('sha256', 'aws4_request', $kService, true);
-    }
-
-    protected function encodeSupabasePath(string $path): string
-    {
-        return implode('/', array_map(static fn ($segment) => rawurlencode($segment), explode('/', ltrim($path, '/'))));
-    }
-
-    protected function extractSupabaseError(string $responseBody): string
-    {
-        $responseBody = trim($responseBody);
-
-        if ($responseBody === '') {
-            return 'No response body returned by Supabase.';
+            if ($disk->exists($path)) {
+                $disk->delete($path);
+                return;
+            }
         }
-
-        if (preg_match('/<Message>(.*?)<\/Message>/s', $responseBody, $matches)) {
-            return trim(html_entity_decode($matches[1], ENT_QUOTES | ENT_XML1, 'UTF-8'));
-        }
-
-        return $responseBody;
     }
 
     protected function buildEventImageFileName($file): string

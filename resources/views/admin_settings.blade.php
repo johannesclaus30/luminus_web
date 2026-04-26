@@ -11,22 +11,20 @@
 </head>
 <body>
     
-    <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
-    </nav>
+    @include('partials.admin-navbar')
 
     <div class="layout-wrapper">
         <div class="admin-menu">
             <div>
                 <p class="text-titles">Admin Menu</p>
-                <a href="dashboard" class="admin-menu-buttons">Admin Dashboard</a>
-                <a href="directory" class="admin-menu-buttons">Alumni Directory</a>
-                <a href="announcements" class="admin-menu-buttons">Announcement Editor</a>
-                <a href="events" class="admin-menu-buttons">Event Organizer</a>
-                <a href="perks" class="admin-menu-buttons">Perks and Discounts</a>
-                <a href="alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
-                <a href="messages" class="admin-menu-buttons">Messages</a>
-                <a href="settings" class="admin-menu-current">Settings</a>
+                <a href="{{ url('/admin/dashboard') }}" class="admin-menu-buttons">Admin Dashboard</a>
+                <a href="{{ route('admin.directory') }}" class="admin-menu-buttons">Alumni Directory</a>
+                <a href="{{ route('announcements.index') }}" class="admin-menu-buttons">Announcement Editor</a>
+                <a href="{{ route('events.index') }}" class="admin-menu-buttons">Event Organizer</a>
+                <a href="{{ route('perks.index') }}" class="admin-menu-buttons">Perks and Discounts</a>
+                <a href="{{ url('/admin/alumni_tracer') }}" class="admin-menu-buttons">NU Alumni Tracer</a>
+                <a href="{{ url('/admin/messages') }}" class="admin-menu-buttons">Messages</a>
+                <a href="{{ route('admin.settings') }}" class="admin-menu-current">Settings</a>
             </div>
             <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
         </div>
@@ -346,14 +344,44 @@
                 @break
 
                 @default
+                    @php
+                        // Compute initials for the current admin (same logic as navbar)
+                        $firstName = trim($currentAdmin->admin_first_name ?? '');
+                        $lastName = trim($currentAdmin->admin_last_name ?? '');
+                        $initials = '';
+
+                        if ($firstName !== '') {
+                            $initials .= strtoupper(mb_substr($firstName, 0, 1));
+                        }
+                        if ($lastName !== '') {
+                            $initials .= strtoupper(mb_substr($lastName, 0, 1));
+                        }
+                        if ($initials === '') {
+                            $nameParts = preg_split('/\s+/', trim($currentAdmin->admin_name ?? '')) ?: [];
+                            if (count($nameParts) >= 2) {
+                                $initials = strtoupper(mb_substr($nameParts[0], 0, 1) . mb_substr($nameParts[count($nameParts) - 1], 0, 1));
+                            } else {
+                                $initials = strtoupper(mb_substr($currentAdmin->admin_name ?? 'AD', 0, 2));
+                            }
+                        }
+                    @endphp
+
                     <div class="settings-card settings-profile-card">
                         <div class="profile-pic-section">
-                            <img src="{{ $currentAdminPhotoUrl ?: '/assets/avatar-placeholder.png' }}" alt="Profile">
+                            {{-- Avatar with conditional photo/initials --}}
+                            <div class="profile-avatar-wrapper {{ $currentAdminPhotoUrl ? 'has-photo' : 'is-initials' }}">
+                                @if ($currentAdminPhotoUrl)
+                                    <img src="{{ $currentAdminPhotoUrl }}" alt="Profile photo">
+                                @else
+                                    <span class="profile-initials">{{ $initials }}</span>
+                                @endif
+                            </div>
                             <div class="profile-pic-copy">
                                 <h3>Profile Photo</h3>
                                 <p>Use a clear headshot so the admin profile is recognizable across the system.</p>
                                 <div class="profile-action-row">
                                     <label class="upload-btn" for="account-photo-input">Upload New Photo</label>
+                                    <button type="button" id="remove-photo-btn" class="remove-btn">Remove Photo</button>
                                 </div>
                             </div>
                         </div>
@@ -370,6 +398,8 @@
                         <form id="account-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
                             @csrf
                             @method('PUT')
+                            <input type="hidden" name="remove_photo" id="remove-photo-flag" value="">
+
                             <div class="form-group">
                                 <label>Last Name</label>
                                 <input type="text" name="admin_last_name" value="{{ old('admin_last_name', $currentAdmin->admin_last_name ?? '') }}">
@@ -401,6 +431,7 @@
                             </div>
                         </form>
                     </div>
+                @enddefault
             @endswitch
         </div>
 
@@ -457,6 +488,22 @@
         function fakeSave(msg){
             alert(msg);
         }
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const removeBtn = document.getElementById('remove-photo-btn');
+            const form = document.getElementById('account-form');
+            const removeFlag = document.getElementById('remove-photo-flag');
+
+            if (removeBtn && form && removeFlag) {
+                removeBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure you want to remove your profile photo?')) {
+                        removeFlag.value = '1';
+                        form.submit();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

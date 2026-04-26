@@ -11,9 +11,7 @@
 </head>
 <body>
     
-    <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
-    </nav>
+    @include('partials.admin-navbar')
 
     <div class="layout-wrapper">
         <div class="admin-menu">
@@ -50,8 +48,8 @@
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <p class="events-title-text" style="margin: 0;">{{ $event->title }}</p>
                                 <i>
-                                    <span class="status-badge {{ $event->status == 'Active' ? 'badge-active' : 'badge-archived' }}">
-                                    {{ $event->status }}
+                                    <span class="status-badge {{ ((int) $event->status === 1 || is_null($event->status)) ? 'badge-active' : 'badge-archived' }}">
+                                    {{ (int) $event->status === 0 ? 'Archived' : 'Active' }}
                                 </span>
                                 </i>
                                 

@@ -67,7 +67,7 @@
                                 <div class="preview-container" style="margin-bottom: 10px; pointer-events: auto;">
                                     @foreach($existingImages as $img)
                                         <div class="existing-item-container" id="media-{{ $img->id }}">
-                                            <img src="{{ asset('storage/' . $img->image_path) }}" class="preview-item" style="width:60px; height:60px; object-fit:cover;">
+                                            <img src="{{ $img->image_url }}" class="preview-item" style="width:60px; height:60px; object-fit:cover;">
                                             <button type="button" class="remove-media-btn" onclick="removeExistingMedia(event, {{ $img->id }})">&times;</button>
                                         </div>
                                     @endforeach

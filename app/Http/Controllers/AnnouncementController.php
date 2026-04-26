@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Announcement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AnnouncementController extends Controller
@@ -75,7 +76,7 @@ class AnnouncementController extends Controller
 
         if (! empty($uploadedImages)) {
             foreach ($uploadedImages as $image) {
-                $path = $image->store('announcements', 'public');
+                $path = $this->storeAnnouncementImage($announcement, $image);
                 $announcement->images()->create([
                     'image_path' => $path,
                 ]);
@@ -133,7 +134,7 @@ class AnnouncementController extends Controller
             $media = $announcement->images->firstWhere('id', $mediaId);
 
             if ($media) {
-                Storage::disk('public')->delete($media->image_path);
+                $this->deleteStoredImage($media->image_path);
                 $media->delete();
             }
         }
@@ -146,7 +147,7 @@ class AnnouncementController extends Controller
 
         if (! empty($uploadedImages)) {
             foreach ($uploadedImages as $image) {
-                $path = $image->store('announcements', 'public');
+                $path = $this->storeAnnouncementImage($announcement, $image);
                 $announcement->images()->create([
                     'image_path' => $path,
                 ]);
@@ -194,5 +195,46 @@ class AnnouncementController extends Controller
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true);
+    }
+
+    private function storeAnnouncementImage(Announcement $announcement, $image): string
+    {
+        $directory = 'announcements_images/' . $announcement->id;
+        $fileName = $this->buildAttachmentFileName($image, 'announcement-image');
+
+        Storage::disk('supabase_admin')->putFileAs($directory, $image, $fileName, 'public');
+
+        return $directory . '/' . $fileName;
+    }
+
+    private function deleteStoredImage(?string $imagePath): void
+    {
+        $path = trim((string) $imagePath);
+
+        if ($path === '') {
+            return;
+        }
+
+        foreach (['public', 'supabase_admin'] as $diskName) {
+            $disk = Storage::disk($diskName);
+
+            if ($disk->exists($path)) {
+                $disk->delete($path);
+                return;
+            }
+        }
+    }
+
+    private function buildAttachmentFileName($file, string $fallbackPrefix): string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        $name = pathinfo((string) $file->getClientOriginalName(), PATHINFO_FILENAME);
+        $slug = Str::slug($name);
+
+        if ($slug === '') {
+            $slug = $fallbackPrefix;
+        }
+
+        return $slug . '-' . Str::random(12) . '.' . $extension;
     }
 }

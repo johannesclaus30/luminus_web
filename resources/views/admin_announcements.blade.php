@@ -12,23 +12,21 @@
 </head>
 <body>
     
-    <nav class="nav-main">
-        <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
-    </nav>
+    @include('partials.admin-navbar')
 
     <div class="layout-wrapper">
         <div class="admin-menu">
             <div>
                 <p class="text-titles">Admin Menu</p>
 
-                <a href="dashboard" class="admin-menu-buttons">Admin Dashboard</a>
-                <a href="directory" class="admin-menu-buttons">Alumni Directory</a>
-                <a href="announcements" class="admin-menu-current">Announcement Editor</a>
-                <a href="events" class="admin-menu-buttons">Event Organizer</a>
-                <a href="perks" class="admin-menu-buttons">Perks and Discounts</a>
-                <a href="alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
-                <a href="messages" class="admin-menu-buttons">Messages</a>
-                <a href="settings" class="admin-menu-buttons">Settings</a>
+                <a href="{{ url('/admin/dashboard') }}" class="admin-menu-buttons">Admin Dashboard</a>
+                <a href="{{ route('admin.directory') }}" class="admin-menu-buttons">Alumni Directory</a>
+                <a href="{{ route('announcements.index') }}" class="admin-menu-current">Announcement Editor</a>
+                <a href="{{ route('events.index') }}" class="admin-menu-buttons">Event Organizer</a>
+                <a href="{{ route('perks.index') }}" class="admin-menu-buttons">Perks and Discounts</a>
+                <a href="{{ url('/admin/alumni_tracer') }}" class="admin-menu-buttons">NU Alumni Tracer</a>
+                <a href="{{ url('/admin/messages') }}" class="admin-menu-buttons">Messages</a>
+                <a href="{{ route('admin.settings') }}" class="admin-menu-buttons">Settings</a>
             </div>
 
             <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
@@ -84,7 +82,7 @@
 
                                     @if (in_array($extension, $imageExtensions))
                                         <img
-                                            src="{{ asset('storage/' . $path) }}"
+                                            src="{{ $attachment->image_url }}"
                                             alt="Announcement"
                                             class="perk-image" {{-- The JS looks for this class --}}
                                             style="width: 80px; height: 80px; object-fit: cover; border-radius: 5px; border: 1px solid #eee;"

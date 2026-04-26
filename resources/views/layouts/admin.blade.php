@@ -14,9 +14,7 @@
 </head>
 <body>
 
-<nav class="nav-main">
-    <img class="nav-logo" src="/assets/logos/LumiNUs_Logo_Landscape_White.png" alt="LumiNUs Logo">
-</nav>
+@include('partials.admin-navbar')
 
 <!-- PAGE CONTENT -->
 @yield('content')

@@ -55,16 +55,29 @@ button {
     padding-right: 25px;
     text-decoration: none;
     border-radius: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.add-perks-button:hover {
+    background-color: #28316e;     /* slightly darker blue */
 }
 
-/* Archived toggle button styles */
+/* Default (inactive) “Archived Perks” button → gray */
 .archived-toggle {
-    background-color: #ff7a59; /* initial archived button color (orange) */
+    background-color: #6c757d;      /* gray */
+    color: #ffffff;
+    transition: background-color 0.3s ease;
+}
+.archived-toggle:hover {
+    background-color: #5a6268;      /* slightly darker gray */
+}
+
+/* Active state when viewing archived list → light green */
+.archived-toggle.active {
+    background-color: #28a745;      /* green */
     color: #ffffff;
 }
-.archived-toggle.active {
-    background-color: #28a745; /* active state when viewing archived (green) */
-    color: #ffffff;
+.archived-toggle.active:hover {
+    background-color: #218838;      /* darker green on hover */
 }
 
 .perks-container {
