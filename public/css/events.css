@@ -876,3 +876,293 @@ label {
     border: 1px solid #d9d9d9;
     box-sizing: border-box;
 }
+
+/* ===================== EVENT CARD ENHANCEMENTS ===================== */
+
+/* Soft shadow and smooth transition */
+.events-container.event-card {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 18px;
+    overflow: hidden;  /* so the left accent doesn't break corners */
+    position: relative;
+}
+
+/* Coloured left border based on event type */
+.event-card-online  { border-left: 6px solid #4CAF50; }
+.event-card-inperson { border-left: 6px solid #FF9800; }
+.event-card-hybrid { border-left: 6px solid #9C27B0; }
+
+/* Hover lift */
+.events-container.event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* Header row (title + badges) */
+.event-header-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.event-header-row .events-title-text {
+    margin: 0;
+    font-size: 22px;
+    flex: 1;
+}
+
+.event-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Status badge styles (if not already present) */
+.status-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-active {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.badge-archived {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+/* Details list */
+.events-details-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 14px;
+    color: #444242;
+    line-height: 1.4;
+}
+
+.detail-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.coords {
+    color: #888;
+    font-size: 12px;
+}
+
+.platform-link {
+    color: #32418c;
+    text-decoration: underline;
+    word-break: break-all;
+}
+
+/* Attachments grid */
+.attachment-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.attachment-thumb {
+    width: 75px;
+    height: 75px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid #eee;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.attachment-thumb:hover {
+    transform: scale(1.05);
+    border-color: #32418c;
+}
+
+.no-attachments {
+    color: #999;
+    font-size: 13px;
+    padding: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+/* Capacity stat */
+.capacity-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+}
+
+.capacity-icon {
+    font-size: 28px;
+}
+
+.capacity-label {
+    display: block;
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.capacity-number {
+    font-size: 22px;
+    color: #32418c;
+    font-weight: 700;
+}
+
+/* Empty state */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 50px 20px;
+    text-align: center;
+    border: 1px dashed #ccc;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.empty-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #444242;
+    margin-bottom: 5px;
+}
+
+.empty-sub {
+    color: #888;
+    font-size: 14px;
+}
+
+/* Responsive tweaks for the map */
+@media (max-width: 768px) {
+    .venue-mini-map {
+        max-width: 100%;
+    }
+
+    .events-tools {
+        width: 100%;
+        flex: 1 1 100%;
+        min-width: unset;
+    }
+}
+
+/* ===================== CUSTOM CONFIRMATION MODAL ===================== */
+
+.confirm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.confirm-modal-box {
+    background: #fff;
+    border-radius: 24px;
+    padding: 32px 28px 28px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+    animation: modalPop 0.25s ease-out;
+}
+
+@keyframes modalPop {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.confirm-modal-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.confirm-modal-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #444242;
+    margin: 0 0 8px;
+}
+
+.confirm-modal-message {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    color: #696969;
+    margin: 0 0 24px;
+    line-height: 1.4;
+}
+
+.confirm-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.confirm-btn {
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: 25px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    min-width: 120px;
+}
+
+.confirm-btn:active {
+    transform: scale(0.96);
+}
+
+.confirm-btn-cancel {
+    background: #e0e0e0;
+    color: #444242;
+}
+
+.confirm-btn-cancel:hover {
+    background: #d0d0d0;
+}
+
+.confirm-btn-ok {
+    background: #32418c;
+    color: #fbd117;
+}
+
+.confirm-btn-ok:hover {
+    opacity: 0.9;
+}
