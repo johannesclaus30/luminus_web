@@ -88,13 +88,20 @@ button {
     margin-bottom: 10px;
 }
 .events-description-text {
-    width: 340px;
+    width: 100%;
+    max-width: 400px;     
     font-family: 'Poppins', sans-serif;
     color: #696969;
     font-size: 16px;
     font-weight: 400;
     margin-bottom: 10px;
 }
+
+/* .events-description-text {
+    width: 100%;          
+    max-width: 400px;     
+    
+} */
 
 .events-image-container {
     background-color: #F9F9F9;
@@ -843,4 +850,29 @@ label {
     .venue-map {
         height: 220px;
     }
+}
+
+/* Event type badges */
+.event-type-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: capitalize;
+    color: #fff;
+    line-height: 1.4;
+}
+.badge-online { background-color: #4CAF50; }
+.badge-inperson { background-color: #FF9800; }
+.badge-hybrid { background-color: #9C27B0; }
+
+.venue-mini-map {
+    width: 100%;
+    max-width: 400px;
+    height: 150px;
+    border-radius: 12px;
+    margin-top: 8px;
+    border: 1px solid #d9d9d9;
+    box-sizing: border-box;
 }

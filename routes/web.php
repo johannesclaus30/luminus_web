@@ -5,6 +5,7 @@ use App\Http\Controllers\PerksController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\TracerFormController;
 
 Route::prefix('admin')->group(function () {
     Route::get('/login', [AdminController::class, 'showLogin'])
@@ -105,9 +106,32 @@ Route::prefix('admin')->group(function () {
             return view('admin_dashboard');
         });
 
-        Route::get('/alumni_tracer', function () {
-            return view('admin_alumni_tracer');
-        });
+        Route::get('/alumni_tracer', [TracerFormController::class, 'index'])
+            ->name('admin.alumni_tracer');
+
+        Route::get('/alumni_tracer/list', [TracerFormController::class, 'list'])
+            ->name('admin.alumni_tracer.list');
+
+        Route::get('/alumni_tracer/deleted', [TracerFormController::class, 'deleted'])
+            ->name('admin.alumni_tracer.deleted');
+
+        Route::get('/alumni_tracer/{id}', [TracerFormController::class, 'show'])
+            ->name('admin.alumni_tracer.show');
+
+        Route::post('/alumni_tracer', [TracerFormController::class, 'store'])
+            ->name('admin.alumni_tracer.store');
+
+        Route::put('/alumni_tracer/{id}', [TracerFormController::class, 'update'])
+            ->name('admin.alumni_tracer.update');
+
+        Route::delete('/alumni_tracer/{id}', [TracerFormController::class, 'destroy'])
+            ->name('admin.alumni_tracer.destroy');
+
+        Route::put('/alumni_tracer/{id}/restore', [TracerFormController::class, 'restore'])
+            ->name('admin.alumni_tracer.restore');
+
+        Route::post('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
+            ->name('admin.alumni_tracer.toggle-status');
 
         Route::get('/messages', function () {
             return view('admin_messages');
@@ -115,13 +139,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('/settings', [AdminController::class, 'settings'])
             ->name('admin.settings');
-
     });
 });
-
-// OTHER
 
 Route::get('/', function () {
     return view('welcome');
 });
-

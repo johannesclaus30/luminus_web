@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Digital Alumni Tracer | LumiNUs Admin</title>
 
     <link rel="stylesheet" href="/css/admin.css">
@@ -46,7 +47,8 @@
                                 <span class="status-badge" id="surveyStatusDisplay">Accepting Responses</span>
                             </div>
                             <div class="panel-actions">
-                                <button class="btn-primary" id="previewBtn">👁 Preview</button>
+                                <button class="btn-gray" id="previewBtn">👁 Preview</button>
+                                <button class="btn-primary" id="saveBtn">💾 Save</button>
                             </div>
                         </div>
 
@@ -81,7 +83,7 @@
                                 <h2>Manage Surveys</h2>
                             </div>
                         </div>
-                        <div style="overflow-x: auto;">
+                        <div style="overflow-x: auto; margin-bottom: 28px;">
                             <table style="width: 100%; border-collapse: collapse;" id="manageTable">
                                 <thead>
                                     <tr style="background: #f3f4f6; text-align: left;">
@@ -93,6 +95,23 @@
                                 <tbody id="manageTableBody"></tbody>
                             </table>
                         </div>
+                        <div class="panel-header" style="margin-top: 12px;">
+                            <div class="header-titles">
+                                <h2>Recently Deleted Surveys</h2>
+                            </div>
+                        </div>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse;" id="deletedTable">
+                                <thead>
+                                    <tr style="background: #f3f4f6; text-align: left;">
+                                        <th style="padding: 12px;">Title</th>
+                                        <th style="padding: 12px;">Deleted At</th>
+                                        <th style="padding: 12px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="deletedTableBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -101,7 +120,7 @@
                     <h2 class="sidebar-title">Alumni Tracer</h2>
                     <button id="addNewTracerBtn" class="add-tracer-btn">+ Add New Alumni Tracer</button>
                     <div class="sidebar-tabs">
-                        <button class="tab-btn active" id="tabAddNew">Add New Survey</button>
+                        <button class="tab-btn active" id="tabAddNew">All Surveys</button>
                         <button class="tab-btn" id="tabManage">Manage Surveys</button>
                     </div>
                     <div class="survey-list" id="surveyList"></div>
@@ -128,10 +147,11 @@
                     status: 'Active',
                     logo: 'NU',
                     headerPhoto: '/assets/logos/nu_banner.png',
+                    persisted: false,
                     questions: [
                         { id: 101, type: 'text', question_text: 'Full Name', subtitle: '', required: true },
                         { id: 102, type: 'choice', question_text: 'Employment Status', subtitle: 'Select your current status', required: true, display_type: 'list', options: [ { label: 'Employed', go_to: null }, { label: 'Unemployed', go_to: null }, { label: 'Self-employed', go_to: null } ], other_enabled: false },
-                        { id: 103, type: 'likert', question_text: 'Rate your overall satisfaction', subtitle: '', required: false, scale_points: 5, scale_labels: ['Very Dissatisfied', '', '', '', 'Very Satisfied'] },
+                        { id: 103, type: 'likert', question_text: 'Rate the following aspects', subtitle: '1 = Very Dissatisfied, 5 = Very Satisfied', required: false, scale_points: 5, scale_labels: ['Very Dissatisfied', '', '', '', 'Very Satisfied'], statements: [ { id: 1001, text: 'Quality of Education' }, { id: 1002, text: 'Facilities' }, { id: 1003, text: 'Faculty Support' } ] },
                         { id: 104, type: 'section_header', question_text: 'Educational Background', subtitle: '', required: false }
                     ]
                 },
@@ -141,6 +161,7 @@
                     status: 'Closed',
                     logo: 'NU',
                     headerPhoto: '/assets/logos/nu_banner.png',
+                    persisted: false,
                     questions: [
                         { id: 201, type: 'checkbox', question_text: 'Which skills have you acquired?', subtitle: 'Select all that apply', required: true, display_type: 'list', options: [ { label: 'Communication', go_to: null }, { label: 'Leadership', go_to: null } ], other_enabled: true }
                     ]
@@ -149,6 +170,7 @@
 
             let currentSurveyId = surveys[0].id;
             let questionCounter = 0;
+            let deletedSurveys = [];
 
             // DOM references
             const formBuilder = document.getElementById('formBuilder');
@@ -159,6 +181,7 @@
             const headerPhotoImg = document.getElementById('headerPhotoImg');
             const surveyListContainer = document.getElementById('surveyList');
             const manageTableBody = document.getElementById('manageTableBody');
+            const deletedTableBody = document.getElementById('deletedTableBody');
             const tabAddNew = document.getElementById('tabAddNew');
             const tabManage = document.getElementById('tabManage');
             const editorView = document.getElementById('editorView');
@@ -167,6 +190,11 @@
             const previewContent = document.getElementById('previewContent');
             const closePreview = document.getElementById('closePreview');
             const previewBtn = document.getElementById('previewBtn');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const tracerListUrl = "{{ route('admin.alumni_tracer.list') }}";
+            const tracerDeletedUrl = "{{ route('admin.alumni_tracer.deleted') }}";
+            const tracerStoreUrl = "{{ route('admin.alumni_tracer.store') }}";
+            const tracerUpdateBaseUrl = "{{ url('/admin/alumni_tracer') }}";
 
             // Branding upload elements
             const changeLogoBtn = document.getElementById('changeLogoBtn');
@@ -179,6 +207,10 @@
                 return Date.now() + Math.floor(Math.random()*1000) + questionCounter++;
             }
 
+            function generateStatementId() {
+                return 'stmt_' + Date.now() + Math.floor(Math.random()*1000) + questionCounter++;
+            }
+
             function createEmptyQuestion(type = 'text') {
                 const base = { id: generateQuestionId(), type, question_text: '', subtitle: '', required: false };
                 if (type === 'choice' || type === 'checkbox') {
@@ -188,6 +220,7 @@
                 } else if (type === 'likert') {
                     base.scale_points = 5;
                     base.scale_labels = Array(5).fill('');
+                    base.statements = [{ id: generateStatementId(), text: '' }];
                 }
                 return base;
             }
@@ -196,38 +229,123 @@
                 return surveys.find(s => s.id === currentSurveyId);
             }
 
-            // Sync DOM back to survey object
-            function syncBuilderToSurvey() {
-                const survey = getCurrentSurvey();
-                if (!survey) return;
-                survey.logo = surveyLogoText.innerText === '' ? 'NU' : surveyLogoText.innerText;
-                survey.headerPhoto = headerPhotoImg.src;
-                const cards = document.querySelectorAll('.question-card-builder');
-                survey.questions = [];
-                cards.forEach(card => {
-                    const q = {
+            function normalizeServerSurvey(form) {
+                return {
+                    id: form.id,
+                    title: form.form_title || '',
+                    status: form.is_active ? 'Active' : 'Closed',
+                    logo: 'NU',
+                    headerPhoto: form.form_header || '/assets/logos/nu_banner.png',
+                    persisted: true,
+                    deletedAt: form.deleted_at || null,
+                    questions: (form.questions || []).map(question => {
+                        const settings = question.settings || {};
+                        const normalized = {
+                            id: question.id,
+                            type: question.type || 'text',
+                            question_text: question.question_text || '',
+                            subtitle: question.description || '',
+                            required: !!question.is_required,
+                        };
+
+                        if (normalized.type === 'choice' || normalized.type === 'checkbox') {
+                            normalized.options = (question.options || []).map(option => ({
+                                label: option.option_label || option.option_value || '',
+                                go_to: null,
+                            }));
+                            normalized.other_enabled = !!settings.other_enabled;
+                            normalized.display_type = settings.display_type || 'list';
+                        } else if (normalized.type === 'likert') {
+                            const points = settings.scale_points || 5;
+                            normalized.scale_points = points;
+                            normalized.scale_labels = settings.scale_labels || Array(points).fill('');
+                            normalized.statements = (settings.statements || []).map(statement => ({
+                                id: statement.id || generateStatementId(),
+                                text: statement.text || '',
+                            }));
+                        }
+
+                        return normalized;
+                    }),
+                };
+            }
+
+            async function loadTracerData() {
+                try {
+                    const [activeResponse, deletedResponse] = await Promise.all([
+                        fetch(tracerListUrl, { headers: { Accept: 'application/json' } }),
+                        fetch(tracerDeletedUrl, { headers: { Accept: 'application/json' } }),
+                    ]);
+
+                    if (!activeResponse.ok || !deletedResponse.ok) {
+                        throw new Error('Failed to load tracer forms.');
+                    }
+
+                    const activeForms = await activeResponse.json();
+                    const deletedForms = await deletedResponse.json();
+
+                    surveys.splice(0, surveys.length, ...activeForms.map(normalizeServerSurvey));
+                    deletedSurveys = deletedForms.map(normalizeServerSurvey);
+                    currentSurveyId = surveys.length ? surveys[0].id : null;
+                } catch (error) {
+                    deletedSurveys = [];
+                }
+            }
+
+            function collectSurveyFromBuilder() {
+                const currentSurvey = getCurrentSurvey();
+                const questions = [];
+
+                document.querySelectorAll('.question-card-builder').forEach(card => {
+                    const question = {
                         id: parseInt(card.dataset.questionId),
                         type: card.querySelector('.type-select').value,
                         question_text: card.querySelector('.question-text-input').value,
                         subtitle: card.querySelector('.subtitle-input').value,
-                        required: card.querySelector('.required-toggle input').checked
+                        required: card.querySelector('.required-toggle input').checked,
                     };
-                    if (q.type === 'choice' || q.type === 'checkbox') {
-                        q.options = [];
+
+                    if (question.type === 'choice' || question.type === 'checkbox') {
+                        question.options = [];
                         card.querySelectorAll('.option-row').forEach(row => {
-                            q.options.push({
+                            question.options.push({
                                 label: row.querySelector('.option-label').value,
-                                go_to: row.querySelector('.goto-select')?.value || null
+                                go_to: row.querySelector('.goto-select')?.value || null,
                             });
                         });
-                        q.other_enabled = card.querySelector('.other-toggle input')?.checked || false;
-                        q.display_type = card.querySelector('.display-type-toggle input')?.checked ? 'dropdown' : 'list';
-                    } else if (q.type === 'likert') {
-                        q.scale_points = parseInt(card.querySelector('.scale-points-input').value) || 5;
-                        q.scale_labels = Array.from(card.querySelectorAll('.scale-label-item input')).map(inp => inp.value);
+                        question.other_enabled = card.querySelector('.other-toggle input')?.checked || false;
+                        question.display_type = card.querySelector('.display-type-toggle input')?.checked ? 'dropdown' : 'list';
+                    } else if (question.type === 'likert') {
+                        question.scale_points = parseInt(card.querySelector('.scale-points-input').value) || 5;
+                        question.scale_labels = Array.from(card.querySelectorAll('.scale-label-item input')).map(inp => inp.value);
+                        question.statements = [];
+                        card.querySelectorAll('.likert-statement-row').forEach(row => {
+                            question.statements.push({
+                                id: row.dataset.statementId,
+                                text: row.querySelector('.statement-text-input').value,
+                            });
+                        });
                     }
-                    survey.questions.push(q);
+
+                    questions.push(question);
                 });
+
+                return {
+                    id: currentSurvey ? currentSurvey.id : null,
+                    title: surveyTitleInput.value,
+                    status: surveyStatusDisplay.textContent === 'Accepting Responses' ? 'Active' : (surveyStatusDisplay.textContent === 'Closed' ? 'Closed' : 'Draft'),
+                    logo: surveyLogoText.innerText === '' ? 'NU' : surveyLogoText.innerText,
+                    headerPhoto: headerPhotoImg.src,
+                    persisted: currentSurvey ? !!currentSurvey.persisted : false,
+                    questions,
+                };
+            }
+
+            // Sync DOM back to survey object
+            function syncBuilderToSurvey() {
+                const survey = getCurrentSurvey();
+                if (!survey) return;
+                Object.assign(survey, collectSurveyFromBuilder());
                 refreshAllGoToDropdowns();
             }
 
@@ -323,8 +441,14 @@
                 } else if (type === 'likert') {
                     const points = question.scale_points || 5;
                     const labels = question.scale_labels || Array(points).fill('');
+                    const statements = question.statements || [{ id: generateStatementId(), text: '' }];
                     bodyElement.innerHTML = `
-                        <div class="likert-setup"><div><label>Scale Points</label><input type="number" class="form-control scale-points-input" min="2" max="10" value="${points}"></div></div>
+                        <div class="likert-setup">
+                            <div>
+                                <label>Scale Points</label>
+                                <input type="number" class="form-control scale-points-input" min="2" max="10" value="${points}">
+                            </div>
+                        </div>
                         <div class="scale-labels-editor">
                             ${labels.map((label, i) => `
                                 <div class="scale-label-item">
@@ -333,6 +457,20 @@
                                 </div>
                             `).join('')}
                         </div>
+
+                        <div class="likert-statements-section">
+                            <label style="margin-top: 15px;">Statements (rows)</label>
+                            <div class="likert-statements-list">
+                                ${statements.map(stmt => `
+                                    <div class="likert-statement-row" data-statement-id="${stmt.id}">
+                                        <input type="text" class="form-control statement-text-input" value="${stmt.text || ''}" placeholder="Enter statement">
+                                        <button class="remove-statement-btn" title="Remove statement">&times;</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <button class="add-statement-btn">+ Add Statement</button>
+                        </div>
+
                         <div class="scale-preview" id="scalePreview">${generateScalePoints(points)}</div>
                     `;
                 } else if (type === 'text') {
@@ -355,7 +493,7 @@
                     const qText = card.querySelector('.question-text-input').value;
                     const subtitle = card.querySelector('.subtitle-input').value;
                     const required = card.querySelector('.required-toggle input').checked;
-                    loadTypeBody(body, { type: newType, question_text: qText, subtitle, required, options: [], scale_points: 5, scale_labels: [], other_enabled: false, display_type: 'list' });
+                    loadTypeBody(body, { type: newType, question_text: qText, subtitle, required, options: [], scale_points: 5, scale_labels: [], statements: [], other_enabled: false, display_type: 'list' });
                     attachBodyEvents(card);
                     syncBuilderToSurvey();
                     refreshAllGoToDropdowns();
@@ -377,6 +515,8 @@
                     if (!origQ) return;
                     const clone = JSON.parse(JSON.stringify(origQ));
                     clone.id = generateQuestionId();
+                    // regen statement IDs for duplicate
+                    if (clone.statements) clone.statements = clone.statements.map(s => ({ ...s, id: generateStatementId() }));
                     const newCard = buildCardElement(clone);
                     card.after(newCard);
                     updateQuestionNumbers();
@@ -453,6 +593,39 @@
                     });
                     card.querySelectorAll('.scale-labels-editor input').forEach(inp => inp.addEventListener('input', syncBuilderToSurvey));
                 }
+
+                // Likert statements
+                const addStatementBtn = card.querySelector('.add-statement-btn');
+                if (addStatementBtn) {
+                    addStatementBtn.addEventListener('click', () => {
+                        const list = card.querySelector('.likert-statements-list');
+                        const newRow = document.createElement('div');
+                        newRow.className = 'likert-statement-row';
+                        newRow.dataset.statementId = generateStatementId();
+                        newRow.innerHTML = `
+                            <input type="text" class="form-control statement-text-input" placeholder="Enter statement">
+                            <button class="remove-statement-btn" title="Remove statement">&times;</button>
+                        `;
+                        list.appendChild(newRow);
+                        newRow.querySelector('.remove-statement-btn').addEventListener('click', () => {
+                            newRow.remove();
+                            syncBuilderToSurvey();
+                        });
+                        newRow.querySelector('.statement-text-input').addEventListener('input', syncBuilderToSurvey);
+                        syncBuilderToSurvey();
+                    });
+                }
+
+                card.querySelectorAll('.remove-statement-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        btn.closest('.likert-statement-row').remove();
+                        syncBuilderToSurvey();
+                    });
+                });
+
+                card.querySelectorAll('.statement-text-input').forEach(inp => {
+                    inp.addEventListener('input', syncBuilderToSurvey);
+                });
             }
 
             function buildCardElement(questionData) {
@@ -494,6 +667,9 @@
                 return card;
             }
 
+            // ... (rest of the functions: updateQuestionNumbers, addBetweenButtons, enableDragDrop, handleDrag events, renderSidebar, selectSurvey, renderManageTable, switchToEditor, switchToManage, resetForm, deleteSurvey, openPreview, branding uploads, button listeners) ...
+            // They remain exactly as provided, but ensure the openPreview() function is updated as below.
+
             function updateQuestionNumbers() {
                 document.querySelectorAll('.question-card-builder').forEach((card, idx) => {
                     const numSpan = card.querySelector('.question-number');
@@ -524,7 +700,6 @@
                 });
             }
 
-            // Drag & Drop (unchanged)
             function enableDragDrop() {
                 const cards = document.querySelectorAll('.question-card-builder');
                 cards.forEach(card => {
@@ -561,7 +736,6 @@
             }
             function handleDragEnd() { this.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); draggedItem = null; }
 
-            // Sidebar & manage functions
             function renderSidebar() {
                 surveyListContainer.innerHTML = '';
                 surveys.forEach(survey => {
@@ -601,6 +775,11 @@
 
             function renderManageTable() {
                 manageTableBody.innerHTML = '';
+                if (!surveys.length) {
+                    manageTableBody.innerHTML = '<tr><td colspan="3" style="padding: 14px; color: #6b7280;">No active surveys yet.</td></tr>';
+                    return;
+                }
+
                 surveys.forEach(survey => {
                     const row = document.createElement('tr');
                     row.style.borderBottom = '1px solid #e5e7eb';
@@ -621,6 +800,7 @@
                     `;
                     manageTableBody.appendChild(row);
                 });
+
                 document.querySelectorAll('.status-toggle').forEach(toggle => {
                     toggle.addEventListener('change', function() {
                         const id = parseInt(this.dataset.surveyId);
@@ -635,14 +815,43 @@
                         }
                     });
                 });
+
                 document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const id = parseInt(e.target.getAttribute('data-survey-id'));
                     selectSurvey(id);
                     switchToEditor();
                 }));
+
                 document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => {
                     const id = parseInt(e.target.getAttribute('data-survey-id'));
                     deleteSurvey(id);
+                }));
+            }
+
+            function renderDeletedTable() {
+                deletedTableBody.innerHTML = '';
+                if (!deletedSurveys.length) {
+                    deletedTableBody.innerHTML = '<tr><td colspan="3" style="padding: 14px; color: #6b7280;">No recently deleted surveys.</td></tr>';
+                    return;
+                }
+
+                deletedSurveys.forEach(survey => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid #e5e7eb';
+                    const deletedAt = survey.deletedAt ? new Date(survey.deletedAt).toLocaleString() : 'Recently deleted';
+                    row.innerHTML = `
+                        <td style="padding: 12px; font-weight: 500;">${survey.title}</td>
+                        <td style="padding: 12px; color: #6b7280; font-size: 13px;">${deletedAt}</td>
+                        <td style="padding: 12px;">
+                            <button class="restore-btn" data-survey-id="${survey.id}" style="background: #047857; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Restore</button>
+                        </td>
+                    `;
+                    deletedTableBody.appendChild(row);
+                });
+
+                document.querySelectorAll('.restore-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.getAttribute('data-survey-id'));
+                    restoreSurvey(id);
                 }));
             }
 
@@ -660,6 +869,7 @@
                 tabAddNew.classList.remove('active');
                 tabManage.classList.add('active');
                 renderManageTable();
+                renderDeletedTable();
             }
 
             function resetForm() {
@@ -672,20 +882,86 @@
                 addBetweenButtons();
             }
 
-            function deleteSurvey(id) {
+            async function deleteSurvey(id) {
                 if (!confirm('Are you sure?')) return;
-                const idx = surveys.findIndex(s => s.id === id);
-                if (idx > -1) surveys.splice(idx, 1);
-                if (currentSurveyId === id) {
-                    currentSurveyId = surveys.length ? surveys[0].id : null;
-                    if (currentSurveyId) selectSurvey(currentSurveyId);
-                    else resetForm();
+                const survey = surveys.find(s => s.id === id);
+
+                try {
+                    if (survey && survey.persisted) {
+                        const response = await fetch(`${tracerUpdateBaseUrl}/${id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.error || result.message || 'Failed to delete tracer form.');
+                        }
+
+                        const deletedForm = result.form ? normalizeServerSurvey(result.form) : { ...survey, deletedAt: new Date().toISOString() };
+                        deletedSurveys.unshift(deletedForm);
+                    } else if (survey) {
+                        deletedSurveys.unshift({ ...survey, deletedAt: new Date().toISOString() });
+                    }
+
+                    const idx = surveys.findIndex(s => s.id === id);
+                    if (idx > -1) surveys.splice(idx, 1);
+
+                    if (currentSurveyId === id) {
+                        currentSurveyId = surveys.length ? surveys[0].id : null;
+                        if (currentSurveyId) selectSurvey(currentSurveyId);
+                        else resetForm();
+                    }
+
+                    renderSidebar();
+                    renderManageTable();
+                    renderDeletedTable();
+                } catch (error) {
+                    alert(error.message || 'Failed to delete tracer form.');
                 }
-                renderSidebar();
-                if (manageView.style.display !== 'none') renderManageTable();
             }
 
-            // Preview modal
+            async function restoreSurvey(id) {
+                try {
+                    const response = await fetch(`${tracerUpdateBaseUrl}/${id}/restore`, {
+                        method: 'PUT',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.error || result.message || 'Failed to restore tracer form.');
+                    }
+
+                    const restoredSurvey = normalizeServerSurvey(result.form);
+                    const deletedIndex = deletedSurveys.findIndex(s => s.id === id);
+                    if (deletedIndex > -1) deletedSurveys.splice(deletedIndex, 1);
+
+                    const activeIndex = surveys.findIndex(s => s.id === restoredSurvey.id);
+                    if (activeIndex > -1) {
+                        surveys.splice(activeIndex, 1, restoredSurvey);
+                    } else {
+                        surveys.unshift(restoredSurvey);
+                    }
+
+                    renderSidebar();
+                    renderManageTable();
+                    renderDeletedTable();
+                    selectSurvey(restoredSurvey.id);
+                } catch (error) {
+                    alert(error.message || 'Failed to restore tracer form.');
+                }
+            }
+
+            // Preview modal (updated for Likert matrix)
             function openPreview() {
                 syncBuilderToSurvey();
                 const survey = getCurrentSurvey();
@@ -699,20 +975,49 @@
                     html += '<div class="preview-question">';
                     html += `<h3>${q.question_text || 'Untitled'}</h3>`;
                     if (q.subtitle) html += `<div class="preview-subtitle">${q.subtitle}</div>`;
+
                     if (q.type === 'text') {
-                        html += '<input type="text" class="form-control" placeholder="Your answer" disabled>';
+                        html += '<textarea class="form-control" placeholder="Your answer" disabled style="resize: vertical;"></textarea>';
                     } else if (q.type === 'choice' || q.type === 'checkbox') {
-                        html += '<div class="preview-options">';
-                        q.options.forEach(opt => {
-                            html += `<label><input type="${q.type === 'choice' ? 'radio' : 'checkbox'}" disabled> ${opt.label}</label>`;
-                        });
-                        if (q.other_enabled) html += '<label><input type="checkbox" disabled> Other</label>';
-                        html += '</div>';
-                    } else if (q.type === 'likert') {
-                        html += '<div class="scale-preview" style="justify-content: flex-start; gap: 15px;">';
-                        for (let i = 0; i < (q.scale_points || 5); i++) {
-                            html += `<div class="scale-point">${i+1}</div>`;
+                        const isDropdown = q.display_type === 'dropdown';
+                        if (isDropdown) {
+                            html += '<select class="form-control" disabled>';
+                            html += '<option value="">Select an option</option>';
+                            q.options.forEach(opt => {
+                                html += `<option value="${opt.label}">${opt.label}</option>`;
+                            });
+                            if (q.other_enabled) html += '<option value="other">Other</option>';
+                            html += '</select>';
+                        } else {
+                            html += '<div class="preview-options">';
+                            q.options.forEach(opt => {
+                                html += `<label><input type="${q.type === 'choice' ? 'radio' : 'checkbox'}" disabled> ${opt.label}</label>`;
+                            });
+                            if (q.other_enabled) html += '<label><input type="checkbox" disabled> Other</label>';
+                            html += '</div>';
                         }
+                    } else if (q.type === 'likert') {
+                        const points = q.scale_points || 5;
+                        const labels = q.scale_labels || [];
+                        const statements = q.statements || [];
+
+                        html += '<div class="preview-likert-table">';
+                        html += '<table style="width:100%; border-collapse: collapse;">';
+                        html += '<thead><tr><th style="text-align:left; padding: 6px;"></th>';
+                        for (let i = 0; i < points; i++) {
+                            const label = labels[i] || (i+1).toString();
+                            html += `<th style="text-align:center; padding: 6px; font-size:12px;">${label}</th>`;
+                        }
+                        html += '</tr></thead><tbody>';
+                        statements.forEach(stmt => {
+                            html += '<tr>';
+                            html += `<td style="padding: 8px 6px; font-size:14px;">${stmt.text}</td>`;
+                            for (let i = 0; i < points; i++) {
+                                html += `<td style="text-align:center; padding: 6px;"><input type="radio" name="likert_${q.id}_${stmt.id}" disabled></td>`;
+                            }
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table>';
                         html += '</div>';
                     } else if (q.type === 'section_header') {
                         html += '<hr style="margin: 20px 0 10px;">';
@@ -775,12 +1080,73 @@
                 if (survey) survey.title = surveyTitleInput.value;
             });
 
+            document.getElementById('saveBtn').addEventListener('click', async () => {
+                syncBuilderToSurvey();
+                const formData = collectSurveyFromBuilder();
+
+                if (!formData.title.trim()) {
+                    alert('Please enter a survey title before saving.');
+                    return;
+                }
+
+                const payload = {
+                    form_title: formData.title.trim(),
+                    form_description: null,
+                    form_header: formData.headerPhoto,
+                    is_active: formData.status === 'Active',
+                    questions: formData.questions,
+                };
+
+                const currentSurvey = getCurrentSurvey();
+                const shouldUpdate = !!(currentSurvey && currentSurvey.persisted && currentSurvey.id);
+                const endpoint = shouldUpdate ? `${tracerUpdateBaseUrl}/${currentSurvey.id}` : tracerStoreUrl;
+                const method = shouldUpdate ? 'PUT' : 'POST';
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.error || result.message || 'Failed to save tracer form.');
+                    }
+
+                    const savedSurvey = normalizeServerSurvey(result.form);
+                    const currentIndex = currentSurvey ? surveys.findIndex(s => s.id === currentSurvey.id) : -1;
+
+                    if (currentIndex >= 0) {
+                        surveys.splice(currentIndex, 1, savedSurvey);
+                    } else {
+                        surveys.unshift(savedSurvey);
+                    }
+
+                    currentSurveyId = savedSurvey.id;
+                    renderSidebar();
+                    selectSurvey(savedSurvey.id);
+                    alert(result.message || 'Survey saved successfully.');
+                } catch (error) {
+                    alert(error.message || 'Failed to save tracer form.');
+                }
+            });
+
             // Initialize
-            renderSidebar();
-            if (surveys.length) selectSurvey(currentSurveyId);
-            addBetweenButtons();
-            enableDragDrop();
-            refreshAllGoToDropdowns();
+            loadTracerData().finally(() => {
+                renderSidebar();
+                if (surveys.length && currentSurveyId) selectSurvey(currentSurveyId);
+                else if (surveys.length) selectSurvey(surveys[0].id);
+                else resetForm();
+                addBetweenButtons();
+                enableDragDrop();
+                refreshAllGoToDropdowns();
+            });
         })();
     </script>
 </body>

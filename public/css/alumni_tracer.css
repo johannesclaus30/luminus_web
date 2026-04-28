@@ -144,6 +144,20 @@ label {
     opacity: 0.9;
 }
 
+.btn-gray {
+    background: #e5e7eb;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-gray:hover {
+    background: #d1d5db;
+}
+
 .change-logo-btn,
 .change-photo-btn {
     font-size: 11px;
@@ -215,7 +229,6 @@ label {
     border-radius: 12px;
     padding: 20px;
 }
-/* ... rest of original static styles ... */
 
 /* =========================================
    Right Panel: Survey Sidebar
@@ -410,7 +423,7 @@ label {
     position: relative;
     transition: box-shadow 0.2s;
     box-sizing: border-box;
-    overflow: hidden; /* Ensures content never overflows the card */
+    overflow: hidden;
 }
 
 .question-card-builder.drag-over {
@@ -433,7 +446,6 @@ label {
     cursor: grabbing;
 }
 
-/* Question text area – full width top row */
 .card-question-row {
     margin-bottom: 12px;
 }
@@ -443,7 +455,6 @@ label {
     font-weight: 500;
 }
 
-/* Subtitle / description input */
 .card-subtitle-row {
     margin-bottom: 12px;
 }
@@ -455,7 +466,6 @@ label {
     background: #fafafa;
 }
 
-/* Settings toolbar row */
 .card-toolbar {
     display: flex;
     align-items: center;
@@ -524,7 +534,6 @@ label {
     overflow: hidden;
 }
 
-/* Text preview */
 .text-preview {
     box-sizing: border-box;
     max-width: 100%;
@@ -538,7 +547,6 @@ label {
     font-size: 13px;
 }
 
-/* Options */
 .options-list {
     display: flex;
     flex-direction: column;
@@ -608,7 +616,6 @@ label {
     background: #f0f2ff;
 }
 
-/* Other toggle */
 .other-toggle {
     display: flex;
     align-items: center;
@@ -634,7 +641,6 @@ label {
     font-size: 13px;
 }
 
-/* Display type toggle */
 .display-type-toggle {
     display: flex;
     align-items: center;
@@ -731,6 +737,61 @@ label {
     background: #fff;
 }
 
+/* Likert Matrix Statements */
+.likert-statements-section {
+    margin-top: 15px;
+}
+
+.likert-statements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.likert-statement-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.statement-text-input {
+    flex: 1;
+    font-size: 13px;
+    padding: 8px 10px;
+}
+
+.remove-statement-btn {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.remove-statement-btn:hover {
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.add-statement-btn {
+    background: none;
+    border: 1px dashed var(--primary-dark);
+    color: var(--primary-dark);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.add-statement-btn:hover {
+    background: #f0f2ff;
+}
+
 /* Section header mode */
 .question-card-builder.section-header {
     background: #f8fafc;
@@ -806,10 +867,9 @@ label {
 }
 
 /* =========================================
-   NEW: Branding upload, preview modal, toggle switch
+   Branding upload, preview modal, toggle switch
    ========================================= */
 
-/* Add tracer button */
 .add-tracer-btn {
     width: 100%;
     padding: 14px;
@@ -892,9 +952,9 @@ label {
 .modal-content {
     background: #fff;
     border-radius: 16px;
-    max-width: 600px;
-    width: 90%;
-    max-height: 80vh;
+    max-width: 700px; /* slightly wider for table */
+    width: 95%;
+    max-height: 85vh;
     overflow-y: auto;
     padding: 30px;
     position: relative;
@@ -939,4 +999,26 @@ label {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* Preview table for Likert */
+.preview-likert-table {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.preview-likert-table table {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.preview-likert-table th {
+    background: #f9fafb;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.preview-likert-table td {
+    border-bottom: 1px solid #e5e7eb;
 }

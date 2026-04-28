@@ -43,7 +43,7 @@ class AdminController extends Controller
 
         if (! $passwordMatches) {
             throw ValidationException::withMessages([
-                'admin_email' => 'The provided admin credentials are incorrect.',
+                'admin_email' => 'Mali ang password.',
             ]);
         }
 
@@ -105,7 +105,7 @@ class AdminController extends Controller
             'admin_email' => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')],
             'phone_number' => ['required', 'string', 'max:50'],
             'photo' => ['nullable', 'image', 'max:2048'],
-            'admin_role' => ['required', Rule::in(['super_admin', 'moderator', 'event_coordinator'])],
+            'admin_role' => ['required', Rule::in(['Executive Director', 'Academic Director', 'Coordinator', 'Assistant Coordinator'])],
         ]);
 
         $temporaryPassword = 'password123';
