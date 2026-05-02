@@ -137,6 +137,39 @@
         </div>
     </div>
 
+    <!-- ========== ALERT MODAL ========== -->
+    <div class="modal-overlay" id="alertModal" style="display: none; z-index: 2000;">
+        <div class="modal-content alert-modal">
+            <div class="alert-modal-header">
+                <h3 id="alertModalTitle">Notification</h3>
+                <button class="modal-close" id="closeAlertModal">&times;</button>
+            </div>
+            <div class="alert-modal-body">
+                <p id="alertModalMessage"></p>
+            </div>
+            <div class="alert-modal-footer">
+                <button class="btn-primary" id="alertModalConfirm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== CONFIRM MODAL ========== -->
+    <div class="modal-overlay" id="confirmModal" style="display: none; z-index: 2000;">
+        <div class="modal-content alert-modal">
+            <div class="alert-modal-header">
+                <h3 id="confirmModalTitle">Confirm Action</h3>
+                <button class="modal-close" id="closeConfirmModal">&times;</button>
+            </div>
+            <div class="alert-modal-body">
+                <p id="confirmModalMessage"></p>
+            </div>
+            <div class="alert-modal-footer">
+                <button class="btn-gray" id="confirmModalCancel">Cancel</button>
+                <button class="btn-primary" id="confirmModalConfirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function() {
             // ===================== DATA STATE (NO HARDCODED MOCK DATA) =====================
@@ -175,6 +208,81 @@
             const changePhotoBtn = document.getElementById('changePhotoBtn');
             const photoFileInput = document.getElementById('photoFileInput');
 
+            // ========== MODAL ALERT FUNCTIONS ==========
+            function showAlert(message, title = 'Notification', type = 'info', onConfirm = null) {
+                const modal = document.getElementById('alertModal');
+                const modalContent = modal.querySelector('.alert-modal');
+                const titleEl = document.getElementById('alertModalTitle');
+                const messageEl = document.getElementById('alertModalMessage');
+                const confirmBtn = document.getElementById('alertModalConfirm');
+                
+                // Set content
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                
+                // Reset and set type styling
+                modalContent.className = 'modal-content alert-modal';
+                if (['success', 'error', 'warning', 'info'].includes(type)) {
+                    modalContent.classList.add(type);
+                }
+                
+                // Show modal
+                modal.style.display = 'flex';
+                
+                // Handle confirm
+                const handleConfirm = () => {
+                    modal.style.display = 'none';
+                    confirmBtn.removeEventListener('click', handleConfirm);
+                    if (typeof onConfirm === 'function') onConfirm();
+                };
+                
+                confirmBtn.addEventListener('click', handleConfirm);
+            }
+
+            function showConfirm(message, title = 'Confirm Action', onConfirm = null, onCancel = null) {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirmModal');
+                    const titleEl = document.getElementById('confirmModalTitle');
+                    const messageEl = document.getElementById('confirmModalMessage');
+                    const confirmBtn = document.getElementById('confirmModalConfirm');
+                    const cancelBtn = document.getElementById('confirmModalCancel');
+                    
+                    // Set content
+                    titleEl.textContent = title;
+                    messageEl.textContent = message;
+                    
+                    // Show modal
+                    modal.style.display = 'flex';
+                    
+                    const cleanup = () => {
+                        modal.style.display = 'none';
+                        confirmBtn.removeEventListener('click', handleConfirm);
+                        cancelBtn.removeEventListener('click', handleCancel);
+                        document.getElementById('closeConfirmModal').removeEventListener('click', handleCancel);
+                    };
+                    
+                    const handleConfirm = () => {
+                        cleanup();
+                        if (typeof onConfirm === 'function') onConfirm();
+                        resolve(true);
+                    };
+                    
+                    const handleCancel = () => {
+                        cleanup();
+                        if (typeof onCancel === 'function') onCancel();
+                        resolve(false);
+                    };
+                    
+                    confirmBtn.addEventListener('click', handleConfirm);
+                    cancelBtn.addEventListener('click', handleCancel);
+                    document.getElementById('closeConfirmModal').addEventListener('click', handleCancel);
+                });
+            }
+
+            function closeModal(modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            }
+
             // ---------- Utility ----------
             function generateQuestionId() {
                 return Date.now() + Math.floor(Math.random()*1000) + questionCounter++;
@@ -203,7 +311,6 @@
             }
 
             function normalizeServerSurvey(form) {
-                // Map status to display text
                 const statusMap = {
                     0: 'Deleted',
                     1: 'Active',
@@ -211,11 +318,18 @@
                     3: 'Closed'
                 };
                 
+                const statusCode = form.status;
+                const statusText = statusMap[statusCode] || 'Unknown';
+                const displayStatus = statusCode === 1 ? 'Accepting Responses' : 
+                                    statusCode === 2 ? 'Draft' : 
+                                    statusCode === 3 ? 'Closed' : 'Deleted';
+                
                 return {
                     id: form.id,
                     title: form.form_title || '',
-                    status: statusMap[form.status] || 'Unknown',
-                    statusCode: form.status, // Keep raw status code
+                    status: statusText,
+                    displayStatus: displayStatus,
+                    statusCode: statusCode,
                     logo: 'NU',
                     headerPhoto: form.form_header || '/assets/logos/nu_banner.png',
                     persisted: true,
@@ -321,18 +435,16 @@
                     questions.push(question);
                 });
 
-                // Map status text to status code
-                const statusTextToCode = {
-                    'Active': 1,
-                    'Draft': 2,
-                    'Closed': 3,
-                    'Deleted': 0
-                };
+                // Get the actual status code from the current survey or default to draft (2)
+                let statusCode = 2; // default to draft
+                if (currentSurvey) {
+                    statusCode = currentSurvey.statusCode || 2;
+                }
 
                 return {
                     id: currentSurvey ? currentSurvey.id : null,
                     title: surveyTitleInput.value,
-                    status: statusTextToCode[surveyStatusDisplay.textContent] || 1,
+                    status: statusCode,
                     logo: surveyLogoText.innerText === '' ? 'NU' : surveyLogoText.innerText,
                     headerPhoto: headerPhotoImg.src,
                     persisted: currentSurvey ? !!currentSurvey.persisted : false,
@@ -748,7 +860,7 @@
                         <div class="survey-item-icon ${survey.title.includes('SHS') ? 'warning' : ''}">NU</div>
                         <div class="survey-item-details">
                             <h4>${survey.title || 'Untitled Survey'}</h4>
-                            <span>${survey.status}</span>
+                            <span>${survey.displayStatus || survey.status}</span>
                         </div>
                     `;
                     item.addEventListener('click', () => selectSurvey(survey.id));
@@ -757,18 +869,24 @@
             }
 
             function selectSurvey(id) {
-                if (currentSurveyId === id) return;
+                if (!id || currentSurveyId === id) return;
+                
                 syncBuilderToSurvey();
                 currentSurveyId = id;
-                document.querySelectorAll('.survey-item').forEach(item => item.classList.toggle('active', parseInt(item.dataset.surveyId) === id));
+                
+                document.querySelectorAll('.survey-item').forEach(item => {
+                    item.classList.toggle('active', parseInt(item.dataset.surveyId) === id);
+                });
+                
                 const survey = getCurrentSurvey();
                 if (survey) {
                     surveyTitleInput.value = survey.title || '';
                     surveyTitleDisplay.textContent = survey.title || 'Untitled Survey';
-                    surveyStatusDisplay.textContent = survey.status === 'Active' ? 'Accepting Responses' : 'Closed';
+                    surveyStatusDisplay.textContent = survey.displayStatus || survey.status;
                     surveyLogoText.innerText = survey.logo || 'NU';
                     headerPhotoImg.src = survey.headerPhoto || '/assets/logos/nu_banner.png';
                 }
+                
                 buildFormFromSurvey();
                 addBetweenButtons();
                 enableDragDrop();
@@ -785,7 +903,7 @@
                 surveys.forEach(survey => {
                     const row = document.createElement('tr');
                     row.style.borderBottom = '1px solid #e5e7eb';
-                    const isActive = survey.status === 'Active';
+                    const isActive = survey.statusCode === 1;
                     row.innerHTML = `
                         <td style="padding: 12px; font-weight: 500;">${survey.title || 'Untitled'}</td>
                         <td style="padding: 12px;">
@@ -793,7 +911,7 @@
                                 <input type="checkbox" class="status-toggle" data-survey-id="${survey.id}" ${isActive ? 'checked' : ''}>
                                 <span class="toggle-slider"></span>
                             </label>
-                            <span style="margin-left: 8px; font-size:13px;">${survey.status}</span>
+                            <span style="margin-left: 8px; font-size:13px;">${survey.displayStatus || survey.status}</span>
                         </td>
                         <td style="padding: 12px;">
                             <button class="edit-btn" data-survey-id="${survey.id}" style="background: #32418c; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-right: 5px; cursor: pointer;">Edit</button>
@@ -804,15 +922,38 @@
                 });
 
                 document.querySelectorAll('.status-toggle').forEach(toggle => {
-                    toggle.addEventListener('change', function() {
+                    toggle.addEventListener('change', async function() {
                         const id = parseInt(this.dataset.surveyId);
                         const survey = surveys.find(s => s.id === id);
                         if (survey) {
-                            survey.status = this.checked ? 'Active' : 'Closed';
-                            renderManageTable();
-                            renderSidebar();
-                            if (id === currentSurveyId) {
-                                surveyStatusDisplay.textContent = survey.status === 'Active' ? 'Accepting Responses' : 'Closed';
+                            try {
+                                const newStatus = this.checked ? 1 : 3; // Active or Closed
+                                const response = await fetch(`${tracerUpdateBaseUrl}/${id}/toggle-status`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': csrfToken,
+                                    },
+                                    body: JSON.stringify({ status: newStatus }),
+                                });
+                                
+                                if (response.ok) {
+                                    survey.statusCode = newStatus;
+                                    survey.status = newStatus === 1 ? 'Active' : 'Closed';
+                                    survey.displayStatus = newStatus === 1 ? 'Accepting Responses' : 'Closed';
+                                    renderManageTable();
+                                    renderSidebar();
+                                    if (id === currentSurveyId) {
+                                        surveyStatusDisplay.textContent = survey.displayStatus;
+                                    }
+                                } else {
+                                    this.checked = !this.checked; // Revert on error
+                                    showAlert('Failed to update status');
+                                }
+                            } catch (error) {
+                                this.checked = !this.checked; // Revert on error
+                                showAlert('Failed to update status');
                             }
                         }
                     });
@@ -885,7 +1026,14 @@
             }
 
             async function deleteSurvey(id) {
-                if (!confirm('Are you sure you want to delete this survey?')) return;
+                const confirmed = await showConfirm(
+                    'Are you sure you want to delete this survey? This will move it to "Recently Deleted".',
+                    'Delete Survey',
+                    'warning'
+                );
+                
+                if (!confirmed) return;
+                
                 const survey = surveys.find(s => s.id === id);
 
                 try {
@@ -922,8 +1070,9 @@
                     renderSidebar();
                     renderManageTable();
                     renderDeletedTable();
+                    showAlert('Survey moved to Recently Deleted.', 'Deleted', 'success');
                 } catch (error) {
-                    alert(error.message || 'Failed to delete tracer form.');
+                    showAlert(error.message || 'Failed to delete tracer form.', 'Error', 'error');
                 }
             }
 
@@ -959,7 +1108,7 @@
                     renderDeletedTable();
                     selectSurvey(restoredSurvey.id);
                 } catch (error) {
-                    alert(error.message || 'Failed to restore tracer form.');
+                    showAlert(error.message || 'Failed to restore tracer form.');
                 }
             }
 
@@ -1040,9 +1189,47 @@
                 previewModal.style.display = 'flex';
             }
 
+            // ========== ALERT MODAL EVENT LISTENERS ==========
+            document.getElementById('closeAlertModal').addEventListener('click', () => {
+                document.getElementById('alertModal').style.display = 'none';
+            });
+
+            document.getElementById('alertModalConfirm').addEventListener('click', () => {
+                document.getElementById('alertModal').style.display = 'none';
+            });
+
+            document.getElementById('closeConfirmModal').addEventListener('click', () => {
+                document.getElementById('confirmModal').style.display = 'none';
+            });
+
+            document.getElementById('confirmModalCancel').addEventListener('click', () => {
+                document.getElementById('confirmModal').style.display = 'none';
+            });
+
+            // Close modals when clicking outside (single consolidated listener)
+            window.addEventListener('click', (e) => {
+                if (e.target === document.getElementById('alertModal')) {
+                    document.getElementById('alertModal').style.display = 'none';
+                }
+                if (e.target === document.getElementById('confirmModal')) {
+                    document.getElementById('confirmModal').style.display = 'none';
+                }
+                if (e.target === document.getElementById('previewModal')) {
+                    document.getElementById('previewModal').style.display = 'none';
+                }
+            });
+
+            // Close modals on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.getElementById('alertModal').style.display = 'none';
+                    document.getElementById('confirmModal').style.display = 'none';
+                    document.getElementById('previewModal').style.display = 'none';
+                }
+            });
+
             previewBtn.addEventListener('click', openPreview);
             closePreview.addEventListener('click', () => { previewModal.style.display = 'none'; });
-            window.addEventListener('click', (e) => { if (e.target === previewModal) previewModal.style.display = 'none'; });
 
             // Branding uploads
             changeLogoBtn.addEventListener('click', () => logoFileInput.click());
@@ -1097,15 +1284,20 @@
                 const formData = collectSurveyFromBuilder();
 
                 if (!formData.title.trim()) {
-                    alert('Please enter a survey title before saving.');
+                    showAlert('Please enter a survey title before saving.', 'Validation Error', 'error');
                     return;
+                }
+
+                let headerData = formData.headerPhoto;
+                if (headerData && headerData.startsWith('data:image')) {
+                    headerData = headerData;
                 }
 
                 const payload = {
                     form_title: formData.title.trim(),
                     form_description: null,
-                    form_header: formData.headerPhoto,
-                    status: formData.status, // Now using status instead of is_active
+                    form_header: headerData,
+                    status: formData.status,
                     questions: formData.questions,
                 };
 
@@ -1143,19 +1335,21 @@
                     currentSurveyId = savedSurvey.id;
                     renderSidebar();
                     selectSurvey(savedSurvey.id);
-                    alert(result.message || 'Survey saved successfully.');
+                    showAlert(result.message || 'Survey saved successfully.', 'Success', 'success');
                 } catch (error) {
-                    alert(error.message || 'Failed to save tracer form.');
+                    console.error('Save error:', error);
+                    showAlert(error.message || 'Failed to save tracer form.', 'Error', 'error');
                 }
             });
 
             // Initialize: Load data from backend ONLY
-            loadTracerData().finally(() => {
+            loadTracerData().then(() => {
                 renderSidebar();
-                if (surveys.length && currentSurveyId) {
+                if (surveys.length > 0) {
+                    if (!currentSurveyId) {
+                        currentSurveyId = surveys[0].id;
+                    }
                     selectSurvey(currentSurveyId);
-                } else if (surveys.length) {
-                    selectSurvey(surveys[0].id);
                 } else {
                     // Start fresh with empty form
                     resetForm();
@@ -1163,6 +1357,12 @@
                 addBetweenButtons();
                 enableDragDrop();
                 refreshAllGoToDropdowns();
+            }).catch(error => {
+                console.error('Initialization error:', error);
+                surveys = [];
+                deletedSurveys = [];
+                resetForm();
+                renderSidebar();
             });
         })();
     </script>

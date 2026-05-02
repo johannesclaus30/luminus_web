@@ -1022,3 +1022,168 @@ label {
 .preview-likert-table td {
     border-bottom: 1px solid #e5e7eb;
 }
+
+/* Fix for empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+    font-style: italic;
+    background: #f9fafb;
+    border-radius: 12px;
+    border: 2px dashed #e5e7eb;
+}
+
+/* Fix modal overflow for Likert tables */
+.modal-content {
+    max-width: 900px;
+}
+
+.preview-likert-table {
+    overflow-x: auto;
+}
+
+.preview-likert-table table {
+    min-width: 100%;
+}
+
+/* Fix for long question text */
+.question-text-input,
+.subtitle-input {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Better drag visual */
+.question-card-builder.dragging {
+    opacity: 0.5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Fix for status badge colors */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.status-badge[textContent*="Accepting"],
+.status-badge:contains("Accepting") {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge[textContent*="Closed"],
+.status-badge:contains("Closed") {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge[textContent*="Draft"],
+.status-badge:contains("Draft") {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* ========== ALERT MODAL STYLES ========== */
+.alert-modal {
+    max-width: 450px;
+    width: 90%;
+    padding: 0;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    border-radius: 16px 16px 0 0;
+}
+
+.alert-modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.alert-modal-body {
+    padding: 25px;
+    color: #4b5563;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.alert-modal-body p { margin: 0; }
+
+.alert-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 15px 25px 25px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.alert-modal-footer .btn-primary,
+.alert-modal-footer .btn-gray {
+    padding: 10px 24px;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.alert-modal-footer .btn-primary {
+    background: var(--primary-dark, #32418c);
+    color: white;
+    border: none;
+}
+
+.alert-modal-footer .btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.alert-modal-footer .btn-gray {
+    background: #e5e7eb;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.alert-modal-footer .btn-gray:hover {
+    background: #d1d5db;
+}
+
+/* Type variants */
+.alert-modal.success .alert-modal-header {
+    background: #d1fae5;
+    border-bottom-color: #10b981;
+}
+.alert-modal.success .alert-modal-header h3 { color: #065f46; }
+
+.alert-modal.error .alert-modal-header {
+    background: #fee2e2;
+    border-bottom-color: #dc2626;
+}
+.alert-modal.error .alert-modal-header h3 { color: #991b1b; }
+
+.alert-modal.warning .alert-modal-header {
+    background: #fef3c7;
+    border-bottom-color: #f59e0b;
+}
+.alert-modal.warning .alert-modal-header h3 { color: #92400e; }
+
+.alert-modal.info .alert-modal-header {
+    background: #dbeafe;
+    border-bottom-color: #3b82f6;
+}
+.alert-modal.info .alert-modal-header h3 { color: #1e40af; }

@@ -6,9 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\TracerForm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TracerFormController extends Controller
 {
+    protected $supabaseDisk;
+
+    public function __construct()
+    {
+        // Initialize Supabase storage disk
+        $this->supabaseDisk = Storage::disk('supabase_admin');
+    }
+
     public function index()
     {
         return view('admin_alumni_tracer');
@@ -81,11 +91,17 @@ class TracerFormController extends Controller
         DB::beginTransaction();
 
         try {
+            // Process form header image if present
+            $formHeaderPath = null;
+            if (!empty($validated['form_header'])) {
+                $formHeaderPath = $this->uploadFormHeader($validated['form_header'], null);
+            }
+
             $form = TracerForm::create([
                 'admin_id' => auth()->id() ?? 1,
                 'form_title' => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
-                'form_header' => $validated['form_header'] ?? null,
+                'form_header' => $formHeaderPath,
                 'status' => $validated['status'] ?? TracerForm::STATUS_ACTIVE,
             ]);
 
@@ -125,10 +141,27 @@ class TracerFormController extends Controller
         DB::beginTransaction();
 
         try {
+            // Process form header image if present
+            $formHeaderPath = $form->form_header;
+            if (!empty($validated['form_header'])) {
+                // Check if it's base64 data (new upload) or existing URL
+                if (Str::startsWith($validated['form_header'], 'data:image')) {
+                    $formHeaderPath = $this->uploadFormHeader($validated['form_header'], $form->id);
+                    
+                    // Delete old image if exists
+                    if ($form->form_header) {
+                        $this->deleteFormHeader($form->form_header);
+                    }
+                } else {
+                    // It's already a URL/path, keep it
+                    $formHeaderPath = $validated['form_header'];
+                }
+            }
+
             $form->update([
                 'form_title' => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
-                'form_header' => $validated['form_header'] ?? null,
+                'form_header' => $formHeaderPath,
                 'status' => $validated['status'] ?? $form->status,
             ]);
 
@@ -164,6 +197,11 @@ class TracerFormController extends Controller
     {
         try {
             $form = TracerForm::findOrFail($id);
+            
+            // Delete form header image if exists
+            if ($form->form_header) {
+                $this->deleteFormHeader($form->form_header);
+            }
             
             // Set status to deleted (0)
             $form->update(['status' => TracerForm::STATUS_DELETED]);
@@ -234,6 +272,75 @@ class TracerFormController extends Controller
         }
     }
 
+    /**
+     * Upload form header image to Supabase storage
+     */
+    private function uploadFormHeader(string $base64Image, ?int $formId)
+    {
+        try {
+            // Decode base64 image
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+                $base64Image = substr($base64Image, strpos($base64Image, ',') + 1);
+                $type = strtolower($type[1]); // jpg, png, gif, etc.
+                
+                $base64Image = str_replace(' ', '+', $base64Image);
+                $imageData = base64_decode($base64Image);
+                
+                if ($imageData === false) {
+                    throw new \Exception('Failed to decode base64 image');
+                }
+                
+                // Generate unique filename
+                $filename = 'header_' . time() . '_' . Str::random(10) . '.' . $type;
+                
+                // Determine folder path
+                $folderPath = $formId 
+                    ? "tracer_images/{$formId}/" 
+                    : "tracer_images/temp_" . Str::random(10) . "/";
+                
+                $fullPath = $folderPath . $filename;
+                
+                // Upload to Supabase
+                $this->supabaseDisk->put($fullPath, $imageData, [
+                    'visibility' => 'public',
+                    'Content-Type' => 'image/' . $type
+                ]);
+                
+                // Get public URL
+                $url = $this->supabaseDisk->url($fullPath);
+                
+                return $url;
+            }
+            
+            throw new \Exception('Invalid image format');
+            
+        } catch (\Exception $e) {
+            \Log::error('Failed to upload form header: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Delete form header image from Supabase storage
+     */
+    private function deleteFormHeader(string $imageUrl)
+    {
+        try {
+            // Extract path from URL
+            // Assuming URL format: https://your-project.supabase.co/storage/v1/object/public/luminus_assets/tracer_images/...
+            $path = parse_url($imageUrl, PHP_URL_PATH);
+            
+            // Extract the path after the bucket name
+            if (preg_match('/luminus_assets\/(.+)$/', $path, $matches)) {
+                $filePath = $matches[1];
+                $this->supabaseDisk->delete($filePath);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete form header: ' . $e->getMessage());
+            // Don't throw exception, just log it
+        }
+    }
+
     private function saveQuestions(TracerForm $form, array $questions)
     {
         foreach ($questions as $index => $questionData) {
@@ -257,6 +364,7 @@ class TracerFormController extends Controller
                     $question->options()->create([
                         'option_label' => $optionData['label'] ?? '',
                         'option_value' => $optionData['label'] ?? '',
+                        'order_priority' => $optIndex,
                     ]);
                 }
             }
