@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TracerAnswerOption extends Model
 {
@@ -14,7 +15,7 @@ class TracerAnswerOption extends Model
         'option_value',
     ];
 
-    public function question()
+    public function question(): BelongsTo
     {
         return $this->belongsTo(TracerQuestion::class, 'tq_id');
     }

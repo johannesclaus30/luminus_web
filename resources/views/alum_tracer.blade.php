@@ -117,7 +117,5 @@
         </div>
     </div>
 
-    {{-- this is the last update from Gemini --}}
-
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Admin; // Import the Model
+use App\Models\Admin;
 use App\Models\Alumni;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -33,13 +33,21 @@ class AdminController extends Controller
             ->where('admin_email', $credentials['admin_email'])
             ->first();
 
+        if (! $admin) {
+            throw ValidationException::withMessages([
+                'admin_email' => 'Mali ang password.',
+            ]);
+        }
+
         $storedPassword = (string) ($admin->admin_password_hash ?? '');
+        
+        // 🔐 Check if password is hashed (for backward compatibility during transition)
         $isHashedPassword = password_get_info($storedPassword)['algo'] !== 0;
 
-        $passwordMatches = $admin && (
-            $storedPassword === $credentials['password'] ||
-            ($isHashedPassword && Hash::check($credentials['password'], $storedPassword))
-        );
+        // ✅ Supports both hashed AND legacy plain-text passwords
+        $passwordMatches = $isHashedPassword 
+            ? Hash::check($credentials['password'], $storedPassword)
+            : $storedPassword === $credentials['password'];
 
         if (! $passwordMatches) {
             throw ValidationException::withMessages([
@@ -116,7 +124,7 @@ class AdminController extends Controller
             'admin_email' => $validated['admin_email'],
             'phone_number' => $validated['phone_number'],
             'photo' => null,
-            'admin_password_hash' => $temporaryPassword,
+            'admin_password_hash' => Hash::make($temporaryPassword), // 🔐 Hashed!
             'admin_role' => $validated['admin_role'],
         ]);
 
@@ -132,49 +140,49 @@ class AdminController extends Controller
     }
 
     public function updateProfile(Request $request)
-{
-    $admin = $this->getAuthenticatedAdmin($request);
+    {
+        $admin = $this->getAuthenticatedAdmin($request);
 
-    if (! $admin) {
-        abort(403);
+        if (! $admin) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'admin_first_name' => ['required', 'string', 'max:255'],
+            'admin_middle_name' => ['nullable', 'string', 'max:255'],
+            'admin_last_name'  => ['required', 'string', 'max:255'],
+            'admin_email'      => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
+            'phone_number'     => ['required', 'string', 'max:50'],
+            'photo'            => ['nullable', 'image', 'max:4096'],
+            'remove_photo'     => ['nullable', 'string'],
+        ]);
+
+        // Handle photo removal (priority over new upload)
+        if ($request->has('remove_photo') && $request->input('remove_photo') == '1') {
+            $this->deleteAdminPhoto($admin->photo);
+            $admin->photo = null;
+        } elseif ($request->hasFile('photo')) {
+            $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, $admin->photo);
+        }
+
+        // Update other fields
+        $admin->admin_first_name = $validated['admin_first_name'];
+        $admin->admin_middle_name = $validated['admin_middle_name'] ?? null;
+        $admin->admin_last_name  = $validated['admin_last_name'];
+        $admin->admin_email      = $validated['admin_email'];
+        $admin->phone_number     = $validated['phone_number'];
+        $admin->save();
+
+        // Update session data
+        $request->session()->put([
+            'admin_email' => $admin->admin_email,
+            'admin_name'  => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
+        ]);
+
+        return redirect()
+            ->route('admin.settings', ['section' => 'account'])
+            ->with('status', 'Account information updated successfully.');
     }
-
-    $validated = $request->validate([
-        'admin_first_name' => ['required', 'string', 'max:255'],
-        'admin_middle_name' => ['nullable', 'string', 'max:255'],
-        'admin_last_name'  => ['required', 'string', 'max:255'],
-        'admin_email'      => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
-        'phone_number'     => ['required', 'string', 'max:50'],
-        'photo'            => ['nullable', 'image', 'max:4096'],
-        'remove_photo'     => ['nullable', 'string'], // new validation rule
-    ]);
-
-    // Handle photo removal (priority over new upload)
-    if ($request->has('remove_photo') && $request->input('remove_photo') == '1') {
-        $this->deleteAdminPhoto($admin->photo);
-        $admin->photo = null;
-    } elseif ($request->hasFile('photo')) {
-        $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, $admin->photo);
-    }
-
-    // Update other fields
-    $admin->admin_first_name = $validated['admin_first_name'];
-    $admin->admin_middle_name = $validated['admin_middle_name'] ?? null;
-    $admin->admin_last_name  = $validated['admin_last_name'];
-    $admin->admin_email      = $validated['admin_email'];
-    $admin->phone_number     = $validated['phone_number'];
-    $admin->save();
-
-    // Update session data
-    $request->session()->put([
-        'admin_email' => $admin->admin_email,
-        'admin_name'  => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
-    ]);
-
-    return redirect()
-        ->route('admin.settings', ['section' => 'account'])
-        ->with('status', 'Account information updated successfully.');
-}
 
     public function storeAlumni(Request $request)
     {
@@ -219,11 +227,11 @@ class AdminController extends Controller
             'last_name' => $validated['last_name'],
             'date_of_birth' => $validated['date_of_birth'] ?? null,
             'sex' => $validated['sex'] ?? null,
-            'year_graduated' => $validated['year_graduated'], // Now saving the exact date from Excel
+            'year_graduated' => $validated['year_graduated'],
             'student_id_number' => $validated['student_id_number'],
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
-            'password_hash' => 'password123',
+            'password_hash' => Hash::make('password123'), // 🔐 Hashed!
             'verification_status' => 'pending',
             'program' => $validated['program'] ?? null,
             'card_photo' => $cardPhotoPath,

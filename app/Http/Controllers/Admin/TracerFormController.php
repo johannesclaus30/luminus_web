@@ -16,29 +16,56 @@ class TracerFormController extends Controller
 
     public function list()
     {
-        $forms = TracerForm::with(['questions.options'])
-            ->orderByDesc('id')
-            ->get();
+        try {
+            // Get all non-deleted forms (status != 0)
+            $forms = TracerForm::with(['questions.options'])
+                ->where('status', '!=', TracerForm::STATUS_DELETED)
+                ->orderByDesc('created_at')
+                ->get();
 
-        return response()->json($forms);
+            return response()->json($forms);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to load tracer forms: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to load forms',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function deleted()
     {
-        $forms = TracerForm::onlyTrashed()
-            ->with(['questions.options'])
-            ->orderByDesc('deleted_at')
-            ->get();
+        try {
+            // Get only deleted forms (status = 0)
+            $forms = TracerForm::with(['questions.options'])
+                ->where('status', TracerForm::STATUS_DELETED)
+                ->orderByDesc('updated_at')
+                ->get();
 
-        return response()->json($forms);
+            return response()->json($forms);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to load deleted tracer forms: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to load deleted forms',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function show($id)
     {
-        $form = TracerForm::with(['questions.options'])
-            ->findOrFail($id);
+        try {
+            $form = TracerForm::with(['questions.options'])
+                ->where('status', '!=', TracerForm::STATUS_DELETED)
+                ->findOrFail($id);
 
-        return response()->json($form);
+            return response()->json($form);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'Form not found',
+                'message' => $e->getMessage()
+            ], 404);
+        }
     }
 
     public function store(Request $request)
@@ -47,8 +74,8 @@ class TracerFormController extends Controller
             'form_title' => 'required|string|max:255',
             'form_description' => 'nullable|string',
             'form_header' => 'nullable|string',
-            'is_active' => 'boolean',
-            'questions' => 'array',
+            'status' => 'integer|in:1,2,3', // 1=active, 2=draft, 3=closed
+            'questions' => 'nullable|array',
         ]);
 
         DB::beginTransaction();
@@ -59,19 +86,22 @@ class TracerFormController extends Controller
                 'form_title' => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
                 'form_header' => $validated['form_header'] ?? null,
-                'is_active' => $validated['is_active'] ?? true,
+                'status' => $validated['status'] ?? TracerForm::STATUS_ACTIVE,
             ]);
 
-            $this->saveQuestions($form, $request->input('questions', []));
+            if (!empty($validated['questions'])) {
+                $this->saveQuestions($form, $validated['questions']);
+            }
 
             DB::commit();
 
             return response()->json([
                 'message' => 'Tracer form saved successfully.',
                 'form' => $form->load('questions.options')
-            ]);
+            ], 201);
         } catch (\Throwable $e) {
             DB::rollBack();
+            \Log::error('Failed to save tracer form: ' . $e->getMessage());
 
             return response()->json([
                 'message' => 'Failed to save tracer form.',
@@ -88,8 +118,8 @@ class TracerFormController extends Controller
             'form_title' => 'required|string|max:255',
             'form_description' => 'nullable|string',
             'form_header' => 'nullable|string',
-            'is_active' => 'boolean',
-            'questions' => 'array',
+            'status' => 'integer|in:1,2,3',
+            'questions' => 'nullable|array',
         ]);
 
         DB::beginTransaction();
@@ -99,11 +129,19 @@ class TracerFormController extends Controller
                 'form_title' => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
                 'form_header' => $validated['form_header'] ?? null,
-                'is_active' => $validated['is_active'] ?? true,
+                'status' => $validated['status'] ?? $form->status,
             ]);
 
+            // Delete existing questions and options
+            foreach ($form->questions as $question) {
+                $question->options()->delete();
+            }
             $form->questions()->delete();
-            $this->saveQuestions($form, $request->input('questions', []));
+
+            // Save new questions
+            if (!empty($validated['questions'])) {
+                $this->saveQuestions($form, $validated['questions']);
+            }
 
             DB::commit();
 
@@ -113,6 +151,7 @@ class TracerFormController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
+            \Log::error('Failed to update tracer form: ' . $e->getMessage());
 
             return response()->json([
                 'message' => 'Failed to update tracer form.',
@@ -123,30 +162,76 @@ class TracerFormController extends Controller
 
     public function destroy($id)
     {
-        $form = TracerForm::findOrFail($id);
-        $form->delete();
+        try {
+            $form = TracerForm::findOrFail($id);
+            
+            // Set status to deleted (0)
+            $form->update(['status' => TracerForm::STATUS_DELETED]);
 
-        return response()->json(['message' => 'Tracer form deleted successfully.']);
+            return response()->json([
+                'message' => 'Tracer form deleted successfully.',
+                'form' => $form->load('questions.options'),
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to delete tracer form: ' . $e->getMessage());
+            
+            return response()->json([
+                'message' => 'Failed to delete tracer form.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function restore($id)
     {
-        $form = TracerForm::onlyTrashed()->findOrFail($id);
-        $form->restore();
+        try {
+            $form = TracerForm::findOrFail($id);
+            
+            // Only restore if actually deleted
+            if ($form->status !== TracerForm::STATUS_DELETED) {
+                return response()->json([
+                    'message' => 'Form is not deleted.',
+                    'form' => $form->load('questions.options'),
+                ], 400);
+            }
+            
+            // Restore by setting status back to active (1)
+            $form->update(['status' => TracerForm::STATUS_ACTIVE]);
 
-        return response()->json([
-            'message' => 'Tracer form restored successfully.',
-            'form' => $form->load('questions.options'),
-        ]);
+            return response()->json([
+                'message' => 'Tracer form restored successfully.',
+                'form' => $form->load('questions.options'),
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to restore tracer form: ' . $e->getMessage());
+            
+            return response()->json([
+                'message' => 'Failed to restore tracer form.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function toggleStatus(Request $request, $id)
     {
-        $form = TracerForm::findOrFail($id);
-        $form->is_active = $request->boolean('is_active');
-        $form->save();
+        try {
+            $form = TracerForm::findOrFail($id);
+            $newStatus = $request->integer('status');
+            
+            // Validate status
+            if (!in_array($newStatus, [TracerForm::STATUS_ACTIVE, TracerForm::STATUS_CLOSED, TracerForm::STATUS_DRAFT])) {
+                return response()->json(['message' => 'Invalid status.'], 400);
+            }
+            
+            $form->update(['status' => $newStatus]);
 
-        return response()->json(['message' => 'Status updated successfully.']);
+            return response()->json(['message' => 'Status updated successfully.']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Failed to update status.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     private function saveQuestions(TracerForm $form, array $questions)

@@ -188,20 +188,42 @@
                                 </thead>
                                 <tbody>
                                     @forelse ($admins as $admin)
-                                        @php
-                                            $firstName = $admin->admin_first_name ?? $admin->AdminFirstName ?? '';
-                                            $middleName = $admin->admin_middle_name ?? $admin->AdminMiddleName ?? '';
-                                            $lastName = $admin->admin_last_name ?? $admin->AdminLastName ?? '';
-                                            $email = $admin->admin_email ?? $admin->AdminEmail ?? '';
-                                            $roleValue = $admin->admin_role ?? $admin->AdminRole ?? '';
-                                            $displayName = trim($firstName . ' ' . ($middleName ? $middleName . ' ' : '') . $lastName);
-                                            $roleLabel = $roleValue !== '' ? ucwords(str_replace(['_', '-'], ' ', $roleValue)) : 'Unassigned';
-                                        @endphp
+
+                                    @php
+                                        $firstName = $admin->admin_first_name ?? $admin->AdminFirstName ?? '';
+                                        $middleName = $admin->admin_middle_name ?? $admin->AdminMiddleName ?? '';
+                                        $lastName = $admin->admin_last_name ?? $admin->AdminLastName ?? '';
+                                        $email = $admin->admin_email ?? $admin->AdminEmail ?? '';
+                                        $roleValue = $admin->admin_role ?? $admin->AdminRole ?? '';
+                                        $displayName = trim($firstName . ' ' . ($middleName ? $middleName . ' ' : '') . $lastName);
+                                        
+                                        // Map role values to display labels (matches controller validation)
+                                        $roleLabels = [
+                                            'Executive Director' => 'Executive Director',
+                                            'Academic Director' => 'Academic Director',
+                                            'Coordinator' => 'Coordinator',
+                                            'Assistant Coordinator' => 'Assistant Coordinator',
+                                        ];
+                                        $roleLabel = $roleLabels[$roleValue] ?? ($roleValue !== '' ? ucwords(str_replace(['_', '-'], ' ', $roleValue)) : 'Unassigned');
+                                    @endphp
+
                                         <tr>
                                             <td>{{ $displayName ?: 'Unnamed Admin' }}</td>
                                             <td>{{ $email ?: 'No email provided' }}</td>
                                             <td>
-                                                <span class="role-chip {{ $roleValue === 'super_admin' || $roleValue === 'SuperAdmin' ? 'role-chip-primary' : '' }}">
+                                                {{-- <span class="role-chip {{ $roleValue === 'super_admin' || $roleValue === 'SuperAdmin' ? 'role-chip-primary' : '' }}">
+                                                    {{ $roleLabel }}
+                                                </span> --}}
+                                                @php
+                                                    $roleChipClass = match($roleValue) {
+                                                        'Executive Director' => 'role-chip-primary',
+                                                        'Academic Director' => 'role-chip-secondary',
+                                                        'Coordinator' => 'role-chip-success',
+                                                        'Assistant Coordinator' => 'role-chip-muted',
+                                                        default => '',
+                                                    };
+                                                @endphp
+                                                <span class="role-chip {{ $roleChipClass }}">
                                                     {{ $roleLabel }}
                                                 </span>
                                             </td>
@@ -252,13 +274,15 @@
                                 <input type="text" name="phone_number" value="{{ old('phone_number') }}" placeholder="09xx xxx xxxx">
                             </div>
                             <div class="form-group">
-                                <label>Role</label>
-                                <select name="admin_role">
-                                    <option value="super_admin" @selected(old('admin_role') === 'super_admin')>Super Admin</option>
-                                    <option value="moderator" @selected(old('admin_role') === 'moderator')>Moderator</option>
-                                    <option value="event_coordinator" @selected(old('admin_role') === 'event_coordinator')>Event Coordinator</option>
-                                </select>
-                            </div>
+                            <label>Role</label>
+                            <select name="admin_role">
+                                <option value="">-- Select a role --</option>
+                                <option value="Executive Director" @selected(old('admin_role') === 'Executive Director')>Executive Director</option>
+                                <option value="Academic Director" @selected(old('admin_role') === 'Academic Director')>Academic Director</option>
+                                <option value="Coordinator" @selected(old('admin_role') === 'Coordinator')>Coordinator</option>
+                                <option value="Assistant Coordinator" @selected(old('admin_role') === 'Assistant Coordinator')>Assistant Coordinator</option>
+                            </select>
+                        </div>
                             <div class="form-group full-width settings-form-note">
                                 <strong>Temporary password</strong>
                                 <p>A secure password will be generated automatically after saving.</p>
@@ -431,7 +455,7 @@
                             </div>
                         </form>
                     </div>
-                @enddefault
+                {{-- @enddefault --}}
             @endswitch
         </div>
 

@@ -44,8 +44,8 @@ class PerksController extends Controller
             'description' => $request->description,
             'valid_until' => $request->valid_until,
             'status'      => $this->normalizeStatus($request->input('status'), 1),
-            // For temporary testing when admin auth isn't wired, default to admin id 1
-            'admin_id'    => Auth::id() ?? 4,
+            // ✅ Defaults to admin 1 if not authenticated
+            'admin_id'    => Auth::id() ?? 1,
         ]);
 
         if ($request->hasFile('images')) {

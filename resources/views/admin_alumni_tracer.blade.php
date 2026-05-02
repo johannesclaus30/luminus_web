@@ -43,8 +43,8 @@
                                 <input type="file" id="logoFileInput" accept="image/*" style="display: none;">
                             </div>
                             <div class="header-titles">
-                                <h2 id="surveyTitleDisplay">NU Lipa College Tracer Study</h2>
-                                <span class="status-badge" id="surveyStatusDisplay">Accepting Responses</span>
+                                <h2 id="surveyTitleDisplay">New Alumni Tracer Survey</h2>
+                                <span class="status-badge" id="surveyStatusDisplay">Draft</span>
                             </div>
                             <div class="panel-actions">
                                 <button class="btn-gray" id="previewBtn">👁 Preview</button>
@@ -64,7 +64,7 @@
 
                             <div class="form-group">
                                 <label>Survey Title:</label>
-                                <input type="text" class="form-control title-input" id="surveyTitleInput" value="NU Lipa College Tracer Study">
+                                <input type="text" class="form-control title-input" id="surveyTitleInput" value="New Alumni Tracer Survey">
                             </div>
 
                             <div class="builder-container" id="formBuilder">
@@ -139,36 +139,9 @@
 
     <script>
         (function() {
-            // ===================== MOCK DATA =====================
-            const surveys = [
-                {
-                    id: 1,
-                    title: 'NU Lipa College Tracer Study',
-                    status: 'Active',
-                    logo: 'NU',
-                    headerPhoto: '/assets/logos/nu_banner.png',
-                    persisted: false,
-                    questions: [
-                        { id: 101, type: 'text', question_text: 'Full Name', subtitle: '', required: true },
-                        { id: 102, type: 'choice', question_text: 'Employment Status', subtitle: 'Select your current status', required: true, display_type: 'list', options: [ { label: 'Employed', go_to: null }, { label: 'Unemployed', go_to: null }, { label: 'Self-employed', go_to: null } ], other_enabled: false },
-                        { id: 103, type: 'likert', question_text: 'Rate the following aspects', subtitle: '1 = Very Dissatisfied, 5 = Very Satisfied', required: false, scale_points: 5, scale_labels: ['Very Dissatisfied', '', '', '', 'Very Satisfied'], statements: [ { id: 1001, text: 'Quality of Education' }, { id: 1002, text: 'Facilities' }, { id: 1003, text: 'Faculty Support' } ] },
-                        { id: 104, type: 'section_header', question_text: 'Educational Background', subtitle: '', required: false }
-                    ]
-                },
-                {
-                    id: 2,
-                    title: 'NU Lipa SHS Tracer Study',
-                    status: 'Closed',
-                    logo: 'NU',
-                    headerPhoto: '/assets/logos/nu_banner.png',
-                    persisted: false,
-                    questions: [
-                        { id: 201, type: 'checkbox', question_text: 'Which skills have you acquired?', subtitle: 'Select all that apply', required: true, display_type: 'list', options: [ { label: 'Communication', go_to: null }, { label: 'Leadership', go_to: null } ], other_enabled: true }
-                    ]
-                }
-            ];
-
-            let currentSurveyId = surveys[0].id;
+            // ===================== DATA STATE (NO HARDCODED MOCK DATA) =====================
+            let surveys = []; // ← Empty array: data loads from backend only
+            let currentSurveyId = null; // ← Start with no selection
             let questionCounter = 0;
             let deletedSurveys = [];
 
@@ -230,14 +203,23 @@
             }
 
             function normalizeServerSurvey(form) {
+                // Map status to display text
+                const statusMap = {
+                    0: 'Deleted',
+                    1: 'Active',
+                    2: 'Draft',
+                    3: 'Closed'
+                };
+                
                 return {
                     id: form.id,
                     title: form.form_title || '',
-                    status: form.is_active ? 'Active' : 'Closed',
+                    status: statusMap[form.status] || 'Unknown',
+                    statusCode: form.status, // Keep raw status code
                     logo: 'NU',
                     headerPhoto: form.form_header || '/assets/logos/nu_banner.png',
                     persisted: true,
-                    deletedAt: form.deleted_at || null,
+                    deletedAt: form.status === 0 ? form.updated_at : null,
                     questions: (form.questions || []).map(question => {
                         const settings = question.settings || {};
                         const normalized = {
@@ -284,11 +266,20 @@
                     const activeForms = await activeResponse.json();
                     const deletedForms = await deletedResponse.json();
 
+                    // Populate from backend only — no mock data fallback
                     surveys.splice(0, surveys.length, ...activeForms.map(normalizeServerSurvey));
                     deletedSurveys = deletedForms.map(normalizeServerSurvey);
-                    currentSurveyId = surveys.length ? surveys[0].id : null;
+                    
+                    // Set initial selection if surveys exist
+                    if (surveys.length && !currentSurveyId) {
+                        currentSurveyId = surveys[0].id;
+                    }
                 } catch (error) {
+                    console.warn('Tracer data load warning:', error.message);
+                    // Keep arrays empty — UI will show "no surveys" state
+                    surveys = [];
                     deletedSurveys = [];
+                    currentSurveyId = null;
                 }
             }
 
@@ -330,10 +321,18 @@
                     questions.push(question);
                 });
 
+                // Map status text to status code
+                const statusTextToCode = {
+                    'Active': 1,
+                    'Draft': 2,
+                    'Closed': 3,
+                    'Deleted': 0
+                };
+
                 return {
                     id: currentSurvey ? currentSurvey.id : null,
                     title: surveyTitleInput.value,
-                    status: surveyStatusDisplay.textContent === 'Accepting Responses' ? 'Active' : (surveyStatusDisplay.textContent === 'Closed' ? 'Closed' : 'Draft'),
+                    status: statusTextToCode[surveyStatusDisplay.textContent] || 1,
                     logo: surveyLogoText.innerText === '' ? 'NU' : surveyLogoText.innerText,
                     headerPhoto: headerPhotoImg.src,
                     persisted: currentSurvey ? !!currentSurvey.persisted : false,
@@ -667,9 +666,6 @@
                 return card;
             }
 
-            // ... (rest of the functions: updateQuestionNumbers, addBetweenButtons, enableDragDrop, handleDrag events, renderSidebar, selectSurvey, renderManageTable, switchToEditor, switchToManage, resetForm, deleteSurvey, openPreview, branding uploads, button listeners) ...
-            // They remain exactly as provided, but ensure the openPreview() function is updated as below.
-
             function updateQuestionNumbers() {
                 document.querySelectorAll('.question-card-builder').forEach((card, idx) => {
                     const numSpan = card.querySelector('.question-number');
@@ -738,6 +734,12 @@
 
             function renderSidebar() {
                 surveyListContainer.innerHTML = '';
+                
+                if (surveys.length === 0) {
+                    surveyListContainer.innerHTML = '<div class="empty-state">No surveys yet. Click "+ Add New Alumni Tracer" to create one.</div>';
+                    return;
+                }
+                
                 surveys.forEach(survey => {
                     const item = document.createElement('div');
                     item.className = `survey-item${currentSurveyId === survey.id ? ' active' : ''}`;
@@ -745,7 +747,7 @@
                     item.innerHTML = `
                         <div class="survey-item-icon ${survey.title.includes('SHS') ? 'warning' : ''}">NU</div>
                         <div class="survey-item-details">
-                            <h4>${survey.title}</h4>
+                            <h4>${survey.title || 'Untitled Survey'}</h4>
                             <span>${survey.status}</span>
                         </div>
                     `;
@@ -761,8 +763,8 @@
                 document.querySelectorAll('.survey-item').forEach(item => item.classList.toggle('active', parseInt(item.dataset.surveyId) === id));
                 const survey = getCurrentSurvey();
                 if (survey) {
-                    surveyTitleInput.value = survey.title;
-                    surveyTitleDisplay.textContent = survey.title;
+                    surveyTitleInput.value = survey.title || '';
+                    surveyTitleDisplay.textContent = survey.title || 'Untitled Survey';
                     surveyStatusDisplay.textContent = survey.status === 'Active' ? 'Accepting Responses' : 'Closed';
                     surveyLogoText.innerText = survey.logo || 'NU';
                     headerPhotoImg.src = survey.headerPhoto || '/assets/logos/nu_banner.png';
@@ -785,7 +787,7 @@
                     row.style.borderBottom = '1px solid #e5e7eb';
                     const isActive = survey.status === 'Active';
                     row.innerHTML = `
-                        <td style="padding: 12px; font-weight: 500;">${survey.title}</td>
+                        <td style="padding: 12px; font-weight: 500;">${survey.title || 'Untitled'}</td>
                         <td style="padding: 12px;">
                             <label class="toggle-switch">
                                 <input type="checkbox" class="status-toggle" data-survey-id="${survey.id}" ${isActive ? 'checked' : ''}>
@@ -840,7 +842,7 @@
                     row.style.borderBottom = '1px solid #e5e7eb';
                     const deletedAt = survey.deletedAt ? new Date(survey.deletedAt).toLocaleString() : 'Recently deleted';
                     row.innerHTML = `
-                        <td style="padding: 12px; font-weight: 500;">${survey.title}</td>
+                        <td style="padding: 12px; font-weight: 500;">${survey.title || 'Untitled'}</td>
                         <td style="padding: 12px; color: #6b7280; font-size: 13px;">${deletedAt}</td>
                         <td style="padding: 12px;">
                             <button class="restore-btn" data-survey-id="${survey.id}" style="background: #047857; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Restore</button>
@@ -883,7 +885,7 @@
             }
 
             async function deleteSurvey(id) {
-                if (!confirm('Are you sure?')) return;
+                if (!confirm('Are you sure you want to delete this survey?')) return;
                 const survey = surveys.find(s => s.id === id);
 
                 try {
@@ -965,65 +967,75 @@
             function openPreview() {
                 syncBuilderToSurvey();
                 const survey = getCurrentSurvey();
-                if (!survey) return;
+                if (!survey) {
+                    previewContent.innerHTML = '<p style="text-align:center; color:#6b7280;">No survey loaded to preview.</p>';
+                    previewModal.style.display = 'flex';
+                    return;
+                }
+                
                 let html = '';
                 if (survey.headerPhoto) {
                     html += `<img src="${survey.headerPhoto}" class="preview-header-img" alt="Header">`;
                 }
-                html += `<h2>${survey.title}</h2>`;
-                survey.questions.forEach(q => {
-                    html += '<div class="preview-question">';
-                    html += `<h3>${q.question_text || 'Untitled'}</h3>`;
-                    if (q.subtitle) html += `<div class="preview-subtitle">${q.subtitle}</div>`;
+                html += `<h2>${survey.title || 'Untitled Survey'}</h2>`;
+                
+                if (!survey.questions || survey.questions.length === 0) {
+                    html += '<p style="color:#6b7280; font-style:italic;">No questions added yet.</p>';
+                } else {
+                    survey.questions.forEach(q => {
+                        html += '<div class="preview-question">';
+                        html += `<h3>${q.question_text || 'Untitled Question'}</h3>`;
+                        if (q.subtitle) html += `<div class="preview-subtitle">${q.subtitle}</div>`;
 
-                    if (q.type === 'text') {
-                        html += '<textarea class="form-control" placeholder="Your answer" disabled style="resize: vertical;"></textarea>';
-                    } else if (q.type === 'choice' || q.type === 'checkbox') {
-                        const isDropdown = q.display_type === 'dropdown';
-                        if (isDropdown) {
-                            html += '<select class="form-control" disabled>';
-                            html += '<option value="">Select an option</option>';
-                            q.options.forEach(opt => {
-                                html += `<option value="${opt.label}">${opt.label}</option>`;
-                            });
-                            if (q.other_enabled) html += '<option value="other">Other</option>';
-                            html += '</select>';
-                        } else {
-                            html += '<div class="preview-options">';
-                            q.options.forEach(opt => {
-                                html += `<label><input type="${q.type === 'choice' ? 'radio' : 'checkbox'}" disabled> ${opt.label}</label>`;
-                            });
-                            if (q.other_enabled) html += '<label><input type="checkbox" disabled> Other</label>';
-                            html += '</div>';
-                        }
-                    } else if (q.type === 'likert') {
-                        const points = q.scale_points || 5;
-                        const labels = q.scale_labels || [];
-                        const statements = q.statements || [];
-
-                        html += '<div class="preview-likert-table">';
-                        html += '<table style="width:100%; border-collapse: collapse;">';
-                        html += '<thead><tr><th style="text-align:left; padding: 6px;"></th>';
-                        for (let i = 0; i < points; i++) {
-                            const label = labels[i] || (i+1).toString();
-                            html += `<th style="text-align:center; padding: 6px; font-size:12px;">${label}</th>`;
-                        }
-                        html += '</tr></thead><tbody>';
-                        statements.forEach(stmt => {
-                            html += '<tr>';
-                            html += `<td style="padding: 8px 6px; font-size:14px;">${stmt.text}</td>`;
-                            for (let i = 0; i < points; i++) {
-                                html += `<td style="text-align:center; padding: 6px;"><input type="radio" name="likert_${q.id}_${stmt.id}" disabled></td>`;
+                        if (q.type === 'text') {
+                            html += '<textarea class="form-control" placeholder="Your answer" disabled style="resize: vertical;"></textarea>';
+                        } else if (q.type === 'choice' || q.type === 'checkbox') {
+                            const isDropdown = q.display_type === 'dropdown';
+                            if (isDropdown) {
+                                html += '<select class="form-control" disabled>';
+                                html += '<option value="">Select an option</option>';
+                                (q.options || []).forEach(opt => {
+                                    html += `<option value="${opt.label}">${opt.label || 'Option'}</option>`;
+                                });
+                                if (q.other_enabled) html += '<option value="other">Other</option>';
+                                html += '</select>';
+                            } else {
+                                html += '<div class="preview-options">';
+                                (q.options || []).forEach(opt => {
+                                    html += `<label><input type="${q.type === 'choice' ? 'radio' : 'checkbox'}" disabled> ${opt.label || 'Option'}</label>`;
+                                });
+                                if (q.other_enabled) html += '<label><input type="checkbox" disabled> Other</label>';
+                                html += '</div>';
                             }
-                            html += '</tr>';
-                        });
-                        html += '</tbody></table>';
+                        } else if (q.type === 'likert') {
+                            const points = q.scale_points || 5;
+                            const labels = q.scale_labels || [];
+                            const statements = q.statements || [];
+
+                            html += '<div class="preview-likert-table">';
+                            html += '<table style="width:100%; border-collapse: collapse;">';
+                            html += '<thead><tr><th style="text-align:left; padding: 6px;"></th>';
+                            for (let i = 0; i < points; i++) {
+                                const label = labels[i] || (i+1).toString();
+                                html += `<th style="text-align:center; padding: 6px; font-size:12px;">${label}</th>`;
+                            }
+                            html += '</tr></thead><tbody>';
+                            statements.forEach(stmt => {
+                                html += '<tr>';
+                                html += `<td style="padding: 8px 6px; font-size:14px;">${stmt.text || 'Statement'}</td>`;
+                                for (let i = 0; i < points; i++) {
+                                    html += `<td style="text-align:center; padding: 6px;"><input type="radio" name="likert_${q.id}_${stmt.id}" disabled></td>`;
+                                }
+                                html += '</tr>';
+                            });
+                            html += '</tbody></table>';
+                            html += '</div>';
+                        } else if (q.type === 'section_header') {
+                            html += '<hr style="margin: 20px 0 10px;">';
+                        }
                         html += '</div>';
-                    } else if (q.type === 'section_header') {
-                        html += '<hr style="margin: 20px 0 10px;">';
-                    }
-                    html += '</div>';
-                });
+                    });
+                }
                 previewContent.innerHTML = html;
                 previewModal.style.display = 'flex';
             }
@@ -1075,7 +1087,7 @@
             tabManage.addEventListener('click', switchToManage);
 
             surveyTitleInput.addEventListener('input', () => {
-                surveyTitleDisplay.textContent = surveyTitleInput.value;
+                surveyTitleDisplay.textContent = surveyTitleInput.value || 'Untitled Survey';
                 const survey = getCurrentSurvey();
                 if (survey) survey.title = surveyTitleInput.value;
             });
@@ -1093,7 +1105,7 @@
                     form_title: formData.title.trim(),
                     form_description: null,
                     form_header: formData.headerPhoto,
-                    is_active: formData.status === 'Active',
+                    status: formData.status, // Now using status instead of is_active
                     questions: formData.questions,
                 };
 
@@ -1137,12 +1149,17 @@
                 }
             });
 
-            // Initialize
+            // Initialize: Load data from backend ONLY
             loadTracerData().finally(() => {
                 renderSidebar();
-                if (surveys.length && currentSurveyId) selectSurvey(currentSurveyId);
-                else if (surveys.length) selectSurvey(surveys[0].id);
-                else resetForm();
+                if (surveys.length && currentSurveyId) {
+                    selectSurvey(currentSurveyId);
+                } else if (surveys.length) {
+                    selectSurvey(surveys[0].id);
+                } else {
+                    // Start fresh with empty form
+                    resetForm();
+                }
                 addBetweenButtons();
                 enableDragDrop();
                 refreshAllGoToDropdowns();
