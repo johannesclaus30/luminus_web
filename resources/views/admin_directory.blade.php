@@ -287,17 +287,28 @@
 
     // Maps the specific AAO Excel columns to our database fields
     function normalizeBulkRow(row) {
+        // Helper to find case-insensitive key
+        const findKey = (obj, possibleKeys) => {
+            for (const key of possibleKeys) {
+                if (obj[key] !== undefined) return obj[key];
+                // Try case-insensitive match
+                const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+                if (found) return obj[found];
+            }
+            return '';
+        };
+
         return {
-            first_name: row['First Name'] || row.first_name || '',
-            middle_name: row['Middle Name'] || row.middle_name || '',
-            last_name: row['Last Name'] || row.last_name || '',
-            student_id_number: row['Student ID'] || row.student_id_number || '',
-            program: row['Strand'] || row.program || '', // Mapping Strand to Program
-            email: row['Personal Email'] || row['Official Email'] || row.email || '',
-            phone_number: row['Mobile No'] || row.phone_number || '',
-            year_graduated: row['Graduation Period'] || row.year_graduated || '',
-            date_of_birth: '', // Intentionally left blank for alumni to fill later
-            sex: '',           // Intentionally left blank for alumni to fill later
+            first_name: findKey(row, ['First Name', 'first_name', 'FirstName']).trim(),
+            middle_name: findKey(row, ['Middle Name', 'middle_name', 'MiddleName']).trim(),
+            last_name: findKey(row, ['Last Name', 'last_name', 'LastName']).trim(),
+            student_id_number: findKey(row, ['Student ID', 'student_id_number', 'StudentID', 'Student ID Number']).trim(),
+            program: findKey(row, ['Strand', 'program', 'Program', 'Department']).trim(),
+            email: findKey(row, ['Personal Email', 'Official Email', 'email', 'Email', 'E-mail']).trim(),
+            phone_number: findKey(row, ['Mobile No', 'phone_number', 'MobileNo', 'Mobile Number', 'Phone']).trim(),
+            year_graduated: findKey(row, ['Graduation Period', 'year_graduated', 'GraduationPeriod', 'Year Graduated']).trim(),
+            date_of_birth: '',
+            sex: findKey(row, ['Sex', 'sex', 'Gender']).trim(),
         };
     }
 
@@ -325,7 +336,7 @@
         }
     }
 
-    async function handleBulkImport() {
+        async function handleBulkImport() {
         const fileInput = document.getElementById('bulkImportFile');
         const status = document.getElementById('bulkImportStatus');
         const file = fileInput.files[0];
@@ -344,50 +355,70 @@
 
         try {
             const buffer = await file.arrayBuffer();
-            // cellDates: true handles Excel's internal date formatting properly
             const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             
-            // 1. Convert to an array of arrays first to find the actual header row dynamically
+            // Convert to array of arrays to find header row
             const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+            
+            // DEBUG: Log what we're seeing
+            console.log('Raw data rows:', rawData.length);
+            console.log('First 5 rows:', rawData.slice(0, 5));
+            
             let headerRowIndex = -1;
 
             for (let i = 0; i < rawData.length; i++) {
-                const rowString = (rawData[i] || []).join(' ').toLowerCase();
-                // We identify the header row if it contains these two key columns
+                const row = rawData[i] || [];
+                const rowString = row.join(' ').toLowerCase();
+                
+                // Check if this row contains our expected headers
                 if (rowString.includes('student id') && rowString.includes('last name')) {
                     headerRowIndex = i;
+                    console.log('✓ Found header row at index:', i);
+                    console.log('Headers:', row);
                     break;
                 }
             }
 
             if (headerRowIndex === -1) {
-                status.textContent = 'Error: Could not find standard headers (Student ID, Last Name) in the file.';
+                status.textContent = 'Error: Could not find headers. Make sure the file has "Student ID" and "Last Name" columns.';
+                console.error('Available rows:', rawData.map((r, i) => `Row ${i}: ${r.join(', ')}`).slice(0, 10));
                 return;
             }
 
-            // 2. Parse the JSON properly, starting ONLY from the detected header row
+            // Parse JSON starting from header row
             const rows = XLSX.utils.sheet_to_json(sheet, { 
                 range: headerRowIndex, 
                 defval: '', 
                 raw: false,
-                dateNF: 'yyyy-mm-dd' // Forces dates like 'Graduation Period' to string formats
+                dateNF: 'yyyy-mm-dd'
             });
+
+            console.log('Parsed rows:', rows.length);
+            if (rows.length > 0) {
+                console.log('First row keys:', Object.keys(rows[0]));
+                console.log('First row data:', rows[0]);
+            }
 
             const records = rows
                 .map(normalizeBulkRow)
-                // Filter out empty rows to ensure we only process valid students
-                .filter((record) => record.first_name && record.last_name && record.student_id_number);
+                .filter((record) => {
+                    const isValid = record.first_name && record.last_name && record.student_id_number;
+                    if (!isValid) {
+                        console.log('Skipping invalid record:', record);
+                    }
+                    return isValid;
+                });
 
             if (!records.length) {
-                status.textContent = 'No valid alumni records were found below the headers.';
+                status.textContent = 'No valid alumni records found. Check console for details.';
                 return;
             }
 
             let created = 0;
             let failed = 0;
 
-            status.textContent = `Importing ${records.length} alumni record(s). Please do not close this window...`;
+            status.textContent = `Importing ${records.length} alumni record(s). Please wait...`;
 
             for (const record of records) {
                 try {
@@ -396,20 +427,21 @@
                     status.textContent = `Progress: ${created}/${records.length} created...`;
                 } catch (error) {
                     failed += 1;
-                    console.error("Failed to import record:", record, error);
+                    console.error("Failed to import:", record.student_id_number, error.message);
                 }
             }
 
-            status.textContent = `Import complete: ${created} created${failed ? `, ${failed} failed` : ''}.`;
+            status.textContent = `✓ Import complete: ${created} created${failed ? `, ${failed} failed` : ''}.`;
 
             if (created > 0) {
                 setTimeout(() => window.location.reload(), 1500);
             }
         } catch (error) {
-            console.error(error);
-            status.textContent = 'An error occurred while reading the file. Make sure it is a valid Excel/CSV.';
+            console.error('Import error:', error);
+            status.textContent = 'Error reading file: ' + error.message;
         }
     }
+
 </script>
 
 </body>

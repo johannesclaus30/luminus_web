@@ -232,7 +232,7 @@ class AdminController extends Controller
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
             'password_hash' => Hash::make('password123'), // 🔐 Hashed!
-            'verification_status' => 'pending',
+            'verification_status' => 'verified',
             'program' => $validated['program'] ?? null,
             'card_photo' => $cardPhotoPath,
         ]);

@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | LumiNUs Admin</title>
 
-    <link rel="stylesheet" href="/css/admin_dashboard.css">
+    <link rel="stylesheet" href="/css/dashboard_new.css">
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+
+    <!-- Leaflet & Chart.js CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     
@@ -17,7 +22,6 @@
         <div class="admin-menu">
             <div>
                 <p class="text-titles">Admin Menu</p>
-
                 <a href="{{ url('/admin/dashboard') }}" class="admin-menu-current">Admin Dashboard</a>
                 <a href="{{ route('admin.directory') }}" class="admin-menu-buttons">Alumni Directory</a>
                 <a href="{{ route('announcements.index') }}" class="admin-menu-buttons">Announcement Editor</a>
@@ -27,188 +31,408 @@
                 <a href="{{ url('/admin/messages') }}" class="admin-menu-buttons">Messages</a>
                 <a href="{{ route('admin.settings') }}" class="admin-menu-buttons">Settings</a>
             </div>
-
             <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
         </div>
+
         <div class="div-dashboard-container">
-            <div class="div-dashboard-container admin-scrollable">
-    
-                <div class="dash-top-row">
-                    <div class="stat-card stat-yellow">
-                        <div class="stat-icon-wrapper">👤</div>
-                        <div class="stat-details">
-                            <span class="stat-label">Total Registered Alumni</span>
-                            <span class="stat-number">1,256</span>
-                        </div>
-                    </div>
-                    <div class="stat-card stat-blue">
-                        <div class="stat-icon-wrapper">🌍</div>
-                        <div class="stat-details">
-                            <span class="stat-label">Mapped Alumni Worldwide</span>
-                            <span class="stat-number">874</span>
-                        </div>
-                    </div>
-                    <div class="stat-card stat-green">
-                        <div class="stat-icon-wrapper">📈</div>
-                        <div class="stat-details">
-                            <span class="stat-label">Active Alumni This Month</span>
-                            <span class="stat-number">342</span>
-                        </div>
-                    </div>
-                    <div class="stat-card stat-red">
-                        <div class="stat-icon-wrapper">🔔</div>
-                        <div class="stat-details">
-                            <span class="stat-label">Pending Notifications</span>
-                            <span class="stat-number">8 Alerts</span>
-                        </div>
-                    </div>
+            <div class="admin-scrollable">
+                
+                <!-- TAB NAVIGATION -->
+                <div class="tab-navigation">
+                    <button class="tab-btn active" onclick="showTab('main')">📊 Main Dashboard</button>
+                    <button class="tab-btn" onclick="showTab('events')">📅 Events</button>
+                    <button class="tab-btn" onclick="showTab('alumni')">👥 Alumni Info</button>
+                    <button class="tab-btn" onclick="showTab('tracer')">📋 Tracer Forms</button>
                 </div>
 
-                <div class="dash-mid-row">
-                    <div class="dash-card geo-card">
-                        <div class="card-header">
-                            <h3 class="card-title">Alumni Geo-Mapping</h3>
-                        </div>
-                        <div class="map-placeholder">
-                            <div class="mock-map">Map Placeholder</div>
-                        </div>
-                        <div class="card-legend">
-                            <span><i class="legend-dot dot-yellow"></i> High Density Alumni Areas</span>
-                            <span><i class="legend-dot dot-green"></i> Moderate Density Alumni Areas</span>
-                        </div>
-                    </div>
-
-                    <div class="dash-card activity-card">
-                        <div class="card-header flex-between">
-                            <h3 class="card-title">Alumni Activity Overview</h3>
-                            <select class="dash-select">
-                                <option>Last 6 Months</option>
-                            </select>
-                        </div>
-                        <div class="chart-placeholder">
-                            <div class="mock-chart">Line Chart Placeholder</div>
-                        </div>
-                        <div class="card-footer flex-between">
-                            <div class="card-legend">
-                                <span><i class="legend-box box-blue"></i> Daily Logins</span>
-                                <span><i class="legend-box box-yellow"></i> Event Registrations</span>
+                <!-- MAIN DASHBOARD TAB (Always Visible by Default) -->
+                <div id="tab-main" class="tab-content active">
+                    
+                    <!-- KEY METRICS -->
+                    <section class="dashboard-section">
+                        <h2 class="section-title">📊 Overview</h2>
+                        <div class="dash-top-row">
+                            <div class="stat-card stat-yellow">
+                                <div class="stat-icon-wrapper">✅</div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Verified Alumni</span>
+                                    <span class="stat-number">{{ number_format($verifiedAlumniCount) }}</span>
+                                </div>
                             </div>
-                            <button class="btn-dash btn-light-blue">View All Events ></button>
+                            <div class="stat-card stat-blue">
+                                <div class="stat-icon-wrapper">📅</div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Active Events</span>
+                                    <span class="stat-number">{{ number_format($activeEventsCount) }}</span>
+                                </div>
+                            </div>
+                            <div class="stat-card stat-green">
+                                <div class="stat-icon-wrapper">📝</div>
+                                <div class="stat-details">
+                                    <span class="stat-label">Tracer Responses</span>
+                                    <span class="stat-number">{{ number_format($totalTracerResponses) }}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <!-- CHARTS SECTION -->
+                    <section class="dashboard-section">
+                        <div class="section-header-flex">
+                            <h2 class="section-title">📈 Alumni Analytics</h2>
+                            <div class="chart-toggle">
+                                <button class="toggle-btn active" onclick="showChart('year')" id="btn-year">
+                                    📅 By Year Graduated
+                                </button>
+                                <button class="toggle-btn" onclick="showChart('program')" id="btn-program">
+                                    🎓 By Program
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="card-header">
+                                <h3 class="card-title" id="chart-title">Alumni by Year Graduated</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="yearChart"></canvas>
+                                <canvas id="programChart" style="display: none;"></canvas>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- RECENT ACTIVITY -->
+                    <section class="dashboard-section">
+                        <h2 class="section-title">🔔 Recent Activity</h2>
+                        <div class="activity-grid">
+                            <div class="dash-card">
+                                <div class="card-header flex-between">
+                                    <h3 class="card-title">Recent Announcements</h3>
+                                    <a href="{{ route('announcements.index') }}" class="link-text">View All ></a>
+                                </div>
+                                <div class="list-wrapper compact">
+                                    @forelse($recentAnnouncements as $announcement)
+                                    <div class="message-item compact">
+                                        <div class="item-avatar small">AN</div>
+                                        <div class="msg-content">
+                                            <div class="msg-header">
+                                                <span class="msg-name">{{ Str::limit($announcement->title, 40) }}</span>
+                                                <span class="msg-time">{{ $announcement->date_posted->format('M d') }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @empty
+                                    <div class="empty-state">No announcements yet.</div>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            <div class="dash-card">
+                                <div class="card-header flex-between">
+                                    <h3 class="card-title">Latest Tracer Forms</h3>
+                                    <a href="{{ url('/admin/alumni_tracer') }}" class="link-text">View All ></a>
+                                </div>
+                                <div class="list-wrapper compact">
+                                    @forelse($recentTracerForms as $form)
+                                    <div class="list-item compact">
+                                        <div class="item-avatar small" style="background: var(--nu-blue);">TF</div>
+                                        <div class="item-info">
+                                            <p class="item-name small">{{ Str::limit($form->form_title, 35) }}</p>
+                                            <p class="item-sub">{{ $form->created_at->diffForHumans() }}</p>
+                                        </div>
+                                        <span class="badge badge-green small">Active</span>
+                                    </div>
+                                    @empty
+                                    <div class="empty-state">No tracer forms yet.</div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="dash-bot-row">
-                    <div class="dash-card">
-                        <div class="card-header flex-between">
-                            <h3 class="card-title">Pending Tracer Surveys</h3>
-                            <a href="#" class="link-text">View All ></a>
-                        </div>
-                        <div class="list-wrapper">
-                            <div class="list-item">
-                                <div class="item-avatar">SL</div>
-                                <div class="item-info">
-                                    <p class="item-name">Sarah Lin</p>
-                                    <p class="item-sub">Pending Checkout</p>
-                                </div>
-                                <div class="item-action">
-                                    <p class="due-text">Due Dec 21</p>
-                                    <span class="badge badge-yellow">✔ Due</span>
-                                </div>
+                <!-- EVENTS TAB -->
+                <div id="tab-events" class="tab-content">
+                    <section class="dashboard-section">
+                        <h2 class="section-title">📅 Events Management</h2>
+                        
+                        <div class="dash-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Event Geomap</h3>
+                                <span class="card-subtitle">Live event locations</span>
                             </div>
-                            <div class="list-item">
-                                <div class="item-avatar">JM</div>
-                                <div class="item-info">
-                                    <p class="item-name">John Murphy</p>
-                                    <p class="item-sub">Awaiting Consent</p>
-                                </div>
-                                <div class="item-action">
-                                    <p class="due-text">Due Dec 28</p>
-                                    <span class="badge badge-yellow">✔ Due</span>
-                                </div>
-                            </div>
+                            <div class="map-wrapper" id="event-map"></div>
                         </div>
-                    </div>
 
-                    <div class="dash-card events-card">
-                        <div class="mini-map-placeholder"></div>
-                        <div class="list-wrapper mt-10">
-                            <div class="event-item">
-                                <div class="event-left">
-                                    <i class="legend-dot dot-blue"></i>
-                                    <span>NU Alumni Meetup</span>
-                                </div>
-                                <span class="event-date">Apr 25 ∨</span>
+                        <div class="dash-card mt-20">
+                            <div class="card-header flex-between">
+                                <h3 class="card-title">Upcoming Events with Registrations</h3>
+                                <a href="{{ route('events.index') }}" class="link-text">Manage Events ></a>
                             </div>
-                            <div class="event-item">
-                                <div class="event-left">
-                                    <i class="legend-dot dot-yellow"></i>
-                                    <span>Career Fair</span>
+                            <div class="list-wrapper">
+                                @forelse($upcomingEvents as $event)
+                                <div class="event-item detailed">
+                                    <div class="event-left">
+                                        <i class="legend-dot {{ now()->between($event->start_date, $event->end_date) ? 'dot-yellow' : 'dot-blue' }}"></i>
+                                        <div>
+                                            <p class="item-name">{{ $event->title }}</p>
+                                            <p class="item-sub">📍 {{ $event->venue_name ?? 'TBA' }} | 📅 {{ $event->start_date->format('M d, Y') }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="event-stats">
+                                        <div class="registration-badge">
+                                            <span class="reg-count">{{ $event->registration_count ?? 0 }}</span>
+                                            <span class="reg-label">Registered</span>
+                                        </div>
+                                        <span class="event-date">{{ $event->start_date->format('M d') }}</span>
+                                    </div>
                                 </div>
-                                <span class="event-date">Apr 30 ∨</span>
-                            </div>
-                            <div class="event-item">
-                                <div class="event-left">
-                                    <i class="legend-dot dot-green"></i>
-                                    <span>Workshop</span>
-                                </div>
-                                <span class="event-date">May 5 ∨</span>
+                                @empty
+                                <div class="empty-state">No upcoming events scheduled.</div>
+                                @endforelse
                             </div>
                         </div>
-                    </div>
+                    </section>
+                </div>
 
-                    <div class="dash-card">
-                        <div class="card-header">
-                            <h3 class="card-title">Recent Announcements</h3>
-                        </div>
-                        <div class="list-wrapper">
-                            <div class="message-item">
-                                <div class="item-avatar">AG</div>
-                                <div class="msg-content">
-                                    <div class="msg-header">
-                                        <span class="msg-name">Amy Garcia</span>
-                                        <span class="msg-time">3 min ago</span>
-                                    </div>
-                                    <p class="msg-text">Anyone going to the alumni meetup over report? Looking forward to catching up!</p>
+                <!-- ALUMNI INFO TAB -->
+                <div id="tab-alumni" class="tab-content">
+                    <section class="dashboard-section">
+                        <h2 class="section-title">👥 Alumni Information</h2>
+                        
+                        <div class="dash-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Detailed Alumni Statistics</h3>
+                            </div>
+                            <div class="stats-detail-grid">
+                                <div class="stat-box">
+                                    <h4>Total Verified Alumni</h4>
+                                    <p class="stat-big">{{ number_format($verifiedAlumniCount) }}</p>
+                                </div>
+                                <div class="stat-box">
+                                    <h4>Top Program</h4>
+                                    <p class="stat-big">{{ $chartData['programs'][0] ?? 'N/A' }}</p>
+                                    <p class="stat-small">{{ $chartData['programs_count'][0] ?? 0 }} alumni</p>
+                                </div>
+                                <div class="stat-box">
+                                    <h4>Most Recent Batch</h4>
+                                    <p class="stat-big">{{ $chartData['years'][0] ?? 'N/A' }}</p>
+                                    <p class="stat-small">{{ $chartData['years_count'][0] ?? 0 }} graduates</p>
                                 </div>
                             </div>
-                            <div class="message-item">
-                                <div class="item-avatar">DL</div>
-                                <div class="msg-content">
-                                    <div class="msg-header">
-                                        <span class="msg-name">Daniel Lee</span>
-                                        <span class="msg-time">10 min ago</span>
-                                    </div>
-                                    <p class="msg-text">You'll be free too. Excited to reconnect.</p>
-                                </div>
-                            </div>
                         </div>
-                        <button class="btn-dash btn-light-yellow mt-auto">View All Events ></button>
-                    </div>
 
-                    <div class="dash-card flex-col">
-                        <div class="card-header">
-                            <h3 class="card-title">In-App Messaging</h3>
-                        </div>
-                        <div class="list-wrapper">
-                            <div class="message-item">
-                                <div class="item-avatar">AG</div>
-                                <div class="msg-content">
-                                    <div class="msg-header">
-                                        <span class="msg-name">Amy Garcia</span>
-                                        <span class="msg-time">3m</span>
+                        <div class="dash-card mt-20">
+                            <div class="card-header">
+                                <h3 class="card-title">Alumni Distribution by Program</h3>
+                            </div>
+                            <div class="program-list">
+                                @foreach($chartData['programs'] as $index => $program)
+                                <div class="program-item">
+                                    <div class="program-name">{{ $program }}</div>
+                                    <div class="program-bar">
+                                        <div class="program-fill" style="width: {{ ($chartData['programs_count'][$index] / max($chartData['programs_count'])) * 100 }}%"></div>
                                     </div>
-                                    <p class="msg-text line-clamp">Anyone going to the alumni meetup over report? Looking forward to catching up!</p>
+                                    <div class="program-count">{{ $chartData['programs_count'][$index] }}</div>
                                 </div>
+                                @endforeach
                             </div>
                         </div>
-                        <button class="btn-dash btn-primary mt-auto">Open Inbox ></button>
-                    </div>
+                    </section>
+                </div>
+
+                <!-- TRACER FORMS TAB -->
+                <div id="tab-tracer" class="tab-content">
+                    <section class="dashboard-section">
+                        <h2 class="section-title">📋 Tracer Forms Management</h2>
+                        
+                        <div class="dash-card">
+                            <div class="card-header flex-between">
+                                <h3 class="card-title">All Tracer Forms</h3>
+                                <a href="{{ url('/admin/alumni_tracer') }}" class="link-text">Create New ></a>
+                            </div>
+                            <div class="list-wrapper">
+                                @forelse($recentTracerForms as $form)
+                                <div class="list-item">
+                                    <div class="item-avatar" style="background: var(--nu-blue);">TF</div>
+                                    <div class="item-info">
+                                        <p class="item-name">{{ $form->form_title }}</p>
+                                        <p class="item-sub">Published {{ $form->created_at->diffForHumans() }}</p>
+                                    </div>
+                                    <div class="item-action">
+                                        <span class="badge {{ $form->status == 1 ? 'badge-green' : 'badge-gray' }}">
+                                            {{ $form->status == 1 ? 'Active' : 'Draft' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                @empty
+                                <div class="empty-state">No tracer forms published yet.</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
             </div>
         </div>
     </div>
+
+    <script>
+        // Tab Navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+
+        // Chart Toggle Function
+        let yearChartInstance = null;
+        let programChartInstance = null;
+        
+        function showChart(type) {
+            const yearChart = document.getElementById('yearChart');
+            const programChart = document.getElementById('programChart');
+            const btnYear = document.getElementById('btn-year');
+            const btnProgram = document.getElementById('btn-program');
+            const chartTitle = document.getElementById('chart-title');
+            
+            if (type === 'year') {
+                yearChart.style.display = 'block';
+                programChart.style.display = 'none';
+                btnYear.classList.add('active');
+                btnProgram.classList.remove('active');
+                chartTitle.textContent = 'Alumni by Year Graduated';
+                
+                // Initialize Year chart if not already done
+                if (!yearChartInstance && chartData.years.length > 0) {
+                    yearChartInstance = new Chart(yearChart, {
+                        type: 'bar',
+                        data: {
+                            labels: chartData.years,
+                            datasets: [{
+                                label: 'Number of Alumni',
+                                data: chartData.years_count,
+                                backgroundColor: 'rgba(50, 65, 140, 0.8)',
+                                borderColor: 'rgba(50, 65, 140, 1)',
+                                borderWidth: 1,
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                        }
+                    });
+                }
+            } else {
+                yearChart.style.display = 'none';
+                programChart.style.display = 'block';
+                btnYear.classList.remove('active');
+                btnProgram.classList.add('active');
+                chartTitle.textContent = 'Alumni by Program';
+                
+                // Initialize Program chart if not already done
+                if (!programChartInstance && chartData.programs.length > 0) {
+                    programChartInstance = new Chart(programChart, {
+                        type: 'bar',
+                        data: {
+                            labels: chartData.programs,
+                            datasets: [{
+                                label: 'Number of Alumni',
+                                data: chartData.programs_count,
+                                backgroundColor: 'rgba(251, 209, 23, 0.8)',
+                                borderColor: 'rgba(251, 209, 23, 1)',
+                                borderWidth: 1,
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { beginAtZero: true } }
+                        }
+                    });
+                }
+            }
+        }
+
+        // Chart.js Initialization
+        const chartData = @json($chartData);
+        
+        // Initialize Year chart by default on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const yearChart = document.getElementById('yearChart');
+            if (yearChart && chartData.years.length > 0) {
+                yearChartInstance = new Chart(yearChart, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.years,
+                        datasets: [{
+                            label: 'Number of Alumni',
+                            data: chartData.years_count,
+                            backgroundColor: 'rgba(50, 65, 140, 0.8)',
+                            borderColor: 'rgba(50, 65, 140, 1)',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    }
+                });
+            }
+        });
+
+        // Leaflet Map
+        const eventLocations = @json($eventLocations);
+        
+        if (eventLocations.length > 0 && typeof L !== 'undefined') {
+            const map = L.map('event-map').setView([14.6091, 121.0223], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            const bounds = [];
+
+            eventLocations.forEach(evt => {
+                if (evt.latitude && evt.longitude) {
+                    const marker = L.marker([evt.latitude, evt.longitude]).addTo(map);
+                    
+                    marker.bindPopup(`
+                        <div style="min-width:200px; padding:5px;">
+                            <strong style="font-size:14px;">${evt.title}</strong><br/>
+                            <span style="color:#666; font-size:12px;">📍 ${evt.venue_name}</span><br/>
+                            <span style="color:#666; font-size:12px;">📅 ${evt.start_date} - ${evt.end_date}</span>
+                        </div>
+                    `);
+                    bounds.push([evt.latitude, evt.longitude]);
+                }
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [30, 30] });
+            }
+        }
+    </script>
 
 </body>
 </html>

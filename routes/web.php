@@ -6,8 +6,11 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Admin\TracerFormController;
+use App\Http\Controllers\AdminDashboardController; // ✅ Added this import
 
 Route::prefix('admin')->group(function () {
+    
+    //  Public Admin Routes (Login)
     Route::get('/login', [AdminController::class, 'showLogin'])
         ->name('admin.login');
 
@@ -17,12 +20,22 @@ Route::prefix('admin')->group(function () {
     Route::get('/logout', [AdminController::class, 'logout'])
         ->name('admin.logout');
 
+    // 🔹 Protected Admin Routes
     Route::middleware('admin.auth')->group(function () {
+        
+        // ✅ Dashboard - Points to your new Controller
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])
+            ->name('admin.dashboard');
+
+        // Directory & Settings
         Route::get('/directory', [AdminController::class, 'index'])
             ->name('admin.directory');
 
         Route::post('/alumni', [AdminController::class, 'storeAlumni'])
             ->name('admin.alumni.store');
+
+        Route::get('/settings', [AdminController::class, 'settings'])
+            ->name('admin.settings');
 
         Route::post('/settings', [AdminController::class, 'store'])
             ->name('admin.settings.store');
@@ -30,6 +43,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/settings', [AdminController::class, 'updateProfile'])
             ->name('admin.settings.update');
 
+        // Events
         Route::get('/events', [EventController::class, 'index'])
             ->name('events.index');
 
@@ -54,6 +68,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/events/{event}/restore', [EventController::class, 'restore'])
             ->name('events.restore');
 
+        // Perks
         Route::get('/perks', [PerksController::class, 'index'])
             ->name('perks.index');
 
@@ -78,6 +93,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/perks/{perk}', [PerksController::class, 'update'])
             ->name('perks.update');
 
+        // Announcements
         Route::get('/announcements', [AnnouncementController::class, 'index'])
             ->name('announcements.index');
 
@@ -102,10 +118,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])
             ->name('announcements.restore');
 
-        Route::get('/dashboard', function () {
-            return view('admin_dashboard');
-        });
-
+        // Alumni Tracer
         Route::get('/alumni_tracer', [TracerFormController::class, 'index'])
             ->name('admin.alumni_tracer');
 
@@ -133,15 +146,14 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
             ->name('admin.alumni_tracer.toggle-status');
 
+        // Messages - Matches admin_messages.blade.php
         Route::get('/messages', function () {
-            return view('admin_messages');
+            return view('admin_messages'); 
         });
-
-        Route::get('/settings', [AdminController::class, 'settings'])
-            ->name('admin.settings');
     });
 });
 
+// Public Route
 Route::get('/', function () {
     return view('welcome');
 });
