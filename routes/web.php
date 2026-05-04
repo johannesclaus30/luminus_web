@@ -34,6 +34,12 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni', [AdminController::class, 'storeAlumni'])
             ->name('admin.alumni.store');
 
+        // ✅ ADD NEW ROUTES HERE:
+        Route::get('/alumni/{id}/edit', [AdminController::class, 'editAlumni'])
+            ->name('admin.alumni.edit');
+        Route::put('/alumni/{id}', [AdminController::class, 'updateAlumni'])
+            ->name('admin.alumni.update');
+
         Route::get('/settings', [AdminController::class, 'settings'])
             ->name('admin.settings');
 

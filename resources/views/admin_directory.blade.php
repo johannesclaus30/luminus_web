@@ -96,19 +96,28 @@
                             <p class="field-label">Email</p>
                             <p class="email">{{ $email ?: 'Email not provided' }}</p>
                         </div>
+                        
                         <div class="tools-container">
-                            <div class="tools-container">
-                                <a href="#" class="tools-button" title="Message">
-                                    <i class="fa-solid fa-comment-dots"></i>
-                                </a>
-                                <a href="#" class="tools-button" title="View Profile">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                <a href="#" class="tools-button" title="Edit Info">
-                                    <i class="fa-solid fa-circle-info"></i>
-                                </a>
-                            </div>
+                            {{-- Message: Reserved --}}
+                            <button type="button" class="tools-button" title="Coming Soon" 
+                                    style="cursor: not-allowed; opacity: 0.5;" 
+                                    onclick="alert('Message feature reserved for future updates.')">
+                                <i class="fa-solid fa-comment-dots"></i>
+                            </button>
+                            
+                            {{-- View & Edit: Active --}}
+                            <a href="{{ route('admin.alumni.edit', $alumnus->id) }}" class="tools-button" title="View & Edit Profile">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                            
+                            {{-- Disable: Reserved --}}
+                            <button type="button" class="tools-button" title="Coming Soon" 
+                                    style="cursor: not-allowed; opacity: 0.5;" 
+                                    onclick="alert('Disable feature reserved for future updates.')">
+                                <i class="fa-solid fa-circle-info"></i>
+                            </button>
                         </div>
+                        
                     </div>
                 @empty
                     <div class="user-box">

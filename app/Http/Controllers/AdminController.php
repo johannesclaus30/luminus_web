@@ -154,7 +154,8 @@ class AdminController extends Controller
             'admin_email'      => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
             'phone_number'     => ['required', 'string', 'max:50'],
             'photo'            => ['nullable', 'image', 'max:4096'],
-            'remove_photo'     => ['nullable', 'string'],
+            // 'remove_photo'     => ['nullable', 'string'],
+            'remove_photo' => ['nullable', 'string'],
         ]);
 
         // Handle photo removal (priority over new upload)
@@ -387,4 +388,108 @@ class AdminController extends Controller
 
         return $photoPath;
     }
+
+    /**
+ * Show the form for editing the specified alumni.
+ */
+public function editAlumni(string $id)
+{
+    $alumnus = Alumni::findOrFail($id);
+    
+    return view('directory.edit', compact('alumnus'));
+}
+
+/**
+ * Update the specified alumni in storage.
+ */
+public function updateAlumni(Request $request, string $id)
+{
+    $alumnus = Alumni::findOrFail($id);
+
+    $validated = $request->validate([
+        'first_name' => ['required', 'string', 'max:255'],
+        'middle_name' => ['nullable', 'string', 'max:255'],
+        'last_name' => ['required', 'string', 'max:255'],
+        'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')->ignore($alumnus->id)],
+        'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')->ignore($alumnus->id)],
+        'date_of_birth' => ['nullable', 'date'],
+        'sex' => ['nullable', 'string', 'max:50'],
+        'year_graduated' => ['required', 'date'],
+        'phone_number' => ['nullable', 'string', 'max:50'],
+        'program' => ['nullable', 'string', 'max:255'],
+        'card_photo' => ['nullable', 'image', 'max:4096'],
+        'remove_photo' => ['nullable', 'boolean'],
+    ]);
+
+    // Handle photo removal
+    if ($request->has('remove_photo') && $request->input('remove_photo')) {
+        if ($alumnus->card_photo) {
+            $this->deleteAlumniPhoto($alumnus->card_photo);
+            $alumnus->card_photo = null;
+        }
+    } elseif ($request->hasFile('card_photo')) {
+        // Delete old photo if exists
+        if ($alumnus->card_photo) {
+            $this->deleteAlumniPhoto($alumnus->card_photo);
+        }
+        
+        // Upload new photo
+        $storedPath = $request->file('card_photo')->store('card_photo', 's3');
+        
+        if ($storedPath) {
+            $alumnus->card_photo = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
+        }
+    }
+
+    // Update alumni information
+    $alumnus->update([
+        'first_name' => $validated['first_name'],
+        'middle_name' => $validated['middle_name'] ?? null,
+        'last_name' => $validated['last_name'],
+        'student_id_number' => $validated['student_id_number'],
+        'email' => $validated['email'],
+        'date_of_birth' => $validated['date_of_birth'] ?? null,
+        'sex' => $validated['sex'] ?? null,
+        'year_graduated' => $validated['year_graduated'],
+        'phone_number' => $validated['phone_number'] ?? null,
+        'program' => $validated['program'] ?? null,
+    ]);
+
+    return redirect()
+        ->route('admin.directory')
+        ->with('status', 'Alumni information updated successfully.');
+}
+
+    /**
+     * Send message to alumni (placeholder)
+     */
+    public function messageAlumni(string $id)
+    {
+        $alumnus = Alumni::findOrFail($id);
+        
+        // For now, just redirect back with a message
+        // You can implement actual messaging functionality here
+        return redirect()
+            ->route('admin.directory')
+            ->with('status', 'Message feature coming soon for ' . $alumnus->first_name . ' ' . $alumnus->last_name);
+    }
+
+    protected function deleteAlumniPhoto(?string $photoPath): void
+    {
+        if (!$photoPath) {
+            return;
+        }
+        
+        // Extract the path from the full URL if it's a URL
+        if (preg_match('/^https?:\/\//i', $photoPath)) {
+            $parsedPath = parse_url($photoPath, PHP_URL_PATH) ?: '';
+            $photoPath = ltrim($parsedPath, '/');
+        }
+        
+        // Delete from S3
+        if (Storage::disk('s3')->exists($photoPath)) {
+            Storage::disk('s3')->delete($photoPath);
+        }
+    }
+
 }
