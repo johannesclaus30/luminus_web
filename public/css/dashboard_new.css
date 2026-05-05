@@ -642,3 +642,25 @@
         flex: 1;
     }
 }
+
+/* Map container */
+.map-wrapper {
+    height: 350px;
+    min-height: 300px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    background: #f0f4f8;
+    position: relative;
+}
+
+#event-map {
+    height: 100%;
+    width: 100%;
+    z-index: 1;
+}
+
+/* Fix for Leaflet tiles when container was hidden */
+.leaflet-container {
+    background: #f0f4f8 !important;
+}

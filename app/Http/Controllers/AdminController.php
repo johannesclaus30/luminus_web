@@ -35,7 +35,7 @@ class AdminController extends Controller
 
         if (! $admin) {
             throw ValidationException::withMessages([
-                'admin_email' => 'Mali ang password.',
+                'admin_email' => 'Incorrect email or password.',
             ]);
         }
 
@@ -51,7 +51,7 @@ class AdminController extends Controller
 
         if (! $passwordMatches) {
             throw ValidationException::withMessages([
-                'admin_email' => 'Mali ang password.',
+                'admin_email' => 'Incorrect email or password.',
             ]);
         }
 

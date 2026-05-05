@@ -278,107 +278,109 @@
     </div>
 
     <script>
-        // Tab Navigation
-        function showTab(tabName) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Remove active class from all buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Show selected tab
-            document.getElementById('tab-' + tabName).classList.add('active');
-            
-            // Add active class to clicked button
+    // ========== TAB NAVIGATION ==========
+    let mapInitialized = false;
+    
+    function showTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show selected tab
+        document.getElementById('tab-' + tabName).classList.add('active');
+        
+        // Add active class to clicked button
+        if (event && event.target) {
             event.target.classList.add('active');
         }
-
-        // Chart Toggle Function
-        let yearChartInstance = null;
-        let programChartInstance = null;
         
-        function showChart(type) {
-            const yearChart = document.getElementById('yearChart');
-            const programChart = document.getElementById('programChart');
-            const btnYear = document.getElementById('btn-year');
-            const btnProgram = document.getElementById('btn-program');
-            const chartTitle = document.getElementById('chart-title');
-            
-            if (type === 'year') {
-                yearChart.style.display = 'block';
-                programChart.style.display = 'none';
-                btnYear.classList.add('active');
-                btnProgram.classList.remove('active');
-                chartTitle.textContent = 'Alumni by Year Graduated';
-                
-                // Initialize Year chart if not already done
-                if (!yearChartInstance && chartData.years.length > 0) {
-                    yearChartInstance = new Chart(yearChart, {
-                        type: 'bar',
-                        data: {
-                            labels: chartData.years,
-                            datasets: [{
-                                label: 'Number of Alumni',
-                                data: chartData.years_count,
-                                backgroundColor: 'rgba(50, 65, 140, 0.8)',
-                                borderColor: 'rgba(50, 65, 140, 1)',
-                                borderWidth: 1,
-                                borderRadius: 6
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-                        }
-                    });
-                }
-            } else {
-                yearChart.style.display = 'none';
-                programChart.style.display = 'block';
-                btnYear.classList.remove('active');
-                btnProgram.classList.add('active');
-                chartTitle.textContent = 'Alumni by Program';
-                
-                // Initialize Program chart if not already done
-                if (!programChartInstance && chartData.programs.length > 0) {
-                    programChartInstance = new Chart(programChart, {
-                        type: 'bar',
-                        data: {
-                            labels: chartData.programs,
-                            datasets: [{
-                                label: 'Number of Alumni',
-                                data: chartData.programs_count,
-                                backgroundColor: 'rgba(251, 209, 23, 0.8)',
-                                borderColor: 'rgba(251, 209, 23, 1)',
-                                borderWidth: 1,
-                                borderRadius: 6
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: { x: { beginAtZero: true } }
-                        }
-                    });
-                }
-            }
+        // Initialize map ONLY when Events tab is shown
+        if (tabName === 'events' && !mapInitialized) {
+            setTimeout(initializeMap, 200); // Small delay for CSS transition
         }
+    }
 
-        // Chart.js Initialization
-        const chartData = @json($chartData);
+    // ========== MAP INITIALIZATION ==========
+    function initializeMap() {
+        const eventLocations = @json($eventLocations);
+        const mapContainer = document.getElementById('event-map');
         
-        // Initialize Year chart by default on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            const yearChart = document.getElementById('yearChart');
-            if (yearChart && chartData.years.length > 0) {
+        // Handle empty data
+        if (!eventLocations || eventLocations.length === 0) {
+            mapContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#718096;font-family:Poppins;">No event locations available</div>';
+            mapInitialized = true;
+            return;
+        }
+        
+        // Create map instance
+        const map = L.map('event-map', {
+            zoomControl: true,
+            scrollWheelZoom: false
+        }).setView([14.6091, 121.0223], 12);
+        
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Add markers
+        const bounds = [];
+        eventLocations.forEach(evt => {
+            const lat = parseFloat(evt.latitude);
+            const lng = parseFloat(evt.longitude);
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup(`
+                    <div style="min-width:200px;padding:8px;font-family:'Poppins',sans-serif;">
+                        <strong style="font-size:14px;color:#32418c;display:block;margin-bottom:4px;">${evt.title}</strong>
+                        <span style="color:#666;font-size:12px;display:block;">📍 ${evt.venue_name || 'TBA'}</span>
+                        <span style="color:#666;font-size:12px;display:block;margin-top:2px;">📅 ${evt.start_date} - ${evt.end_date}</span>
+                    </div>
+                `);
+                bounds.push([lat, lng]);
+            }
+        });
+        
+        // Fit bounds if we have markers
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+        }
+        
+        // Critical: Force Leaflet to recalculate size after tab becomes visible
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+        
+        mapInitialized = true;
+    }
+
+    // ========== CHART TOGGLE ==========
+    let yearChartInstance = null;
+    let programChartInstance = null;
+    
+    function showChart(type) {
+        const yearChart = document.getElementById('yearChart');
+        const programChart = document.getElementById('programChart');
+        const btnYear = document.getElementById('btn-year');
+        const btnProgram = document.getElementById('btn-program');
+        const chartTitle = document.getElementById('chart-title');
+        
+        if (type === 'year') {
+            yearChart.style.display = 'block';
+            programChart.style.display = 'none';
+            btnYear.classList.add('active');
+            btnProgram.classList.remove('active');
+            chartTitle.textContent = 'Alumni by Year Graduated';
+            
+            if (!yearChartInstance && chartData.years?.length > 0) {
                 yearChartInstance = new Chart(yearChart, {
                     type: 'bar',
                     data: {
@@ -400,39 +402,75 @@
                     }
                 });
             }
-        });
-
-        // Leaflet Map
-        const eventLocations = @json($eventLocations);
-        
-        if (eventLocations.length > 0 && typeof L !== 'undefined') {
-            const map = L.map('event-map').setView([14.6091, 121.0223], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-
-            const bounds = [];
-
-            eventLocations.forEach(evt => {
-                if (evt.latitude && evt.longitude) {
-                    const marker = L.marker([evt.latitude, evt.longitude]).addTo(map);
-                    
-                    marker.bindPopup(`
-                        <div style="min-width:200px; padding:5px;">
-                            <strong style="font-size:14px;">${evt.title}</strong><br/>
-                            <span style="color:#666; font-size:12px;">📍 ${evt.venue_name}</span><br/>
-                            <span style="color:#666; font-size:12px;">📅 ${evt.start_date} - ${evt.end_date}</span>
-                        </div>
-                    `);
-                    bounds.push([evt.latitude, evt.longitude]);
-                }
-            });
-
-            if (bounds.length > 0) {
-                map.fitBounds(bounds, { padding: [30, 30] });
+        } else {
+            yearChart.style.display = 'none';
+            programChart.style.display = 'block';
+            btnYear.classList.remove('active');
+            btnProgram.classList.add('active');
+            chartTitle.textContent = 'Alumni by Program';
+            
+            if (!programChartInstance && chartData.programs?.length > 0) {
+                programChartInstance = new Chart(programChart, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.programs,
+                        datasets: [{
+                            label: 'Number of Alumni',
+                            data: chartData.programs_count,
+                            backgroundColor: 'rgba(251, 209, 23, 0.8)',
+                            borderColor: 'rgba(251, 209, 23, 1)',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true } }
+                    }
+                });
             }
         }
-    </script>
+    }
+
+    // ========== INITIALIZE ON PAGE LOAD ==========
+    const chartData = @json($chartData);
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Year chart (visible by default)
+        const yearChart = document.getElementById('yearChart');
+        if (yearChart && chartData.years?.length > 0) {
+            yearChartInstance = new Chart(yearChart, {
+                type: 'bar',
+                data: {
+                    labels: chartData.years,
+                    datasets: [{
+                        label: 'Number of Alumni',
+                        data: chartData.years_count,
+                        backgroundColor: 'rgba(50, 65, 140, 0.8)',
+                        borderColor: 'rgba(50, 65, 140, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+        
+        // Optional: Pre-load map if Events tab is somehow active on load
+        if (document.getElementById('tab-events')?.classList.contains('active')) {
+            setTimeout(initializeMap, 200);
+        }
+    });
+</script>
+
 
 </body>
 </html>
