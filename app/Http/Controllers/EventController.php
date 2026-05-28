@@ -19,7 +19,7 @@ class EventController extends Controller
                 $query->where('status', 1)->orWhereNull('status');
             })
             ->orderByDesc('start_date')
-            ->paginate(5);
+            ->paginate(6);
             
         return view('admin_events', compact('events'));
     }
@@ -29,7 +29,7 @@ class EventController extends Controller
         $events = Event::with(['images', 'admin', 'venue'])
             ->where('status', 0)
             ->orderByDesc('start_date')
-            ->paginate(5);
+            ->paginate(6);
 
         return view('admin_events', compact('events'));
     }

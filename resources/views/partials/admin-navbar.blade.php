@@ -66,7 +66,7 @@
 @endphp
 
 <nav class="nav-main">
-    <img class="nav-logo" src="{{ asset('assets/logos/LumiNUs_Logo_Landscape_White.png') }}" alt="LumiNUs Logo">
+    <img class="nav-logo" src="{{ asset('assets/logos/NULIPA_AAO_White.png') }}" alt="LumiNUs Logo">
 
     <div class="nav-admin-profile">
         <div class="nav-admin-avatar {{ $photoUrl ? 'has-photo' : 'is-initials' }}">
@@ -83,3 +83,11 @@
         </div>
     </div>
 </nav>
+
+<style>
+    .nav-logo {
+        height: 100%;
+        width: auto;
+        padding: 10px;
+    }
+</style>
