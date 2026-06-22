@@ -9,7 +9,7 @@ use App\Models\TracerForm;
 use App\Models\Announcement;
 use Illuminate\Support\Facades\DB;
 
-class AdminDashboardController extends Controller
+class AdminDashboardController extends Controller  // ✅ Correct class name
 {
     public function index()
     {
@@ -24,7 +24,7 @@ class AdminDashboardController extends Controller
         // 3. Total Tracer Responses
         $totalTracerResponses = TracerResponse::count();
 
-        // 4. Event Locations for Map (PostgreSQL-compatible)
+        // 4. Event Locations for Map
         $eventLocations = Event::select(
                 'events.title', 'events.start_date', 'events.end_date',
                 'venues.latitude', 'venues.longitude', 'venues.name as venue_name'
@@ -53,7 +53,7 @@ class AdminDashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 7. Upcoming Events with Registration Count (PostgreSQL-compatible)
+        // 7. Upcoming Events with Registration Count
         $upcomingEvents = Event::select('events.*', DB::raw('COUNT(event_registrations.id) as registration_count'))
             ->leftJoin('event_registrations', 'events.id', '=', 'event_registrations.event_id')
             ->where('events.status', 1)
@@ -63,7 +63,7 @@ class AdminDashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 8. Alumni by Year Graduated - POSTGRESQL VERSION ✅
+        // 8. Alumni by Year Graduated - POSTGRESQL VERSION
         $alumniByYear = Alumni::selectRaw('EXTRACT(YEAR FROM year_graduated) as year, COUNT(*) as count')
             ->where('verification_status', 'verified')
             ->groupBy('year')
@@ -75,7 +75,7 @@ class AdminDashboardController extends Controller
                 'count' => (int)$item->count
             ]);
 
-        // 9. Alumni by Program - POSTGRESQL VERSION ✅
+        // 9. Alumni by Program
         $alumniByProgram = Alumni::selectRaw('program, COUNT(*) as count')
             ->where('verification_status', 'verified')
             ->whereNotNull('program')
@@ -85,7 +85,7 @@ class AdminDashboardController extends Controller
             ->limit(8)
             ->get();
 
-        // Prepare chart data (ensure arrays are clean)
+        // Prepare chart data
         $chartData = [
             'years' => $alumniByYear->pluck('year')->filter()->values()->toArray(),
             'years_count' => $alumniByYear->pluck('count')->filter()->values()->toArray(),

@@ -14,24 +14,46 @@ class EventController extends Controller
 {
     public function index()
     {
-        $events = Event::with(['images', 'admin', 'venue'])
-            ->where(function ($query) {
-                $query->where('status', 1)->orWhereNull('status');
-            })
-            ->orderByDesc('start_date')
-            ->paginate(6);
-            
-        return view('admin_events', compact('events'));
+        // Get counts from the FULL database (not filtered)
+        $totalEvents = Event::count();
+        $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
+        $archivedEvents = Event::where('status', 0)->count();
+        $totalCapacity = Event::sum('max_capacity');
+        
+        // Get paginated active events for display
+        $events = Event::where(function($query) {
+            $query->where('status', 1)->orWhereNull('status');
+        })
+        ->orderBy('created_at', 'desc')
+        ->paginate(6);
+        
+        return view('admin_events', compact(
+            'events',
+            'totalEvents',
+            'activeEvents',
+            'archivedEvents'
+        ));
     }
 
     public function archived()
     {
-        $events = Event::with(['images', 'admin', 'venue'])
-            ->where('status', 0)
-            ->orderByDesc('start_date')
+        // Get counts from the FULL database (not filtered)
+        $totalEvents = Event::count();
+        $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
+        $archivedEvents = Event::where('status', 0)->count();
+        $totalCapacity = Event::sum('max_capacity');
+        
+        // Get paginated archived events for display
+        $events = Event::where('status', 0)
+            ->orderBy('created_at', 'desc')
             ->paginate(6);
-
-        return view('admin_events', compact('events'));
+        
+        return view('admin_events', compact(
+            'events',
+            'totalEvents',
+            'activeEvents',
+            'archivedEvents'
+        ));
     }
 
     public function create()

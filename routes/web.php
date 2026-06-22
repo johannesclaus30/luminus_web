@@ -6,7 +6,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Admin\TracerFormController;
-use App\Http\Controllers\AdminDashboardController; // ✅ Added this import
+use App\Http\Controllers\AdminDashboardController;
 
 Route::prefix('admin')->group(function () {
     
@@ -23,7 +23,7 @@ Route::prefix('admin')->group(function () {
     // 🔹 Protected Admin Routes
     Route::middleware('admin.auth')->group(function () {
         
-        // ✅ Dashboard - Points to your new Controller
+        // ✅ Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])
             ->name('admin.dashboard');
 
@@ -31,14 +31,22 @@ Route::prefix('admin')->group(function () {
         Route::get('/directory', [AdminController::class, 'index'])
             ->name('admin.directory');
 
+        // ✅ NEW: Archived Directory Route
+        Route::get('/directory/archived', [AdminController::class, 'archived'])
+            ->name('admin.directory.archived');
+
         Route::post('/alumni', [AdminController::class, 'storeAlumni'])
             ->name('admin.alumni.store');
 
-        // ✅ ADD NEW ROUTES HERE:
+        // Alumni CRUD
         Route::get('/alumni/{id}/edit', [AdminController::class, 'editAlumni'])
             ->name('admin.alumni.edit');
         Route::put('/alumni/{id}', [AdminController::class, 'updateAlumni'])
             ->name('admin.alumni.update');
+        
+        // ✅ NEW: Message Alumni Route (optional, for future feature)
+        Route::post('/alumni/{id}/message', [AdminController::class, 'messageAlumni'])
+            ->name('admin.alumni.message');
 
         Route::get('/settings', [AdminController::class, 'settings'])
             ->name('admin.settings');
@@ -152,7 +160,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
             ->name('admin.alumni_tracer.toggle-status');
 
-        // Messages - Matches admin_messages.blade.php
+        // Messages
         Route::get('/messages', function () {
             return view('admin_messages'); 
         });

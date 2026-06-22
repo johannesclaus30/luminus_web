@@ -126,7 +126,7 @@
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-value">{{ $events->total() }}</span>
+                        <span class="stat-value">{{ $totalEvents ?? 0 }}</span>
                         <span class="stat-label">Total Events</span>
                     </div>
                 </div>
@@ -137,7 +137,7 @@
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-value">{{ $events->where('status', 1)->count() + $events->whereNull('status')->count() }}</span>
+                        <span class="stat-value">{{ $activeEvents ?? 0 }}</span>
                         <span class="stat-label">Active Events</span>
                     </div>
                 </div>
@@ -148,19 +148,8 @@
                         </div>
                     </div>
                     <div class="stat-info">
-                        <span class="stat-value">{{ $events->where('status', 0)->count() }}</span>
+                        <span class="stat-value">{{ $archivedEvents ?? 0 }}</span>
                         <span class="stat-label">Archived</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon-wrapper">
-                        <div class="stat-icon views">
-                            <i class="fa-solid fa-users"></i>
-                        </div>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $events->sum('max_capacity') ?? 0 }}</span>
-                        <span class="stat-label">Total Capacity</span>
                     </div>
                 </div>
             </div>

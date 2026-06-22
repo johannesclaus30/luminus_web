@@ -11,6 +11,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
+use App\Mail\AlumniWelcomeMail;
+use Illuminate\Support\Facades\Mail;
+
 class AdminController extends Controller
 {
     public function showLogin(Request $request)
@@ -79,9 +82,38 @@ class AdminController extends Controller
      */
     public function index()
     {
+        // Fetch all alumni for the grid
         $alumni = Alumni::query()->latest('created_at')->get();
 
-        return view('admin_directory', compact('alumni'));
+        // --- DIRECTORY STATS ---
+        
+        // 1. Total Alumni Count
+        $totalAlumni = Alumni::count(); 
+        // Note: If you only want to count verified alumni, use: 
+        // $totalAlumni = Alumni::where('verification_status', 'verified')->count();
+
+        // 2. Recent Graduates (Alumni who graduated in the current year)
+        $recentGraduates = Alumni::whereYear('year_graduated', now()->year)->count();
+
+        // 3. Unique Programs Offered
+        $uniquePrograms = Alumni::whereNotNull('program')
+            ->where('program', '!=', '')
+            ->distinct('program')
+            ->count('program');
+
+        // 4. Alumni With Email Addresses
+        $withEmails = Alumni::whereNotNull('email')
+            ->where('email', '!=', '')
+            ->count();
+
+        // Pass everything to the view
+        return view('admin_directory', compact(
+            'alumni', 
+            'totalAlumni', 
+            'recentGraduates', 
+            'uniquePrograms', 
+            'withEmails'
+        ));
     }
 
     public function settings(Request $request)
@@ -222,7 +254,8 @@ class AdminController extends Controller
             $cardPhotoPath = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
         }
 
-        Alumni::create([
+        // 1. Assign the created record to a variable
+        $alumni = Alumni::create([
             'first_name' => $validated['first_name'],
             'middle_name' => $validated['middle_name'] ?? null,
             'last_name' => $validated['last_name'],
@@ -238,9 +271,19 @@ class AdminController extends Controller
             'card_photo' => $cardPhotoPath,
         ]);
 
+        // 📧 2. Send the Welcome Email
+        try {
+            Mail::to($alumni->email)->send(new AlumniWelcomeMail($alumni));
+        } catch (\Throwable $e) { // <--- CHANGE \Exception TO \Throwable
+            // If the email fails (e.g., SMTP timeout), log the error 
+            // but DO NOT stop the account creation process.
+            \Log::error('Failed to send welcome email to ' . $alumni->email . ': ' . $e->getMessage());
+        }
+
         return redirect()
             ->route('admin.directory')
             ->with('status', 'Alumni account created successfully.');
+
     }
 
     /**

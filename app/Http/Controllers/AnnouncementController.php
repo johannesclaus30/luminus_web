@@ -16,24 +16,52 @@ class AnnouncementController extends Controller
 
     public function index()
     {
-        $announcements = Announcement::with('images')
-            ->where(function ($query) {
-                $query->where('status', 1)->orWhereNull('status');
-            })
-            ->orderBy('date_posted', 'desc')
-            ->paginate(5);
-            
-        return view('admin_announcements', compact('announcements'));
+        // Get counts from FULL database
+        $totalAnnouncements = \App\Models\Announcement::count();
+        $activeAnnouncements = \App\Models\Announcement::where('status', 1)->orWhereNull('status')->count();
+        $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
+        $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
+            ->where('scheduled_post_at', '>', now())
+            ->where(function($q) { $q->where('status', 1)->orWhereNull('status'); })
+            ->count();
+        
+        $announcements = \App\Models\Announcement::where(function($query) {
+            $query->where('status', 1)->orWhereNull('status');
+        })
+        ->orderBy('date_posted', 'desc')
+        ->paginate(6);
+        
+        return view('admin_announcements', compact(
+            'announcements',
+            'totalAnnouncements',
+            'activeAnnouncements',
+            'archivedAnnouncements',
+            'scheduledAnnouncements'
+        ));
     }
 
     public function archived()
     {
-        $announcements = Announcement::with('images')
-            ->where('status', 0)
+        // Same counts from FULL database
+        $totalAnnouncements = \App\Models\Announcement::count();
+        $activeAnnouncements = \App\Models\Announcement::where('status', 1)->orWhereNull('status')->count();
+        $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
+        $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
+            ->where('scheduled_post_at', '>', now())
+            ->where(function($q) { $q->where('status', 1)->orWhereNull('status'); })
+            ->count();
+        
+        $announcements = \App\Models\Announcement::where('status', 0)
             ->orderBy('date_posted', 'desc')
-            ->paginate(5);
-
-        return view('admin_announcements', compact('announcements'));
+            ->paginate(6);
+        
+        return view('admin_announcements', compact(
+            'announcements',
+            'totalAnnouncements',
+            'activeAnnouncements',
+            'archivedAnnouncements',
+            'scheduledAnnouncements'
+        ));
     }
 
     public function create()
