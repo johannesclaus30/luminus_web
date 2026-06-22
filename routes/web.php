@@ -160,6 +160,16 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
             ->name('admin.alumni_tracer.toggle-status');
 
+        // View Alumni Profile
+        // 👇 Changed path to /alumni/... and controller to AdminController::class
+        Route::get('/alumni/{id}/view', [AdminController::class, 'show'])
+            ->name('admin.alumni.show');
+
+        // Send Test Email
+        // 👇 Changed path to /alumni/... and controller to AdminController::class
+        Route::post('/alumni/{id}/send-test-email', [AdminController::class, 'sendTestEmail'])
+            ->name('admin.alumni.send-test-email');
+
         // Messages
         Route::get('/messages', function () {
             return view('admin_messages'); 

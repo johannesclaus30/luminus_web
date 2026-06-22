@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 use App\Mail\AlumniWelcomeMail;
+use App\Mail\TestAlumniEmail;  
 use Illuminate\Support\Facades\Mail;
 
 class AdminController extends Controller
@@ -291,7 +292,28 @@ class AdminController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $alumnus = Alumni::findOrFail($id);
+        return view('directory.show', compact('alumnus')); // 👈 Changed from 'admin.alumni.show'
+    }
+
+    /**
+     * Send a test email to the alumni.
+     */
+    public function sendTestEmail($id)
+    {
+        $alumnus = Alumni::findOrFail($id);
+
+        if (empty($alumnus->email)) {
+            return redirect()->back()->with('error', 'This alumni does not have an email address registered.');
+        }
+
+        try {
+            Mail::to($alumnus->email)->send(new TestAlumniEmail($alumnus));
+            return redirect()->back()->with('success', "Test email successfully sent to {$alumnus->email}!");
+        } catch (\Exception $e) {
+            // Log the actual error for debugging: \Log::error($e->getMessage());
+            return redirect()->back()->with('error', 'Failed to send email. Check your .env mail configuration.');
+        }
     }
 
     /**

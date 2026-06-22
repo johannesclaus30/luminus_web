@@ -276,19 +276,25 @@
                                     <span class="status-dot active"></span>
                                     <span>Active Member</span>
                                 </div>
+                                
+                                <!-- Find this block in your directory page -->
                                 <div class="alumni-actions">
                                     <button type="button" class="btn-action btn-reserved" title="Coming Soon" disabled>
                                         <i class="fa-solid fa-comment-dots"></i>
                                     </button>
-                                    <a href="{{ route('admin.alumni.edit', $alumnus->id) }}" 
-                                       class="btn-action btn-edit" 
-                                       title="View & Edit Profile">
+                                    
+                                    <!-- CHANGE THE ROUTE AND TITLE HERE -->
+                                    <a href="{{ route('admin.alumni.show', $alumnus->id) }}" 
+                                    class="btn-action btn-edit" 
+                                    title="View Profile">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
+                                    
                                     <button type="button" class="btn-action btn-reserved" title="Coming Soon" disabled>
                                         <i class="fa-solid fa-circle-info"></i>
                                     </button>
                                 </div>
+
                             </div>
                         </div>
                     </article>
