@@ -43,6 +43,8 @@ Route::prefix('admin')->group(function () {
             ->name('admin.alumni.edit');
         Route::put('/alumni/{id}', [AdminController::class, 'updateAlumni'])
             ->name('admin.alumni.update');
+        Route::delete('/alumni/{id}', [AdminController::class, 'destroy'])
+            ->name('admin.alumni.destroy');
         
         // ✅ NEW: Message Alumni Route (optional, for future feature)
         Route::post('/alumni/{id}/message', [AdminController::class, 'messageAlumni'])

@@ -290,7 +290,11 @@
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
                                     
-                                    <button type="button" class="btn-action btn-reserved" title="Coming Soon" disabled>
+                                    <!-- Replace your current 'i' button with this -->
+                                    <button type="button" class="btn-action btn-info-action manage-btn" 
+                                            data-id="{{ $alumnus->id }}" 
+                                            data-name="{{ $displayName }}" 
+                                            title="Manage Account">
                                         <i class="fa-solid fa-circle-info"></i>
                                     </button>
                                 </div>
@@ -500,6 +504,97 @@
         </div>
     </div>
 
+    <!-- Manage Alumni Modal -->
+    <div id="manageModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content-wrapper">
+            <div class="modal-card" style="max-width: 550px;">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title">
+                            <i class="fa-solid fa-user-gear"></i>
+                            Manage Account
+                        </h2>
+                        <p class="modal-subtitle">Account actions for <strong id="manageAlumniName"></strong></p>
+                    </div>
+                    <button class="modal-close" onclick="hideManageModal()" title="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <input type="hidden" id="manageAlumniId">
+                    
+                    <div class="manage-action-group">
+                        <!-- Reset Password (Reserved) -->
+                        <div class="manage-action-item">
+                            <div class="manage-action-icon icon-info">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <div class="manage-action-content">
+                                <h4>Reset Password</h4>
+                                <p>Reset the account password to the default or a custom one.</p>
+                            </div>
+                            <button type="button" class="btn btn-secondary" disabled title="Coming Soon">
+                                Reserved
+                            </button>
+                        </div>
+
+                        <!-- Restrict Account (Reserved) -->
+                        <div class="manage-action-item">
+                            <div class="manage-action-icon icon-warning">
+                                <i class="fa-solid fa-user-slash"></i>
+                            </div>
+                            <div class="manage-action-content">
+                                <h4>Restrict Account</h4>
+                                <p>Temporarily suspend or restrict access for this alumnus.</p>
+                            </div>
+                            <button type="button" class="btn btn-secondary" disabled title="Coming Soon">
+                                Reserved
+                            </button>
+                        </div>
+
+                        <!-- Delete Account (Active) -->
+                        <div class="manage-action-item danger-zone">
+                            <div class="manage-action-icon icon-danger">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </div>
+                            <div class="manage-action-content danger-text">
+                                <h4>Delete Account</h4>
+                                <p>Permanently remove this alumni record from the system.</p>
+                            </div>
+                            <button type="button" class="btn btn-danger" onclick="prepareDelete()">
+                                <i class="fa-solid fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content-wrapper" style="max-width: 450px;">
+            <div class="confirm-modal-card">
+                <div class="confirm-icon-wrapper">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 class="confirm-title">Delete Account</h3>
+                <p class="confirm-message">
+                    Are you sure you want to delete <strong id="confirmAlumniName"></strong>? 
+                    <br>This action cannot be undone.
+                </p>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideDeleteConfirm()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="executeDelete()">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Alert Toast -->
     <div id="alertToast" class="alert-toast">
         <i class="alert-icon fa-solid fa-circle-check"></i>
@@ -549,14 +644,15 @@
 
         // Modal functions
         function showModal() {
-            document.getElementById('createModal').style.display = 'flex';
+            document.getElementById('createModal').classList.add('active');
             document.body.style.overflow = 'hidden';
         }
 
         function hideModal() {
-            document.getElementById('createModal').style.display = 'none';
+            document.getElementById('createModal').classList.remove('active');
             document.body.style.overflow = '';
         }
+
 
         function switchModalMode(mode) {
             // Update tabs
@@ -806,6 +902,11 @@
             if (e.target === this) hideModal();
         });
 
+        // Close delete confirm modal when clicking outside
+        document.getElementById('deleteConfirmModal')?.addEventListener('click', function(e) {
+            if (e.target === this) hideDeleteConfirm();
+        });
+
         // Close sidebar on nav item click (mobile)
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', function() {
@@ -828,20 +929,6 @@
             }, 250);
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Escape to close modal
-            if (e.key === 'Escape') {
-                hideModal();
-                hideAlert();
-            }
-            // Ctrl/Cmd + K to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                document.getElementById('searchInput')?.focus();
-            }
-        });
-
         // Initialize search clear button visibility
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.getElementById('searchInput');
@@ -850,6 +937,108 @@
                 clearBtn.style.display = searchInput.value ? 'flex' : 'none';
             }
         });
+
+        // --- Manage Modal Functions ---
+        function openManageModal(id, name) {
+            document.getElementById('manageAlumniId').value = id;
+            document.getElementById('manageAlumniName').textContent = name;
+            document.getElementById('manageModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideManageModal() {
+            document.getElementById('manageModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close manage modal when clicking outside
+    document.getElementById('manageModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideManageModal();
+    });
+
+        
+        // Change to:
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideModal();
+                hideManageModal(); // Added this
+                hideAlert();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                document.getElementById('searchInput')?.focus();
+            }
+        });
+
+        // Safely handle clicks on the 'i' button without breaking HTML quotes
+        document.addEventListener('click', function(e) {
+            // Check if the clicked element (or its parent) is our manage button
+            const btn = e.target.closest('.manage-btn');
+            
+            if (btn) {
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                openManageModal(id, name);
+            }
+        });
+
+                // --- Delete Alumni Functions ---
+        
+        // Variable to hold the ID temporarily
+        let pendingDeleteId = null;
+
+        // --- Delete Confirmation Functions ---
+        function prepareDelete() {
+            const id = document.getElementById('manageAlumniId').value;
+            const name = document.getElementById('manageAlumniName').textContent;
+            
+            pendingDeleteId = id;
+            document.getElementById('confirmAlumniName').textContent = name;
+            
+            hideManageModal();
+            document.getElementById('deleteConfirmModal').classList.add('active');
+        }
+
+        function hideDeleteConfirm() {
+            document.getElementById('deleteConfirmModal').classList.remove('active');
+            document.body.style.overflow = '';
+            pendingDeleteId = null;
+        }
+
+        // 3. This is the actual deletion logic (called by the "Delete" button in the confirm modal)
+        async function executeDelete() {
+            if (!pendingDeleteId) return;
+
+            const formData = new FormData();
+            formData.append('_method', 'DELETE');
+            formData.append('_token', '{{ csrf_token() }}');
+
+            try {
+                const response = await fetch(`/admin/alumni/${pendingDeleteId}`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    hideDeleteConfirm();
+                    showAlert('Alumni account deleted successfully.', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    const data = await response.json().catch(() => null);
+                    showAlert(data?.message || 'Failed to delete account.', 'error');
+                    hideDeleteConfirm();
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                showAlert('An error occurred.', 'error');
+                hideDeleteConfirm();
+            }
+        }
+
     </script>
 </body>
 </html>

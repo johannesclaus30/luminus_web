@@ -337,7 +337,47 @@ class AdminController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $alumnus = Alumni::findOrFail($id);
+
+        try {
+            // 1. Delete the alumni's photo from S3 to save storage space
+            if ($alumnus->card_photo) {
+                $this->deleteAlumniPhoto($alumnus->card_photo);
+            }
+
+            // 2. Delete the alumni record from the database
+            $alumnus->delete();
+
+            // 3. Return a JSON response since the frontend uses AJAX (fetch)
+            return response()->json([
+                'success' => true,
+                'message' => 'Alumni account deleted successfully.'
+            ], 200);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle foreign key constraint errors (e.g., if they have tracer forms or messages)
+            // Error code 23503 is standard for foreign key violations in PostgreSQL/MySQL
+            if ($e->getCode() === '23503' || str_contains($e->getMessage(), 'foreign key constraint')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete this alumni because they have existing records (e.g., Tracer Forms). Please archive or remove those first.'
+                ], 409); // 409 Conflict
+            }
+
+            // Fallback for other database errors
+            \Log::error('Failed to delete alumni ' . $id . ': ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'A database error occurred while deleting the account.'
+            ], 500);
+            
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete alumni ' . $id . ': ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An unexpected error occurred.'
+            ], 500);
+        }
     }
 
     protected function getAuthenticatedAdmin(Request $request): ?Admin
