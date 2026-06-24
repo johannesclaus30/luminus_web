@@ -179,6 +179,17 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/admin/announcements/{announcement}/permanent-delete', [AnnouncementController::class, 'permanentDelete'])
         ->name('announcements.permanent-delete');
+
+
+        // Forgot Password Routes (Public)
+        Route::get('/admin/forgot-password', [AdminController::class, 'showForgotPassword'])->name('admin.forgot-password');
+        Route::post('/admin/forgot-password', [AdminController::class, 'sendResetLink'])->name('admin.send-reset-link');
+        Route::get('/admin/reset-password', [AdminController::class, 'showResetForm'])->name('admin.reset-password');
+        Route::post('/admin/reset-password', [AdminController::class, 'resetPassword'])->name('admin.reset-password.process');
+
+        // Change Password (Authenticated)
+        Route::put('/admin/settings/password', [AdminController::class, 'changePassword'])->name('admin.password.update');
+
     });
 });
 

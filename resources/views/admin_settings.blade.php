@@ -209,22 +209,47 @@
                                         <p>Keep the admin account protected with a strong, unique password.</p>
                                     </div>
                                 </div>
-                                <form id="change-password-form" class="settings-form-grid">
+                                <form id="change-password-form" class="settings-form-grid" method="POST" action="{{ route('admin.password.update') }}">
+                                    @csrf
+                                    @method('PUT')
+                                    
                                     <div class="form-group full-width">
                                         <label class="form-label">Current Password</label>
-                                        <input type="password" name="current_password" class="form-control" placeholder="Enter current password">
+                                        <div class="password-input-wrapper">
+                                            <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
+                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">New Password</label>
-                                        <input type="password" name="password" class="form-control" placeholder="Enter new password">
+                                        <div class="password-input-wrapper">
+                                            <input type="password" name="password" class="form-control" placeholder="Enter new password" required minlength="8">
+                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Confirm New Password</label>
-                                        <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat new password">
+                                        <div class="password-input-wrapper">
+                                            <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat new password" required minlength="8">
+                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </button>
+                                        </div>
                                     </div>
+                                    
+                                    <div class="forgot-password-row full-width">
+                                        <a href="{{ route('admin.forgot-password') }}" class="forgot-password-link">
+                                            <i class="fa-solid fa-key"></i> Forgot your password?
+                                        </a>
+                                    </div>
+                                    
                                     <div class="form-actions full-width">
                                         <button type="button" class="btn btn-secondary" onclick="resetForm('change-password-form')">Reset</button>
-                                        <button type="button" class="btn btn-primary" onclick="fakeSave('Password updated')">Change Password</button>
+                                        <button type="submit" class="btn btn-primary">Change Password</button>
                                     </div>
                                 </form>
                             </div>

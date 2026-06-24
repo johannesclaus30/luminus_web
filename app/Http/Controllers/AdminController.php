@@ -137,6 +137,9 @@ class AdminController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+    /**
+ * Store a newly created admin and send invitation email.
+ */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -149,7 +152,9 @@ class AdminController extends Controller
             'admin_role' => ['required', Rule::in(['Executive Director', 'Academic Director', 'Coordinator', 'Assistant Coordinator'])],
         ]);
 
-        $temporaryPassword = 'password123';
+        // Generate a secure random temporary password
+        $temporaryPassword = Str::random(12); // 12-character random string
+
         $admin = Admin::create([
             'admin_first_name' => $validated['admin_first_name'],
             'admin_middle_name' => $validated['admin_middle_name'] ?? null,
@@ -157,19 +162,34 @@ class AdminController extends Controller
             'admin_email' => $validated['admin_email'],
             'phone_number' => $validated['phone_number'],
             'photo' => null,
-            'admin_password_hash' => Hash::make($temporaryPassword), // 🔐 Hashed!
+            'admin_password_hash' => Hash::make($temporaryPassword),
             'admin_role' => $validated['admin_role'],
         ]);
 
+        // Handle photo upload
         if ($request->hasFile('photo')) {
             $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, null);
             $admin->save();
         }
 
-        return redirect()
-            ->route('admin.settings', ['section' => 'add-admin'])
-            ->with('status', 'Admin account created successfully.')
-            ->with('temporary_password', $temporaryPassword);
+        // Send invitation email
+        try {
+            Mail::to($admin->admin_email)->send(new \App\Mail\AdminInvitationMail($admin, $temporaryPassword));
+            
+            return redirect()
+                ->route('admin.settings', ['section' => 'add-admin'])
+                ->with('status', 'Admin account created successfully! An invitation email has been sent to ' . $admin->admin_email . '.')
+                ->with('temporary_password', $temporaryPassword);
+                
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send invitation email to ' . $admin->admin_email . ': ' . $e->getMessage());
+            
+            // Still return success but with a warning
+            return redirect()
+                ->route('admin.settings', ['section' => 'add-admin'])
+                ->with('status', 'Admin account created, but the invitation email could not be sent. Please provide these credentials manually.')
+                ->with('temporary_password', $temporaryPassword);
+        }
     }
 
     public function updateProfile(Request $request)
@@ -596,5 +616,155 @@ public function updateAlumni(Request $request, string $id)
             Storage::disk('s3')->delete($photoPath);
         }
     }
+
+    // Add these methods to your AdminController
+
+/**
+ * Show the forgot password form.
+ */
+public function showForgotPassword()
+{
+    return view('admin_forgot_password');
+}
+
+/**
+ * Send a password reset link to the admin's email.
+ */
+public function sendResetLink(Request $request)
+{
+    $request->validate([
+        'admin_email' => ['required', 'email', 'exists:admins,admin_email'],
+    ], [
+        'admin_email.exists' => 'No admin account found with this email address.',
+    ]);
+
+    $admin = Admin::where('admin_email', $request->admin_email)->first();
+
+    // Generate a unique reset token
+    $token = Str::random(64);
+    
+    // Store token in database with expiration (1 hour)
+    $admin->update([
+        'reset_token' => $token,
+        'reset_token_expires_at' => now()->addHour(),
+    ]);
+
+    // Send reset email
+    try {
+        Mail::to($admin->admin_email)->send(new \App\Mail\AdminPasswordResetMail($admin, $token));
+        
+        return back()->with('status', 'Password reset link has been sent to your email address.');
+    } catch (\Exception $e) {
+        \Log::error('Failed to send password reset email: ' . $e->getMessage());
+        
+        // Still return success to prevent email enumeration
+        return back()->with('status', 'Password reset link has been sent to your email address.');
+    }
+}
+
+/**
+ * Show the reset password form.
+ */
+public function showResetForm(Request $request)
+{
+    $token = $request->query('token');
+    $email = $request->query('email');
+    
+    if (!$token || !$email) {
+        return redirect()->route('admin.forgot-password')
+            ->with('error', 'Invalid password reset link.');
+    }
+
+    // Verify token is valid
+    $admin = Admin::where('admin_email', $email)
+        ->where('reset_token', $token)
+        ->where('reset_token_expires_at', '>', now())
+        ->first();
+
+    if (!$admin) {
+        return redirect()->route('admin.forgot-password')
+            ->with('error', 'This password reset link is invalid or has expired.');
+    }
+
+    return view('admin_reset_password', compact('token', 'email'));
+}
+
+/**
+ * Process the password reset.
+ */
+public function resetPassword(Request $request)
+{
+    $request->validate([
+        'token' => ['required', 'string'],
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string', 'min:8', 'confirmed'],
+    ], [
+        'password.min' => 'Password must be at least 8 characters.',
+        'password.confirmed' => 'Password confirmation does not match.',
+    ]);
+
+    $admin = Admin::where('admin_email', $request->email)
+        ->where('reset_token', $request->token)
+        ->where('reset_token_expires_at', '>', now())
+        ->first();
+
+    if (!$admin) {
+        return back()->with('error', 'This password reset link is invalid or has expired.');
+    }
+
+    // Update password and clear reset token
+    $admin->update([
+        'admin_password_hash' => Hash::make($request->password),
+        'reset_token' => null,
+        'reset_token_expires_at' => null,
+    ]);
+
+    return redirect()->route('admin.login')
+        ->with('status', 'Your password has been reset successfully. Please login with your new password.');
+}
+
+
+/**
+ * Update the authenticated admin's password.
+ */
+public function changePassword(Request $request)
+{
+    $admin = $this->getAuthenticatedAdmin($request);
+
+    if (!$admin) {
+        abort(403);
+    }
+
+    $request->validate([
+        'current_password' => ['required', 'string'],
+        'password' => ['required', 'string', 'min:8', 'confirmed'],
+    ], [
+        'password.min' => 'New password must be at least 8 characters.',
+        'password.confirmed' => 'Password confirmation does not match.',
+    ]);
+
+    // Verify current password
+    $storedPassword = (string) ($admin->admin_password_hash ?? '');
+    $isHashedPassword = password_get_info($storedPassword)['algo'] !== 0;
+    
+    $passwordMatches = $isHashedPassword 
+        ? Hash::check($request->current_password, $storedPassword)
+        : $storedPassword === $request->current_password;
+
+    if (!$passwordMatches) {
+        throw ValidationException::withMessages([
+            'current_password' => 'The current password you entered is incorrect.',
+        ]);
+    }
+
+    // Update password
+    $admin->update([
+        'admin_password_hash' => Hash::make($request->password),
+    ]);
+
+    return redirect()
+        ->route('admin.settings', ['section' => 'security'])
+        ->with('status', 'Your password has been changed successfully.');
+}
 
 }

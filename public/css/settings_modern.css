@@ -398,3 +398,62 @@ html, body { height: auto !important; }
 .admin-sidebar::-webkit-scrollbar, .admin-main::-webkit-scrollbar { width: 8px; }
 .admin-sidebar::-webkit-scrollbar-track, .admin-main::-webkit-scrollbar-track { background: var(--gray-100); border-radius: var(--radius-full); }
 .admin-sidebar::-webkit-scrollbar-thumb, .admin-main::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: var(--radius-full); }
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper .form-control {
+    padding-right: 3rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 1rem;
+    transition: color var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.password-toggle:hover {
+    color: var(--nu-blue);
+}
+
+/* Forgot Password Row */
+.forgot-password-row {
+    display: flex;
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+}
+
+.forgot-password-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--nu-blue);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition);
+    padding: 0.5rem 0;
+}
+
+.forgot-password-link:hover {
+    color: var(--nu-blue-dark);
+    gap: 0.75rem;
+}
+
+.forgot-password-link i {
+    font-size: 0.875rem;
+}

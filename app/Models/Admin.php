@@ -22,6 +22,8 @@ class Admin extends Authenticatable
         'admin_role',
         'phone_number',
         'photo',
+        'reset_token',              // ← Add this
+        'reset_token_expires_at',   // ← Add this
     ];
  
     protected $hidden = [
