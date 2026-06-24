@@ -95,20 +95,42 @@
                         </h1>
                         <p class="page-subtitle">Share important updates and news with NU Lipa alumni</p>
                     </div>
+                    
                     <div class="header-actions">
                         @if (!request()->routeIs('announcements.archived'))
                             <a href="{{ route('announcements.create') }}" class="btn btn-primary">
                                 <i class="fa-solid fa-plus"></i> 
                                 <span>Add New Announcement</span>
                             </a>
+                            
+                            <!-- Filter Buttons - Only show on active announcements page -->
+                            <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                                <a href="{{ route('announcements.index', ['filter' => 'all']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'all' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    All
+                                </a>
+                                <a href="{{ route('announcements.index', ['filter' => 'active']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'active' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    Published
+                                </a>
+                                <a href="{{ route('announcements.index', ['filter' => 'scheduled']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'scheduled' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    Scheduled
+                                </a>
+                            </div>
                         @endif
+                        
                         <a id="archiveToggleBtn"
-                           href="{{ route('announcements.archived') }}"
-                           class="btn btn-secondary archived-toggle">
+                        href="{{ route('announcements.archived') }}"
+                        class="btn btn-secondary archived-toggle">
                             <i class="fa-solid fa-box-archive"></i> 
                             <span class="btn-text">Archived</span>
                         </a>
                     </div>
+
                 </div>
             </header>
 
@@ -170,12 +192,14 @@
                                     <i class="fa-solid fa-circle"></i>
                                     <span>{{ (int) $announcement->status === 0 ? 'Archived' : 'Active' }}</span>
                                 </div>
-                                @if ($announcement->scheduled_post_at && (int) $announcement->status !== 0)
+                                
+                                @if ($announcement->scheduled_post_at && $announcement->scheduled_post_at->isFuture() && (int) $announcement->status !== 0)
                                     <div class="announcement-scheduled-badge">
                                         <i class="fa-regular fa-clock"></i>
                                         <span>Scheduled</span>
                                     </div>
                                 @endif
+
                             </div>
                             
                             <div class="announcement-card-body">
@@ -186,14 +210,40 @@
                                 
                                 <!-- Date Meta -->
                                 <div class="announcement-dates">
+                                    @php
+                                        $hasScheduled = $announcement->scheduled_post_at !== null;
+                                        $isScheduledFuture = $hasScheduled && $announcement->scheduled_post_at->isFuture();
+                                        $isPublished = $hasScheduled && !$isScheduledFuture;
+                                        
+                                        // Determine which date to show
+                                        if ($isPublished) {
+                                            // Was scheduled, now published - show scheduled date as published date
+                                            $displayDate = $announcement->scheduled_post_at;
+                                            $dateLabel = 'Published';
+                                        } elseif (!$hasScheduled) {
+                                            // Never scheduled - show date_posted as published
+                                            $displayDate = $announcement->date_posted ?? $announcement->created_at;
+                                            $dateLabel = 'Published';
+                                        } else {
+                                            // Scheduled for future - show when it was created/posted to system
+                                            $displayDate = $announcement->date_posted ?? $announcement->created_at;
+                                            $dateLabel = 'Posted';
+                                        }
+                                    @endphp
+                                    
                                     <div class="date-item">
                                         <i class="fa-regular fa-calendar"></i>
-                                        <span>Posted: {{ optional($announcement->date_posted)->format('M d, Y') ?? 'N/A' }}</span>
+                                        <span>{{ $dateLabel }}: {{ $displayDate->format('M d, Y') }}</span>
                                     </div>
-                                    @if ($announcement->scheduled_post_at)
-                                        <div class="date-item scheduled">
-                                            <i class="fa-solid fa-paper-plane"></i>
-                                            <span>Scheduled: {{ $announcement->scheduled_post_at->format('M d, h:i A') }}</span>
+                                    
+                                    {{-- Show countdown ONLY if scheduled for the future --}}
+                                    @if ($isScheduledFuture)
+                                        <div class="date-item scheduled" 
+                                            id="countdown-{{ $announcement->id }}" 
+                                            data-target="{{ $announcement->scheduled_post_at->timestamp * 1000 }}"
+                                            data-published-date="{{ $announcement->scheduled_post_at->format('M d, Y') }}">
+                                            <i class="fa-solid fa-hourglass-half"></i>
+                                            <span>Posts in: <span class="countdown-text" style="font-weight: 600;">Loading...</span></span>
                                         </div>
                                     @endif
                                 </div>
@@ -242,34 +292,44 @@
                                         <span>Views: {{ $announcement->views ?? 0 }}</span>
                                     </div>
                                 </div>
+                                
                                 <div class="announcement-actions">
                                     @if ((int) $announcement->status === 0)
+                                        {{-- Archived: Show Restore + Permanent Delete --}}
                                         <form action="{{ route('announcements.restore', $announcement->id) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              onsubmit="return confirm('Restore this announcement?')">
-                                            @csrf
-                                            @method('PUT')
-                                            <button type="submit" class="btn-action btn-restore" title="Restore Announcement">
+                                            method="POST" class="inline-form"
+                                            onsubmit="return confirm('Restore this announcement?')">
+                                            @csrf @method('PUT')
+                                            <button type="submit" class="btn-action btn-restore" title="Restore">
                                                 <i class="fa-solid fa-rotate-left"></i>
                                             </button>
                                         </form>
+                                        
+                                        {{-- ONLY show permanent delete if archived --}}
+                                        <form action="{{ route('announcements.permanent-delete', $announcement->id) }}" 
+                                            method="POST" class="inline-form"
+                                            onsubmit="return confirm('Permanently delete this announcement? This cannot be undone.')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn-action" style="background:#fee; color:#ef4444;" title="Delete Permanently">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </form>
                                     @else
-                                        <a href="{{ route('announcements.edit', $announcement->id) }}" class="btn-action btn-edit" title="Edit Announcement">
+                                        {{-- Active: Show Edit + Archive --}}
+                                        <a href="{{ route('announcements.edit', $announcement->id) }}" class="btn-action btn-edit" title="Edit">
                                             <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
                                         <form action="{{ route('announcements.destroy', $announcement->id) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              onsubmit="return confirm('Archive this announcement?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn-action btn-archive" title="Archive Announcement">
+                                            method="POST" class="inline-form"
+                                            onsubmit="return confirm('Archive this announcement?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn-action btn-archive" title="Archive">
                                                 <i class="fa-solid fa-box-archive"></i>
                                             </button>
                                         </form>
                                     @endif
                                 </div>
+
                             </div>
                         </div>
                     </article>
@@ -400,6 +460,99 @@
                 }
             });
         });
+
     </script>
+
+    <script>
+    (function() {
+        'use strict';
+        
+        window.countdownIntervals = window.countdownIntervals || {};
+        
+        function updateCountdown(elementId, targetTimestamp, publishedDate) {
+            const el = document.getElementById(elementId);
+            if (!el) {
+                if (window.countdownIntervals[elementId]) {
+                    clearInterval(window.countdownIntervals[elementId]);
+                    delete window.countdownIntervals[elementId];
+                }
+                return;
+            }
+            
+            // Get current time from user's device
+            const now = Date.now();
+            const distance = targetTimestamp - now;
+            const textSpan = el.querySelector('.countdown-text');
+            
+            // Time is up
+            if (distance <= 0) {
+                if (window.countdownIntervals[elementId]) {
+                    clearInterval(window.countdownIntervals[elementId]);
+                    delete window.countdownIntervals[elementId];
+                }
+                
+                // Update date to "Published"
+                const dateItem = el.closest('.announcement-dates').querySelector('.date-item:first-child span');
+                if (dateItem) {
+                    dateItem.textContent = 'Published: ' + publishedDate;
+                }
+                
+                // Smooth removal
+                el.style.transition = 'opacity 0.3s ease';
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 300);
+                
+                return;
+            }
+            
+            // Calculate time remaining
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            // Format display
+            let display = '';
+            if (days > 0) display += `${days}d `;
+            display += `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            if (textSpan) {
+                textSpan.textContent = display;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const countdownElements = document.querySelectorAll('[id^="countdown-"]');
+            
+            countdownElements.forEach(el => {
+                const elementId = el.id;
+                // Timestamp is already in milliseconds from Laravel
+                const targetTimestamp = parseInt(el.dataset.target, 10);
+                const publishedDate = el.dataset.publishedDate;
+                
+                if (window.countdownIntervals[elementId]) {
+                    clearInterval(window.countdownIntervals[elementId]);
+                }
+                
+                // Update immediately
+                updateCountdown(elementId, targetTimestamp, publishedDate);
+                
+                // Set interval
+                window.countdownIntervals[elementId] = setInterval(() => {
+                    updateCountdown(elementId, targetTimestamp, publishedDate);
+                }, 1000);
+            });
+        });
+        
+        window.addEventListener('beforeunload', function() {
+            if (window.countdownIntervals) {
+                Object.values(window.countdownIntervals).forEach(interval => {
+                    clearInterval(interval);
+                });
+            }
+        });
+    })();
+    </script>
+
 </body>
 </html>

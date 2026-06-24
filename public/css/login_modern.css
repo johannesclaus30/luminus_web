@@ -103,7 +103,7 @@ body {
 }
 
 .brand-logo {
-    width: clamp(16rem, 28vw, 24rem);
+    width: clamp(40rem, 28vw, 24rem);
     max-width: 85%;
     margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
     filter: drop-shadow(0 0.375rem 0.625rem rgba(0,0,0,0.4));

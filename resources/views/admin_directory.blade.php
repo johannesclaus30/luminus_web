@@ -507,7 +507,7 @@
     <!-- Manage Alumni Modal -->
     <div id="manageModal" class="modal-overlay" aria-hidden="true">
         <div class="modal-content-wrapper">
-            <div class="modal-card" style="max-width: 550px;">
+            <div class="modal-card" style="max-width: 550px; margin: 0 auto;">
                 <div class="modal-header">
                     <div>
                         <h2 class="modal-title">

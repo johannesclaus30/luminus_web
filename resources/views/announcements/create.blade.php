@@ -1,135 +1,290 @@
-@extends('layouts.admin')
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Announcement | LumiNUs Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/announcements_modern.css">
+    <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+</head>
+<body>
+    @include('partials.admin-navbar')
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('css/announcements.css') }}">
-@endpush
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
 
-@section('content')
-<div class="layout-wrapper">
-    {{-- ... Admin Menu ... --}}
-    <div class="admin-menu">
-        <div>
-            <p class="text-titles">Admin Menu</p>
-            <a href="/admin/dashboard" class="admin-menu-buttons">Admin Dashboard</a>
-            <a href="/admin/directory" class="admin-menu-buttons">Alumni Directory</a>
-            <a href="/admin/announcements" class="admin-menu-current">Announcement Editor</a>
-            <a href="/admin/events" class="admin-menu-buttons">Event Organizer</a>
-            <a href="/admin/perks" class="admin-menu-buttons">Perks and Discounts</a>
-            <a href="/admin/alumni_tracer" class="admin-menu-buttons">NU Alumni Tracer</a>
-            <a href="/admin/messages" class="admin-menu-buttons">Messages</a>
-            <a href="/admin/settings" class="admin-menu-buttons">Settings</a>
-        </div>
-        <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
-    </div>
+    <div class="admin-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="/assets/logos/LumiNUs_Logo_Landscape_Blue.png" alt="LumiNUs Logo" class="logo-luminus">
+                </div>
+                <button class="sidebar-close" id="sidebarClose" onclick="toggleMobileMenu()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <p class="nav-section-title">Admin Menu</p>
+                <a href="/admin/dashboard" class="nav-item">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/directory" class="nav-item">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Alumni Directory</span>
+                </a>
+                <a href="{{ route('announcements.index') }}" class="nav-item active">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    <span>Announcements</span>
+                </a>
+                <a href="{{ route('events.index') }}" class="nav-item">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Events</span>
+                </a>
+                <a href="{{ route('perks.index') }}" class="nav-item">
+                    <i class="fa-solid fa-gift"></i>
+                    <span>Perks & Discounts</span>
+                </a>
+                <a href="/admin/alumni_tracer" class="nav-item">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span>Alumni Tracer</span>
+                </a>
+                <a href="/admin/messages" class="nav-item">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span>Messages</span>
+                </a>
+                <a href="{{ route('admin.settings') }}" class="nav-item">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
 
-    <div class="div-dashboard-container">
-        <div class="announcements-create-container">
-            <h2>Add New Announcement</h2>
+        <main class="admin-main">
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <header class="page-header">
+                <div class="header-content">
+                    <div class="header-title-section">
+                        <h1 class="page-title"><i class="fa-solid fa-plus-circle"></i> Create Announcement</h1>
+                        <p class="page-subtitle">Share a new update with NU Lipa alumni</p>
+                    </div>
+                    <div class="header-actions">
+                        <a href="{{ route('announcements.index') }}" class="btn btn-secondary">
+                            <i class="fa-solid fa-arrow-left"></i> <span>Back</span>
+                        </a>
+                    </div>
+                </div>
+            </header>
 
             @if ($errors->any())
-                <div class="upload-status status-error" style="margin-bottom: 16px;">
-                    @foreach ($errors->all() as $error)
-                        <div>{{ $error }}</div>
-                    @endforeach
+                <div class="upload-status status-error" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: var(--radius-lg); background: #fee2e2; color: #ef4444; border: 1px solid #ef4444;">
+                    <ul style="margin:0; padding-left:1.25rem;">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             @endif
 
-            <form action="{{ route('announcements.store') }}" method="POST" enctype="multipart/form-data" id="announcementForm">
+            <form action="{{ route('announcements.store') }}" method="POST" enctype="multipart/form-data" id="announcementForm" class="form-card">
                 @csrf
-                <div class="announcements-details">
-                    <div class="new-announcements-title-desc">
-                        <label>Announcement Title</label>
-                        <input type="text" name="title" class="textarea-style" value="{{ old('title') }}" required>
-                        
-                        <label>Announcement Description</label>
-                        <textarea name="announcement_description" class="textarea-style textarea-description" required>{{ old('announcement_description') }}</textarea>
 
-                        <label>Schedule Post (optional)</label>
-                        <input type="datetime-local" name="scheduled_post_at" class="textarea-style" value="{{ old('scheduled_post_at') }}">
-                        <small style="display:block; margin-top:6px; color:#666;">Leave blank to publish immediately.</small>
-                        
-                        <button type="submit" class="announcements-submit-btn">Publish Announcement</button>
+                <div class="form-group">
+                    <label for="title" class="form-label">Announcement Title</label>
+                    <input type="text" id="title" name="title" class="form-control" value="{{ old('title') }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="announcement_description" class="form-label">Description</label>
+                    <textarea id="announcement_description" name="announcement_description" class="form-control" required>{{ old('announcement_description') }}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="scheduled_post_at" class="form-label">Schedule Post (Optional)</label>
+                    <input type="datetime-local" id="scheduled_post_at" name="scheduled_post_at" class="form-control" value="{{ old('scheduled_post_at') }}">
+                    <small style="color: var(--gray-500); font-size: 0.8125rem;">Leave blank to post immediately.</small>
+                </div>
+
+                <!-- Attachments Section -->
+                <div class="form-group">
+                    <label class="form-label">Attachments</label>
+                    <div class="rule-alert">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>You can only upload either <strong>images</strong> or a <strong>video</strong> per announcement, not both.</span>
                     </div>
 
-                    <div class="new-announcements-image">
-                        <label>Attach Images Only (up to 5, max 5MB each)</label>
-                        <label class="image-upload-box" id="image-box">
-                            <span class="upload-prompt-text">Click or drag images here</span>
-                            <input type="file" id="image-input" name="images[]" multiple accept="image/*" hidden>
-                            <div id="image-preview-container" class="preview-container"></div>
-                            <div id="image-status" class="upload-status status-default">0 items attached</div>
-                        </label>
+                    <div class="upload-grid">
+                        <div class="upload-zone" id="imageZone" onclick="handleZoneClick('image')">
+                            <input type="file" id="imageInput" name="images[]" multiple accept="image/jpeg,image/png,image/webp" hidden>
+                            <div class="upload-icon"><i class="fa-regular fa-images"></i></div>
+                            <div class="upload-title">Upload Images</div>
+                            <div class="upload-desc">Max 5 files • 3MB each • JPG, PNG, WEBP</div>
+                        </div>
+
+                        <div class="upload-zone" id="videoZone" onclick="handleZoneClick('video')">
+                            <input type="file" id="videoInput" name="video" accept="video/mp4" hidden>
+                            <div class="upload-icon"><i class="fa-solid fa-video"></i></div>
+                            <div class="upload-title">Upload Video</div>
+                            <div class="upload-desc">Max 1 file • 30MB limit • MP4 only</div>
+                        </div>
                     </div>
+                    <div id="uploadError" class="error-message"></div>
+                    <div id="previewContainer" class="preview-container"></div>
+                </div>
+
+                <div class="form-actions">
+                    <a href="{{ route('announcements.index') }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-save"></i>
+                        <span>Create Announcement</span>
+                    </button>
                 </div>
             </form>
-        </div>
+        </main>
     </div>
-</div>
 
-<script>
-    function handleFilePreview(config) {
-        const input = document.getElementById(config.inputId);
-        const container = document.getElementById(config.containerId);
-        const status = document.getElementById(config.statusId);
-        const parentBox = input.closest('.image-upload-box');
+    <script>
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        }
 
-        input.addEventListener('change', function() {
-            container.innerHTML = ''; 
-            status.classList.remove('status-error', 'status-success');
-            status.classList.add('status-default');
+        // Form-specific JS for file uploads
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageInput = document.getElementById('imageInput');
+            const videoInput = document.getElementById('videoInput');
+            const imageZone = document.getElementById('imageZone');
+            const videoZone = document.getElementById('videoZone');
+            const uploadError = document.getElementById('uploadError');
+            const previewContainer = document.getElementById('previewContainer');
 
-            const files = Array.from(this.files);
-            
-            if (files.length === 0) {
-                status.innerText = config.isVideo ? "No video attached" : "0 items attached";
-                parentBox.classList.remove('has-files');
-                return;
+            window.handleZoneClick = function(type) {
+                if (type === 'video' && videoZone.classList.contains('disabled')) return;
+                if (type === 'image' && imageZone.classList.contains('disabled')) return;
+                
+                if (type === 'video') videoInput.click();
+                else imageInput.click();
+            };
+
+            // Handle Image Upload
+            imageInput.addEventListener('change', function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                let errorMsg = '';
+                if (files.length > 5) errorMsg = 'Maximum of 5 images allowed.';
+
+                for (let file of files) {
+                    if (file.size > 3 * 1024 * 1024) {
+                        errorMsg = `Image "${file.name}" exceeds the 3MB limit.`;
+                        break;
+                    }
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                        errorMsg = `Invalid file type "${ext}". Only JPG, PNG, and WEBP are allowed.`;
+                        break;
+                    }
+                }
+
+                if (errorMsg) {
+                    showError(errorMsg);
+                    this.value = ''; 
+                    return;
+                }
+
+                clearError();
+                videoZone.classList.add('disabled');
+                videoInput.disabled = true;
+                videoInput.value = ''; 
+                imageZone.classList.add('active');
+                
+                updateImagePreviews(files);
+            });
+
+            // Handle Video Upload
+            videoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                let errorMsg = '';
+                if (file.size > 30 * 1024 * 1024) errorMsg = 'Video exceeds the 30MB limit.';
+                
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (ext !== 'mp4') errorMsg = 'Invalid file type. Only MP4 videos are allowed.';
+
+                if (errorMsg) {
+                    showError(errorMsg);
+                    this.value = '';
+                    return;
+                }
+
+                clearError();
+                imageZone.classList.add('disabled');
+                imageInput.disabled = true;
+                imageInput.value = ''; 
+                videoZone.classList.add('active');
+
+                updateVideoPreview(file);
+            });
+
+            function showError(msg) {
+                uploadError.textContent = msg;
+                uploadError.style.display = 'block';
             }
 
-            // 1. Validate Amount
-            if (files.length > config.maxCount) {
-                status.innerText = `⚠️ Exceeded limit! Max ${config.maxCount} allowed.`;
-                status.classList.add('status-error');
-                this.value = ""; // Reset input
-                return;
+            function clearError() {
+                uploadError.style.display = 'none';
             }
 
-            // 2. Validate Size (Individual files)
-            const oversized = files.filter(f => f.size > (config.maxSizeMB * 1024 * 1024));
-            if (oversized.length > 0) {
-                status.innerText = `⚠️ File too large! Max ${config.maxSizeMB}MB allowed.`;
-                status.classList.add('status-error');
-                this.value = ""; 
-                return;
+            function updateImagePreviews(files) {
+                previewContainer.innerHTML = '';
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        previewContainer.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
             }
 
-            // If valid, show previews
-            parentBox.classList.add('has-files');
-            status.classList.add('status-success');
-            status.innerText = config.isVideo ? "✅ Video ready" : `✅ ${files.length} image(s) attached`;
-
-            files.forEach(file => {
+            function updateVideoPreview(file) {
+                previewContainer.innerHTML = '';
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    let element = document.createElement(config.isVideo ? 'video' : 'img');
-                    element.src = e.target.result;
-                    element.classList.add(config.isVideo ? 'video-preview' : 'preview-item');
-                    if(config.isVideo) element.muted = true; // Prevents audio issues on auto-load
-                    container.appendChild(element);
-                }
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.style.width = '200px';
+                    div.style.height = '150px';
+                    div.innerHTML = `<video src="${e.target.result}" controls></video>`;
+                    previewContainer.appendChild(div);
+                };
                 reader.readAsDataURL(file);
-            });
+            }
         });
-    }
-
-    // Initialize with limits
-    handleFilePreview({
-        inputId: 'image-input',
-        containerId: 'image-preview-container',
-        statusId: 'image-status',
-        maxCount: 5,
-        maxSizeMB: 5,
-        isVideo: false
-    });
-</script>
-@endsection
+    </script>
+</body>
+</html>

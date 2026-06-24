@@ -1129,3 +1129,259 @@ html, body {
         padding: 5rem 1.5rem 5rem !important;
     }
 }
+
+/* ========================================
+   FORM & UPLOAD UI STYLES
+   ======================================== */
+.form-card {
+    background: var(--white);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-group { 
+    margin-bottom: 1.5rem; 
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    font-family: 'Poppins', sans-serif;
+    color: var(--gray-700);
+    background: var(--white);
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    box-shadow: 0 0 0 3px rgb(50 65 140 / 0.1);
+}
+
+textarea.form-control { 
+    min-height: 150px; 
+    resize: vertical; 
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 1.5rem;
+}
+
+/* Upload Zones */
+.rule-alert {
+    background: var(--info-light);
+    color: var(--info);
+    border: 1px solid var(--info);
+    border-radius: var(--radius-lg);
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.upload-zone {
+    position: relative;
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition);
+    background: var(--gray-50);
+}
+
+.upload-zone:hover:not(.disabled) {
+    border-color: var(--nu-blue);
+    background: var(--nu-blue-soft);
+}
+
+.upload-zone.active {
+    border-color: var(--nu-blue);
+    background: var(--nu-blue-soft);
+    border-style: solid;
+}
+
+.upload-zone.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--gray-100);
+    pointer-events: none;
+}
+
+.upload-icon { 
+    font-size: 2.5rem; 
+    color: var(--nu-blue); 
+    margin-bottom: 1rem; 
+}
+
+.upload-title { 
+    font-size: 1.125rem; 
+    font-weight: 600; 
+    color: var(--gray-800); 
+    margin-bottom: 0.5rem; 
+}
+
+.upload-desc { 
+    font-size: 0.8125rem; 
+    color: var(--gray-500); 
+}
+
+.error-message {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-lg);
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-top: 1rem;
+    display: none;
+}
+
+.preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.preview-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: opacity 0.2s;
+}
+
+.preview-item img, 
+.preview-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.preview-item.existing-media-item {
+    opacity: 1;
+}
+
+.preview-item.existing-media-item[style*="display: none"] {
+    display: none !important;
+}
+
+.preview-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: var(--danger);
+    color: var(--white);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.preview-remove:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+/* Existing Media Container */
+.existing-item-container {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.remove-media-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .upload-grid { 
+        grid-template-columns: 1fr; 
+    }
+    
+    .form-card {
+        padding: 1.5rem;
+    }
+}
+
+/* Filter Buttons */
+.filter-buttons .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: var(--radius-lg);
+    transition: all var(--transition);
+}
+
+.filter-buttons .btn-primary {
+    background: var(--nu-blue);
+    color: var(--white);
+    border-color: var(--nu-blue);
+}
+
+.filter-buttons .btn-secondary {
+    background: var(--white);
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.filter-buttons .btn-secondary:hover {
+    background: var(--gray-100);
+    border-color: var(--nu-blue);
+    color: var(--nu-blue);
+}

@@ -11,44 +11,82 @@ use Illuminate\Validation\ValidationException;
 class AnnouncementController extends Controller
 {
     private const MAX_IMAGE_COUNT = 5;
+    private const MAX_IMAGE_SIZE_MB = 3;
+    private const MAX_VIDEO_SIZE_MB = 30;
 
-    private const MAX_IMAGE_SIZE_KB = 5120;
-
-    public function index()
+   public function index(Request $request)
     {
-        // Get counts from FULL database
-        $totalAnnouncements = \App\Models\Announcement::count();
-        $activeAnnouncements = \App\Models\Announcement::where('status', 1)->orWhereNull('status')->count();
+        $filter = $request->get('filter', 'all'); // all, active, scheduled
+        
+        // Get counts - Total NOW includes scheduled
+        $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
+        
+        $activeAnnouncements = \App\Models\Announcement::where('status', 1)
+            ->where(function($q) {
+                $q->whereNull('scheduled_post_at')
+                ->orWhere('scheduled_post_at', '<=', now());
+            })
+            ->count();
+            
         $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
-        $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
+        
+        $scheduledAnnouncements = \App\Models\Announcement::where('status', 1)
+            ->whereNotNull('scheduled_post_at')
             ->where('scheduled_post_at', '>', now())
-            ->where(function($q) { $q->where('status', 1)->orWhereNull('status'); })
             ->count();
         
-        $announcements = \App\Models\Announcement::where(function($query) {
-            $query->where('status', 1)->orWhereNull('status');
-        })
-        ->orderBy('date_posted', 'desc')
-        ->paginate(6);
+        // Build query based on filter
+        $query = \App\Models\Announcement::where('status', 1);
+        
+        if ($filter === 'active') {
+            $query->where(function($q) {
+                $q->whereNull('scheduled_post_at')
+                ->orWhere('scheduled_post_at', '<=', now());
+            });
+        } elseif ($filter === 'scheduled') {
+            $query->whereNotNull('scheduled_post_at')
+                ->where('scheduled_post_at', '>', now());
+        }
+        
+        // Sort: Published first (newest), then Scheduled (soonest)
+        $announcements = $query->orderByRaw('
+            CASE 
+                WHEN scheduled_post_at IS NULL OR scheduled_post_at <= NOW() THEN 0
+                ELSE 1
+            END,
+            CASE 
+                WHEN scheduled_post_at IS NULL OR scheduled_post_at <= NOW() THEN COALESCE(date_posted, created_at)
+                ELSE scheduled_post_at
+            END DESC
+        ')->paginate(6);
         
         return view('admin_announcements', compact(
             'announcements',
             'totalAnnouncements',
             'activeAnnouncements',
             'archivedAnnouncements',
-            'scheduledAnnouncements'
+            'scheduledAnnouncements',
+            'filter'
         ));
     }
 
     public function archived()
     {
+        // Define filter as null for archived page
+        $filter = null;
+        
         // Same counts from FULL database
-        $totalAnnouncements = \App\Models\Announcement::count();
-        $activeAnnouncements = \App\Models\Announcement::where('status', 1)->orWhereNull('status')->count();
+        $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
+        $activeAnnouncements = \App\Models\Announcement::where('status', 1)
+            ->where(function($q) {
+                $q->whereNull('scheduled_post_at')
+                ->orWhere('scheduled_post_at', '<=', now());
+            })
+            ->count();
         $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
         $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
             ->where('scheduled_post_at', '>', now())
-            ->where(function($q) { $q->where('status', 1)->orWhereNull('status'); })
+            ->where('status', 1)
             ->count();
         
         $announcements = \App\Models\Announcement::where('status', 0)
@@ -60,7 +98,8 @@ class AnnouncementController extends Controller
             'totalAnnouncements',
             'activeAnnouncements',
             'archivedAnnouncements',
-            'scheduledAnnouncements'
+            'scheduledAnnouncements',
+            'filter'  // Now this won't error
         ));
     }
 
@@ -71,134 +110,155 @@ class AnnouncementController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $rules = [
             'title' => 'required|string|max:255',
-            'announcement_description' => 'required|string|max:255',
-            'scheduled_post_at' => 'nullable|date',
+            'announcement_description' => 'required|string',
+            'scheduled_post_at' => 'nullable|date', // Removed 'after:now'
             'images' => 'nullable|array|max:5',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:' . self::MAX_IMAGE_SIZE_KB,
-        ]);
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . (self::MAX_IMAGE_SIZE_MB * 1024),
+            'video' => 'nullable|file|mimetypes:video/mp4|max:' . (self::MAX_VIDEO_SIZE_MB * 1024),
+        ];
 
-        $uploadedImages = $this->normalizeUploadedImages($request->file('images'));
+        $request->validate($rules);
 
-        if (count($uploadedImages) > self::MAX_IMAGE_COUNT) {
+        // Manual check for mutually exclusive media
+        if ($request->hasFile('images') && $request->hasFile('video')) {
             throw ValidationException::withMessages([
-                'images' => 'You can attach up to ' . self::MAX_IMAGE_COUNT . ' images only.',
+                'images' => 'You can only upload either images or a video, not both.'
             ]);
         }
 
         $adminId = $request->session()->get('admin_id');
-
-        if (! $adminId) {
-            abort(403);
-        }
+        if (!$adminId) abort(403);
 
         $announcement = Announcement::create([
             'admin_id' => $adminId,
-            'title' => $validated['title'],
-            'announcement_description' => $validated['announcement_description'],
+            'title' => $request->title,
+            'announcement_description' => $request->announcement_description,
             'date_posted' => now(),
-            'scheduled_post_at' => $validated['scheduled_post_at'] ?? null,
+            'scheduled_post_at' => $request->scheduled_post_at,
             'status' => 1,
         ]);
 
-        if (! empty($uploadedImages)) {
+        // Handle images
+        if ($request->hasFile('images')) {
+            $uploadedImages = $this->normalizeUploadedImages($request->file('images'));
             foreach ($uploadedImages as $image) {
                 $path = $this->storeAnnouncementImage($announcement, $image);
-                $announcement->images()->create([
-                    'image_path' => $path,
-                ]);
+                $announcement->images()->create(['image_path' => $path]);
             }
+        }
+
+        // Handle video
+        if ($request->hasFile('video')) {
+            $video = $request->file('video');
+            $path = $this->storeAnnouncementVideo($announcement, $video);
+            $announcement->images()->create(['image_path' => $path]);
         }
 
         return redirect()->route('announcements.index')->with('success', 'Announcement created successfully!');
     }
 
-    /**
-     * Show the form for editing (Perks Style)
-     */
     public function edit(Announcement $announcement)
     {
         $announcement->load('images');
-
         return view('announcements.edit', compact('announcement'));
     }
 
-    /**
-     * Update the resource (Perks Style)
-     */
     public function update(Request $request, Announcement $announcement)
     {
-        $validated = $request->validate([
+        $rules = [
             'title' => 'required|string|max:255',
-            'announcement_description' => 'required|string|max:255',
-            'scheduled_post_at' => 'nullable|date',
+            'announcement_description' => 'required|string',
+            'scheduled_post_at' => 'nullable|date', // Removed 'after:now'
             'deleted_media' => 'nullable|array',
             'images' => 'nullable|array|max:5',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:' . self::MAX_IMAGE_SIZE_KB,
-        ]);
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . (self::MAX_IMAGE_SIZE_MB * 1024),
+            'video' => 'nullable|file|mimetypes:video/mp4|max:' . (self::MAX_VIDEO_SIZE_MB * 1024),
+        ];
 
-        $announcement->load('images');
+        $request->validate($rules);
 
-        $deletedMediaIds = collect($request->input('deleted_media', []))
-            ->map(fn ($value) => (int) $value)
-            ->filter()
-            ->all();
-
-        $remainingImageCount = $announcement->images
-            ->filter(fn ($attachment) => $this->isImageAttachment($attachment->image_path))
-            ->reject(fn ($attachment) => in_array((int) $attachment->id, $deletedMediaIds, true))
-            ->count();
-
-        $uploadedImages = $this->normalizeUploadedImages($request->file('images'));
-
-        if (($remainingImageCount + count($uploadedImages)) > self::MAX_IMAGE_COUNT) {
+        if ($request->hasFile('images') && $request->hasFile('video')) {
             throw ValidationException::withMessages([
-                'images' => 'You can keep or upload up to ' . self::MAX_IMAGE_COUNT . ' images total.',
+                'images' => 'You can only upload either images or a video, not both.'
             ]);
         }
 
-        foreach ($deletedMediaIds as $mediaId) {
-            $media = $announcement->images->firstWhere('id', $mediaId);
+        $announcement->load('images');
 
+        // Delete marked media
+        $deletedMediaIds = collect($request->input('deleted_media', []))->map(fn($v) => (int)$v)->filter()->all();
+        foreach ($deletedMediaIds as $id) {
+            $media = $announcement->images->firstWhere('id', $id);
             if ($media) {
                 $this->deleteStoredImage($media->image_path);
                 $media->delete();
             }
         }
 
-        $announcement->update([
-            'title' => $validated['title'],
-            'announcement_description' => $validated['announcement_description'],
-            'scheduled_post_at' => $validated['scheduled_post_at'] ?? null,
-        ]);
+        // Count remaining valid attachments
+        $remainingAttachments = $announcement->images->reject(fn($a) => in_array((int)$a->id, $deletedMediaIds));
+        $remainingCount = $remainingAttachments->count();
 
-        if (! empty($uploadedImages)) {
-            foreach ($uploadedImages as $image) {
-                $path = $this->storeAnnouncementImage($announcement, $image);
-                $announcement->images()->create([
-                    'image_path' => $path,
-                ]);
+        // Validate total count after new uploads
+        $newImageCount = $request->hasFile('images') ? count($this->normalizeUploadedImages($request->file('images'))) : 0;
+        $hasNewVideo = $request->hasFile('video');
+
+        if ($hasNewVideo && $remainingCount > 0) {
+            throw ValidationException::withMessages(['video' => 'Cannot add video when existing attachments are present.']);
+        }
+
+        if ($newImageCount + $remainingCount > self::MAX_IMAGE_COUNT) {
+            throw ValidationException::withMessages(['images' => 'Total images cannot exceed 5.']);
+        }
+
+        // Save new files
+        if ($request->hasFile('images')) {
+            foreach ($this->normalizeUploadedImages($request->file('images')) as $img) {
+                $path = $this->storeAnnouncementImage($announcement, $img);
+                $announcement->images()->create(['image_path' => $path]);
             }
         }
 
-        return redirect()
-            ->route('announcements.index')
-            ->with('success', 'Announcement updated successfully!');
+        if ($request->hasFile('video')) {
+            $video = $request->file('video');
+            $path = $this->storeAnnouncementVideo($announcement, $video);
+            $announcement->images()->create(['image_path' => $path]);
+        }
+
+        $announcement->update([
+            'title' => $request->title,
+            'announcement_description' => $request->announcement_description,
+            'scheduled_post_at' => $request->scheduled_post_at,
+        ]);
+
+        return redirect()->route('announcements.index')->with('success', 'Announcement updated successfully!');
     }
 
     public function destroy(Announcement $announcement)
     {
         $announcement->update(['status' => 0]);
-
         return redirect()->route('announcements.index')->with('success', 'Announcement archived.');
     }
 
     public function restore(Announcement $announcement)
     {
         $announcement->update(['status' => 1]);
-
         return redirect()->route('announcements.archived')->with('success', 'Announcement restored.');
+    }
+
+    public function permanentDelete(Announcement $announcement)
+    {
+        // Delete all associated files first
+        foreach ($announcement->images as $media) {
+            $this->deleteStoredImage($media->image_path);
+            $media->delete();
+        }
+        
+        $announcement->delete(); // Hard delete
+        
+        return redirect()->back()->with('success', 'Announcement permanently deleted.');
     }
 
     private function normalizeUploadedImages(mixed $images): array
@@ -221,7 +281,6 @@ class AnnouncementController extends Controller
         }
 
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-
         return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true);
     }
 
@@ -229,9 +288,15 @@ class AnnouncementController extends Controller
     {
         $directory = 'announcements_images/' . $announcement->id;
         $fileName = $this->buildAttachmentFileName($image, 'announcement-image');
-
         Storage::disk('supabase_admin')->putFileAs($directory, $image, $fileName, 'public');
+        return $directory . '/' . $fileName;
+    }
 
+    private function storeAnnouncementVideo(Announcement $announcement, $video): string
+    {
+        $directory = 'announcements_videos/' . $announcement->id;
+        $fileName = $this->buildAttachmentFileName($video, 'announcement-video');
+        Storage::disk('supabase_admin')->putFileAs($directory, $video, $fileName, 'public');
         return $directory . '/' . $fileName;
     }
 

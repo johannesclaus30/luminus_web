@@ -176,6 +176,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/messages', function () {
             return view('admin_messages'); 
         });
+
+        Route::delete('/admin/announcements/{announcement}/permanent-delete', [AnnouncementController::class, 'permanentDelete'])
+        ->name('announcements.permanent-delete');
     });
 });
 
