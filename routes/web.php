@@ -5,12 +5,13 @@ use App\Http\Controllers\PerksController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\Admin\TracerFormController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\TracerFormController;
 use App\Http\Controllers\AdminDashboardController;
 
 Route::prefix('admin')->group(function () {
     
-    //  Public Admin Routes (Login)
+    // Public Admin Routes (Login)
     Route::get('/login', [AdminController::class, 'showLogin'])
         ->name('admin.login');
 
@@ -19,6 +20,12 @@ Route::prefix('admin')->group(function () {
 
     Route::get('/logout', [AdminController::class, 'logout'])
         ->name('admin.logout');
+
+    // Forgot Password Routes (Public)
+    Route::get('/forgot-password', [AdminController::class, 'showForgotPassword'])->name('admin.forgot-password');
+    Route::post('/forgot-password', [AdminController::class, 'sendResetLink'])->name('admin.send-reset-link');
+    Route::get('/reset-password', [AdminController::class, 'showResetForm'])->name('admin.reset-password');
+    Route::post('/reset-password', [AdminController::class, 'resetPassword'])->name('admin.reset-password.process');
 
     // 🔹 Protected Admin Routes
     Route::middleware('admin.auth')->group(function () {
@@ -31,7 +38,6 @@ Route::prefix('admin')->group(function () {
         Route::get('/directory', [AdminController::class, 'index'])
             ->name('admin.directory');
 
-        // ✅ NEW: Archived Directory Route
         Route::get('/directory/archived', [AdminController::class, 'archived'])
             ->name('admin.directory.archived');
 
@@ -46,7 +52,6 @@ Route::prefix('admin')->group(function () {
         Route::delete('/alumni/{id}', [AdminController::class, 'destroy'])
             ->name('admin.alumni.destroy');
         
-        // ✅ NEW: Message Alumni Route (optional, for future feature)
         Route::post('/alumni/{id}/message', [AdminController::class, 'messageAlumni'])
             ->name('admin.alumni.message');
 
@@ -58,6 +63,9 @@ Route::prefix('admin')->group(function () {
 
         Route::put('/settings', [AdminController::class, 'updateProfile'])
             ->name('admin.settings.update');
+
+        // Change Password (Authenticated)
+        Route::put('/settings/password', [AdminController::class, 'changePassword'])->name('admin.password.update');
 
         // Events
         Route::get('/events', [EventController::class, 'index'])
@@ -134,6 +142,9 @@ Route::prefix('admin')->group(function () {
         Route::put('/announcements/{announcement}/restore', [AnnouncementController::class, 'restore'])
             ->name('announcements.restore');
 
+        Route::delete('/announcements/{announcement}/permanent-delete', [AnnouncementController::class, 'permanentDelete'])
+            ->name('announcements.permanent-delete');
+
         // Alumni Tracer
         Route::get('/alumni_tracer', [TracerFormController::class, 'index'])
             ->name('admin.alumni_tracer');
@@ -163,33 +174,23 @@ Route::prefix('admin')->group(function () {
             ->name('admin.alumni_tracer.toggle-status');
 
         // View Alumni Profile
-        // 👇 Changed path to /alumni/... and controller to AdminController::class
         Route::get('/alumni/{id}/view', [AdminController::class, 'show'])
             ->name('admin.alumni.show');
 
         // Send Test Email
-        // 👇 Changed path to /alumni/... and controller to AdminController::class
         Route::post('/alumni/{id}/send-test-email', [AdminController::class, 'sendTestEmail'])
             ->name('admin.alumni.send-test-email');
 
-        // Messages
-        Route::get('/messages', function () {
-            return view('admin_messages'); 
-        });
 
-        Route::delete('/admin/announcements/{announcement}/permanent-delete', [AnnouncementController::class, 'permanentDelete'])
-        ->name('announcements.permanent-delete');
-
-
-        // Forgot Password Routes (Public)
-        Route::get('/admin/forgot-password', [AdminController::class, 'showForgotPassword'])->name('admin.forgot-password');
-        Route::post('/admin/forgot-password', [AdminController::class, 'sendResetLink'])->name('admin.send-reset-link');
-        Route::get('/admin/reset-password', [AdminController::class, 'showResetForm'])->name('admin.reset-password');
-        Route::post('/admin/reset-password', [AdminController::class, 'resetPassword'])->name('admin.reset-password.process');
-
-        // Change Password (Authenticated)
-        Route::put('/admin/settings/password', [AdminController::class, 'changePassword'])->name('admin.password.update');
-
+        // ============================================
+        // MESSAGES ROUTES
+        // ============================================
+        Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
+        Route::get('/messages/conversations', [MessageController::class, 'getConversations'])->name('messages.conversations');
+        Route::get('/messages/search/alumni', [MessageController::class, 'searchAlumni'])->name('messages.search');
+        Route::get('/messages/{alumni}', [MessageController::class, 'getMessages'])->name('messages.get');
+        Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
+        
     });
 });
 

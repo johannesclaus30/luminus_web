@@ -1,18 +1,16 @@
 <?php
- 
+
 namespace App\Models;
- 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
- 
-class Admin extends Authenticatable
+
+use Illuminate\Database\Eloquent\Model;
+
+class Admin extends Model
 {
-    use HasFactory, Notifiable;
- 
     protected $table = 'admins';
-    protected $primaryKey = 'id';
- 
+    
+    // Add this - Supabase needs timestamps disabled if using their auto-generated ones
+    public $timestamps = true; // Keep if you want Laravel to manage timestamps
+    
     protected $fillable = [
         'admin_first_name',
         'admin_middle_name',
@@ -22,17 +20,29 @@ class Admin extends Authenticatable
         'admin_role',
         'phone_number',
         'photo',
-        'reset_token',              // ← Add this
-        'reset_token_expires_at',   // ← Add this
     ];
- 
+
     protected $hidden = [
         'admin_password_hash',
-        'remember_token',
     ];
- 
-    public function getAuthPassword()
+
+    public function getFullNameAttribute()
     {
-        return $this->admin_password_hash;
+        return "{$this->admin_last_name}, {$this->admin_first_name}";
+    }
+
+    public function getInitialsAttribute()
+    {
+        return strtoupper(substr($this->admin_first_name, 0, 1) . substr($this->admin_last_name, 0, 1));
+    }
+
+    public function messagesSent()
+    {
+        return $this->hasMany(Message::class, 'sender_id')->where('sender_type', 'admin');
+    }
+
+    public function messagesReceived()
+    {
+        return $this->hasMany(Message::class, 'receiver_id')->where('receiver_type', 'admin');
     }
 }
