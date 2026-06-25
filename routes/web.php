@@ -181,14 +181,11 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni/{id}/send-test-email', [AdminController::class, 'sendTestEmail'])
             ->name('admin.alumni.send-test-email');
 
-
-        // ============================================
-        // MESSAGES ROUTES
-        // ============================================
+        // Messages
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/conversations', [MessageController::class, 'getConversations'])->name('messages.conversations');
         Route::get('/messages/search/alumni', [MessageController::class, 'searchAlumni'])->name('messages.search');
-        Route::get('/messages/{alumni}', [MessageController::class, 'getMessages'])->name('messages.get');
+        Route::get('/messages/{type}/{id}', [MessageController::class, 'getMessages'])->name('messages.get');
         Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
         
     });

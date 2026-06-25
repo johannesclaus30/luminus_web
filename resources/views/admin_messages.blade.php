@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/messages_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
-    
+
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -387,7 +387,7 @@
         let currentChat = null;
         let allContacts = [];
         let activeTab = 'all';
-        let supabase;
+        let supabaseClient;
         let searchTimeout;
         
         // ============================================
@@ -402,10 +402,11 @@
                 return;
             }
             
-            supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+            // Changed from 'supabase =' to 'supabaseClient ='
+            supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
             
             // Subscribe to realtime messages for this admin
-            const channel = supabase
+            const channel = supabaseClient  // Changed here too
                 .channel('admin-messages-' + adminId)
                 .on('postgres_changes', {
                     event: 'INSERT',
@@ -472,34 +473,38 @@
             }
         }
         
-        function renderContacts(contacts) {
+       function renderContacts(contacts) {
             const contactsList = document.getElementById('contactsList');
             
             if (!contacts || contacts.length === 0) {
+                const query = document.getElementById('searchContacts')?.value?.toLowerCase() || '';
                 contactsList.innerHTML = `
                     <div class="empty-state">
-                        <i class="fa-solid fa-inbox"></i>
-                        <h3>No conversations yet</h3>
-                        <p>Click the + button to start chatting with alumni</p>
+                        <i class="fa-solid fa-user-group"></i>
+                        <h3>${query ? 'No matches found' : 'No conversations yet'}</h3>
+                        <p>${query ? 'Try a different search term' : 'Start a new message to connect with alumni'}</p>
                     </div>
                 `;
                 return;
             }
             
             contactsList.innerHTML = contacts.map(contact => `
-                <div class="contact-card ${currentChat == contact.id ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''}" 
-                     onclick="openChat(${contact.id})">
+                <div class="contact-card ${currentChat?.id == contact.id && currentChat?.type === contact.type ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''}" 
+                    onclick="openChat(${contact.id}, '${contact.type}')">
                     ${contact.avatar 
-                        ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${contact.full_name}">`
+                        ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${escapeHtml(contact.full_name)}">`
                         : `<div class="contact-avatar">${contact.initials}</div>`
                     }
                     <div class="contact-details">
                         <div class="contact-top">
-                            <span class="contact-name">${escapeHtml(contact.full_name)}</span>
+                            <span class="contact-name">
+                                ${escapeHtml(contact.full_name)}
+                                ${contact.type === 'admin' ? '<span style="font-size: 0.6rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 1px 6px; border-radius: 8px; margin-left: 6px; font-weight: 600; vertical-align: middle;">ADMIN</span>' : ''}
+                            </span>
                             <span class="contact-time">${contact.last_message_time || ''}</span>
                         </div>
                         <div class="contact-bottom">
-                            <span class="contact-batch">Batch ${contact.batch} | ${contact.program || 'N/A'}</span>
+                            <span class="contact-batch">${contact.type === 'admin' ? 'Admin Staff' : `Batch ${contact.batch} | ${contact.program || 'N/A'}`}</span>
                             <span class="contact-preview">${contact.last_message ? truncateText(contact.last_message, 25) : 'Start a conversation'}</span>
                             ${contact.unread_count > 0 ? `<span class="unread-count">${contact.unread_count}</span>` : ''}
                         </div>
@@ -558,12 +563,12 @@
         // ============================================
         // CHAT FUNCTIONALITY
         // ============================================
-        async function openChat(alumniId) {
-            currentChat = alumniId;
+        async function openChat(contactId, type = 'alumni') {
+            currentChat = { id: contactId, type: type };
             
             // Update contact list active state
             document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
-            const activeCard = document.querySelector(`.contact-card[onclick="openChat(${alumniId})"]`);
+            const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
             if (activeCard) activeCard.classList.add('active');
             
             // Show chat panel, hide empty state
@@ -573,10 +578,10 @@
             document.getElementById('chatInput').style.display = 'flex';
             
             // Update header
-            const contact = allContacts.find(c => c.id == alumniId);
+            const contact = allContacts.find(c => c.id == contactId && c.type === type);
             if (contact) {
                 document.getElementById('chatAvatar').textContent = contact.initials;
-                document.getElementById('chatName').textContent = contact.full_name;
+                document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
                 document.getElementById('chatStatus').innerHTML = `
                     <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
                     ${contact.is_online ? 'Online' : 'Offline'}
@@ -584,18 +589,18 @@
             }
             
             // Load messages
-            await loadMessages(alumniId);
+            await loadMessages(contactId, type);
             
             // Focus input
             document.getElementById('messageInput').focus();
         }
         
-        async function loadMessages(alumniId) {
+        async function loadMessages(contactId, type = 'alumni') {
             const container = document.getElementById('chatMessages');
             container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading messages...</div>';
             
             try {
-                const response = await fetch(`/admin/messages/${alumniId}`);
+                const response = await fetch(`/admin/messages/${type}/${contactId}`);
                 if (!response.ok) throw new Error('Failed to load messages');
                 
                 const messages = await response.json();
@@ -696,7 +701,8 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({
-                        receiver_id: currentChat,
+                        receiver_id: currentChat.id,
+                        receiver_type: currentChat.type,
                         content: content
                     })
                 });
@@ -711,7 +717,7 @@
                     scrollToBottom();
                     
                     // Update the contact's last message in the list
-                    const contact = allContacts.find(c => c.id == currentChat);
+                    const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
                     if (contact) {
                         contact.last_message = content;
                         contact.last_message_time = 'Just now';
@@ -786,48 +792,60 @@
             searchTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch(`/admin/messages/search/alumni?q=${encodeURIComponent(query)}`);
-                    if (!response.ok) throw new Error('Search failed');
                     
-                    const alumni = await response.json();
+                    // Try to parse JSON even if response is not OK
+                    const data = await response.json();
                     
-                    if (alumni.length === 0) {
+                    if (!response.ok) {
+                        // Show the actual error from the server
+                        const errorMsg = data.error || 'Unknown error';
+                        const errorDetails = data.file ? ` (${data.file}:${data.line})` : '';
+                        console.error('Server error:', data);
+                        document.getElementById('searchResults').innerHTML = 
+                            `<p style="color: #ef4444; text-align: center;">Error: ${errorMsg}${errorDetails}</p>`;
+                        return;
+                    }
+                    
+                    if (data.length === 0) {
                         document.getElementById('searchResults').innerHTML = '<p style="color: #9ca3af; text-align: center;">No alumni found</p>';
                         return;
                     }
                     
-                    document.getElementById('searchResults').innerHTML = alumni.map(a => `
-                        <div class="alumni-item" onclick="startNewChat(${a.id})">
+                    document.getElementById('searchResults').innerHTML = data.map(a => `
+                        <div class="alumni-item" onclick="startNewChat(${a.id}, '${a.type}')">
                             ${a.avatar 
-                                ? `<img src="${a.avatar}" class="contact-avatar-img" alt="${a.full_name}">`
+                                ? `<img src="${a.avatar}" class="contact-avatar-img" alt="${escapeHtml(a.full_name)}">`
                                 : `<div class="alumni-avatar">${a.initials}</div>`
                             }
                             <div class="alumni-info">
                                 <div class="name">${escapeHtml(a.full_name)}</div>
-                                <div class="details">Batch ${a.batch} | ${a.program || 'N/A'}</div>
+                                <div class="details">${a.type === 'admin' ? 'Admin Staff' : `Batch ${a.batch} | ${a.program || 'N/A'}`}</div>
                             </div>
                             ${a.is_online ? '<span class="online-dot" title="Online"></span>' : ''}
                         </div>
                     `).join('');
                 } catch (error) {
-                    console.error('Error searching alumni:', error);
-                    document.getElementById('searchResults').innerHTML = '<p style="color: #ef4444; text-align: center;">Error searching. Please try again.</p>';
+                    console.error('Error searching:', error);
+                    document.getElementById('searchResults').innerHTML = 
+                        `<p style="color: #ef4444; text-align: center;">Error searching. Please try again.</p>`;
                 }
             }, 300);
         }
-        
-        function startNewChat(alumniId) {
+
+        function startNewChat(alumniId, type = 'alumni') {
             closeNewMessageModal();
             
             // Check if contact already exists
-            const existingContact = allContacts.find(c => c.id == alumniId);
+            const existingContact = allContacts.find(c => c.id == alumniId && c.type === type);
             if (!existingContact) {
                 // Add a placeholder contact
                 allContacts.unshift({
                     id: alumniId,
+                    type: type,
                     full_name: 'Loading...',
                     initials: '??',
-                    program: '',
-                    batch: '',
+                    program: type === 'admin' ? 'Admin' : '',
+                    batch: '-',
                     is_online: false,
                     last_message: null,
                     last_message_time: null,
@@ -837,7 +855,7 @@
                 renderContacts(allContacts);
             }
             
-            openChat(alumniId);
+            openChat(alumniId, type);
             
             // Reload conversations to get proper data
             setTimeout(() => loadConversations(), 500);

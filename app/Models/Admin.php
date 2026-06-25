@@ -36,6 +36,17 @@ class Admin extends Model
         return strtoupper(substr($this->admin_first_name, 0, 1) . substr($this->admin_last_name, 0, 1));
     }
 
+    // ADD THESE TWO ACCESSORS:
+    public function getNameAttribute()
+    {
+        return trim($this->admin_first_name . ' ' . $this->admin_last_name);
+    }
+
+    public function getEmailAttribute()
+    {
+        return $this->admin_email;
+    }
+
     public function messagesSent()
     {
         return $this->hasMany(Message::class, 'sender_id')->where('sender_type', 'admin');
