@@ -436,3 +436,14 @@ body {
 .chat-messages-area::-webkit-scrollbar-thumb:hover { 
     background: var(--gray-400); 
 }
+
+.admin-badge {
+    font-size: 0.65rem;
+    background: var(--nu-gold);
+    color: var(--nu-blue-dark);
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+    font-weight: 600;
+    vertical-align: middle;
+}

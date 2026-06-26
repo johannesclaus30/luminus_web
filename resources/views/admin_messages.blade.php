@@ -563,37 +563,47 @@
         // ============================================
         // CHAT FUNCTIONALITY
         // ============================================
-        async function openChat(contactId, type = 'alumni') {
-            currentChat = { id: contactId, type: type };
-            
-            // Update contact list active state
-            document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
-            const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
-            if (activeCard) activeCard.classList.add('active');
-            
-            // Show chat panel, hide empty state
-            document.getElementById('noChatSelected').style.display = 'none';
-            document.getElementById('chatHeader').style.display = 'flex';
-            document.getElementById('chatMessages').style.display = 'block';
-            document.getElementById('chatInput').style.display = 'flex';
-            
-            // Update header
-            const contact = allContacts.find(c => c.id == contactId && c.type === type);
-            if (contact) {
-                document.getElementById('chatAvatar').textContent = contact.initials;
-                document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
-                document.getElementById('chatStatus').innerHTML = `
-                    <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
-                    ${contact.is_online ? 'Online' : 'Offline'}
-                `;
-            }
-            
-            // Load messages
-            await loadMessages(contactId, type);
-            
-            // Focus input
-            document.getElementById('messageInput').focus();
+async function openChat(contactId, type = 'alumni') {
+    currentChat = { id: contactId, type: type };
+    
+    // Update contact list active state
+    document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
+    const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
+    if (activeCard) activeCard.classList.add('active');
+    
+    // Show chat panel, hide empty state
+    document.getElementById('noChatSelected').style.display = 'none';
+    document.getElementById('chatHeader').style.display = 'flex';
+    document.getElementById('chatMessages').style.display = 'block';
+    document.getElementById('chatInput').style.display = 'flex';
+    
+    // Update header
+    const contact = allContacts.find(c => c.id == contactId && c.type === type);
+    if (contact) {
+        const chatAvatar = document.getElementById('chatAvatar');
+        
+        // Show avatar image or fallback to initials
+        if (contact.avatar) {
+            chatAvatar.innerHTML = `<img src="${contact.avatar}" alt="${escapeHtml(contact.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        } else {
+            chatAvatar.textContent = contact.initials;
+            chatAvatar.style.background = 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))';
+            chatAvatar.style.color = 'var(--nu-gold)';
         }
+        
+        document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
+        document.getElementById('chatStatus').innerHTML = `
+            <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
+            ${contact.is_online ? 'Online' : 'Offline'}
+        `;
+    }
+    
+    // Load messages
+    await loadMessages(contactId, type);
+    
+    // Focus input
+    document.getElementById('messageInput').focus();
+}
         
         async function loadMessages(contactId, type = 'alumni') {
             const container = document.getElementById('chatMessages');
@@ -619,51 +629,32 @@
         }
         
         function renderMessages(messages) {
-            const container = document.getElementById('chatMessages');
-            
-            if (!messages || messages.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fa-solid fa-message"></i>
-                        <h3>No messages yet</h3>
-                        <p>Send the first message to start the conversation</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            let lastDate = null;
-            
-            messages.forEach(msg => {
-                const msgDate = new Date(msg.created_at).toLocaleDateString();
-                if (msgDate !== lastDate) {
-                    html += `<div class="date-divider"><span>${formatDateDivider(new Date(msg.created_at))}</span></div>`;
-                    lastDate = msgDate;
-                }
-                
-                const isSent = msg.sender_type === 'admin';
-                html += `
-                    <div class="message-group ${isSent ? 'sent' : 'received'}">
-                        <div class="message-bubble">
-                            <p>${escapeHtml(msg.content)}</p>
-                            <span class="msg-time">
-                                ${msg.time}
-                                ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
-                            </span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
+        const container = document.getElementById('chatMessages');
+        
+        if (!messages || messages.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-message"></i>
+                    <h3>No messages yet</h3>
+                    <p>Send the first message to start the conversation</p>
+                </div>
+            `;
+            return;
         }
         
-        function appendMessage(msg) {
-            const container = document.getElementById('chatMessages');
-            const isSent = msg.sender_type === 'admin';
+        let html = '';
+        let lastDate = null;
+        
+        messages.forEach(msg => {
+            const msgDate = new Date(msg.created_at).toLocaleDateString();
+            if (msgDate !== lastDate) {
+                html += `<div class="date-divider"><span>${formatDateDivider(new Date(msg.created_at))}</span></div>`;
+                lastDate = msgDate;
+            }
             
-            const messageHtml = `
+            // FIX: Check sender_id against current admin, not just sender_type
+            const isSent = msg.sender_id == adminId;
+            html += `
                 <div class="message-group ${isSent ? 'sent' : 'received'}">
                     <div class="message-bubble">
                         <p>${escapeHtml(msg.content)}</p>
@@ -674,67 +665,125 @@
                     </div>
                 </div>
             `;
-            
-            // Remove empty state if present
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-            
-            container.insertAdjacentHTML('beforeend', messageHtml);
-        }
+        });
+        
+        container.innerHTML = html;
+    }
+        
+function appendMessage(msg) {
+    const container = document.getElementById('chatMessages');
+    
+    // FIX: Check if the message is from the current admin
+    // For temp messages, sender_id should match adminId
+    // For server messages, compare sender_id with adminId
+    let isSent = false;
+    
+    if (msg.sender_id == adminId) {
+        isSent = true;
+    } else if (msg.sender_type === 'admin' && msg.sender_id === adminId) {
+        isSent = true;
+    }
+    
+    // For debugging, log the comparison
+    console.log('Message sender_id:', msg.sender_id, 'adminId:', adminId, 'isSent:', isSent);
+    
+    const messageHtml = `
+        <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id && msg.id.toString().startsWith('temp-') ? `data-temp-id="${msg.id}"` : ''}>
+            <div class="message-bubble">
+                <p>${escapeHtml(msg.content)}</p>
+                <span class="msg-time">
+                    ${msg.time}
+                    ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                </span>
+            </div>
+        </div>
+    `;
+    
+    // Remove empty state if present
+    const emptyState = container.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
+    
+    container.insertAdjacentHTML('beforeend', messageHtml);
+}
         
         async function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const content = input.value.trim();
-            
-            if (!content || !currentChat) return;
-            
-            // Clear input immediately for better UX
-            input.value = '';
-            input.focus();
-            
-            try {
-                const response = await fetch('/admin/messages/send', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        receiver_id: currentChat.id,
-                        receiver_type: currentChat.type,
-                        content: content
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Failed to send message');
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Append the sent message to the chat
-                    appendMessage(data.message);
-                    scrollToBottom();
-                    
-                    // Update the contact's last message in the list
-                    const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
-                    if (contact) {
-                        contact.last_message = content;
-                        contact.last_message_time = 'Just now';
-                    }
-                    renderContacts(allContacts.filter(c => {
-                        if (activeTab === 'unread') return c.unread_count > 0;
-                        if (activeTab === 'online') return c.is_online;
-                        return true;
-                    }));
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                // Put the message back in the input if it failed
-                input.value = content;
-                alert('Failed to send message. Please try again.');
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    
+    if (!content || !currentChat) return;
+    
+    // Clear input immediately for better UX
+    input.value = '';
+    input.focus();
+    
+    // Optimistically append the message to the chat (show it immediately as sent)
+    const tempMessage = {
+        id: 'temp-' + Date.now(),
+        content: content,
+        sender_id: adminId,  // Use the admin's ID directly
+        sender_type: 'admin',
+        is_read: false,
+        created_at: new Date().toISOString(),
+        time: formatTime(new Date()),
+        attachments: []
+    };
+    
+    appendMessage(tempMessage);
+    scrollToBottom();
+    
+    try {
+        const response = await fetch('/admin/messages/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                receiver_id: currentChat.id,
+                receiver_type: currentChat.type,
+                content: content
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to send message');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Replace the temporary message with the real one
+            const tempElements = document.querySelectorAll('.message-group');
+            const lastTemp = tempElements[tempElements.length - 1];
+            if (lastTemp && lastTemp.querySelector(`[data-temp-id="${tempMessage.id}"]`)) {
+                lastTemp.remove();
+                appendMessage(data.message);
             }
+            
+            // Update the contact's last message in the list
+            const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+            if (contact) {
+                contact.last_message = content;
+                contact.last_message_time = 'Just now';
+            }
+            renderContacts(allContacts.filter(c => {
+                if (activeTab === 'unread') return c.unread_count > 0;
+                if (activeTab === 'online') return c.is_online;
+                return true;
+            }));
         }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        // Remove the temporary message on error
+        const tempElements = document.querySelectorAll('.message-group');
+        const lastTemp = tempElements[tempElements.length - 1];
+        if (lastTemp && lastTemp.querySelector(`[data-temp-id="${tempMessage.id}"]`)) {
+            lastTemp.remove();
+        }
+        // Put the message back in the input if it failed
+        input.value = content;
+        alert('Failed to send message. Please try again.');
+    }
+}
         
         async function markMessagesAsRead(alumniId) {
             // Messages are marked as read server-side when loading them

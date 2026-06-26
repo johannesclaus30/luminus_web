@@ -112,61 +112,84 @@ class MessageController extends Controller
         return response()->json($contacts);
     }
 
-        private function buildContactData($user, $type, $adminId)
-        {
-            // Get last message
-            $lastMessage = Message::where(function($query) use ($adminId, $user, $type) {
-                    $query->where('sender_id', $adminId)
-                        ->where('sender_type', 'admin')
-                        ->where('receiver_id', $user->id)
-                        ->where('receiver_type', $type);
-                })
-                ->orWhere(function($query) use ($adminId, $user, $type) {
-                    $query->where('sender_id', $user->id)
-                        ->where('sender_type', $type)
-                        ->where('receiver_id', $adminId)
-                        ->where('receiver_type', 'admin');
-                })
-                ->latest()
-                ->first();
-            
-            // Count unread messages
-            $unreadCount = Message::where('sender_id', $user->id)
+private function buildContactData($user, $type, $adminId)
+{
+    // Get last message
+    $lastMessage = Message::where(function($query) use ($adminId, $user, $type) {
+            $query->where('sender_id', $adminId)
+                ->where('sender_type', 'admin')
+                ->where('receiver_id', $user->id)
+                ->where('receiver_type', $type);
+        })
+        ->orWhere(function($query) use ($adminId, $user, $type) {
+            $query->where('sender_id', $user->id)
                 ->where('sender_type', $type)
                 ->where('receiver_id', $adminId)
-                ->where('receiver_type', 'admin')
-                ->where('is_read', false)
-                ->count();
-            
-            // FIXED: Use correct admin column names
-            if ($type === 'admin') {
-                $fullName = trim($user->admin_first_name . ' ' . ($user->admin_middle_name ? $user->admin_middle_name . ' ' : '') . $user->admin_last_name);
-                $initials = strtoupper(substr($user->admin_first_name, 0, 1) . substr($user->admin_last_name, 0, 1));
-                $avatar = $user->photo ?? null;
-                $program = 'Admin';
-                $batch = '-';
+                ->where('receiver_type', 'admin');
+        })
+        ->latest()
+        ->first();
+    
+    // Count unread messages
+    $unreadCount = Message::where('sender_id', $user->id)
+        ->where('sender_type', $type)
+        ->where('receiver_id', $adminId)
+        ->where('receiver_type', 'admin')
+        ->where('is_read', false)
+        ->count();
+    
+    if ($type === 'admin') {
+        $fullName = trim($user->admin_first_name . ' ' . ($user->admin_middle_name ? $user->admin_middle_name . ' ' : '') . $user->admin_last_name);
+        $initials = strtoupper(substr($user->admin_first_name, 0, 1) . substr($user->admin_last_name, 0, 1));
+        
+        // FIX: Build the correct photo URL for admin
+        $avatar = null;
+        if (!empty($user->photo)) {
+            // Check if it's already a full URL
+            if (filter_var($user->photo, FILTER_VALIDATE_URL)) {
+                $avatar = $user->photo;
             } else {
-                $fullName = $user->first_name . ' ' . $user->last_name;
-                $initials = strtoupper(substr($user->first_name, 0, 1) . substr($user->last_name, 0, 1));
-                $avatar = $user->alumni_photo ?? null;
-                $program = $user->program ?? '';
-                $batch = $user->year_graduated ? date('Y', strtotime($user->year_graduated)) : 'N/A';
+                // Add storage path prefix
+                $avatar = asset('storage/' . ltrim($user->photo, '/'));
             }
-            
-            return [
-                'id' => $user->id,
-                'type' => $type,
-                'full_name' => $fullName,
-                'initials' => $initials,
-                'program' => $program,
-                'batch' => $batch,
-                'is_online' => $type === 'admin' ? true : ($user->is_online ?? false),
-                'last_message' => $lastMessage ? $lastMessage->content : null,
-                'last_message_time' => $lastMessage ? $lastMessage->created_at->diffForHumans() : null,
-                'unread_count' => $unreadCount,
-                'avatar' => $avatar,
-            ];
         }
+        
+        $program = 'Admin';
+        $batch = '-';
+    } else {
+        $fullName = $user->first_name . ' ' . $user->last_name;
+        $initials = strtoupper(substr($user->first_name, 0, 1) . substr($user->last_name, 0, 1));
+        
+        // FIX: Build the correct photo URL for alumni
+        $avatar = null;
+        if (!empty($user->alumni_photo)) {
+            // Check if it's already a full URL
+            if (filter_var($user->alumni_photo, FILTER_VALIDATE_URL)) {
+                $avatar = $user->alumni_photo;
+            } else {
+                // Add storage path prefix
+                $avatar = asset('storage/' . ltrim($user->alumni_photo, '/'));
+            }
+        }
+        
+        $program = $user->program ?? '';
+        $batch = $user->year_graduated ? date('Y', strtotime($user->year_graduated)) : 'N/A';
+    }
+    
+    return [
+        'id' => $user->id,
+        'type' => $type,
+        'full_name' => $fullName,
+        'initials' => $initials,
+        'program' => $program,
+        'batch' => $batch,
+        'is_online' => $type === 'admin' ? true : ($user->is_online ?? false),
+        'last_message' => $lastMessage ? $lastMessage->content : null,
+        'last_message_time' => $lastMessage ? $lastMessage->created_at->diffForHumans() : null,
+        'unread_count' => $unreadCount,
+        'avatar' => $avatar,
+    ];
+}
 
         /**
          * Get messages between admin and specific contact (alumni or admin)
@@ -203,6 +226,7 @@ class MessageController extends Controller
                         return [
                             'id' => $message->id,
                             'content' => $message->content,
+                            'sender_id' => $message->sender_id,  // ADD THIS LINE
                             'sender_type' => $message->sender_type,
                             'is_read' => $message->is_read,
                             'created_at' => $message->created_at->toISOString(),
@@ -230,52 +254,53 @@ class MessageController extends Controller
     /**
      * Send a message
      */
-    public function sendMessage(Request $request)
-    {
-        $request->validate([
-            'receiver_id' => 'required|integer',
-            'receiver_type' => 'required|in:alumni,admin',
-            'content' => 'required|string|max:5000',
-        ]);
-        
-        $adminId = $this->getAdminId();
-        
-        if (!$adminId) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-        
-        // Validate receiver exists based on type
-        if ($request->receiver_type === 'alumni') {
-            $exists = Alumni::where('id', $request->receiver_id)->exists();
-        } else {
-            $exists = Admin::where('id', $request->receiver_id)->exists();
-        }
-        
-        if (!$exists) {
-            return response()->json(['error' => 'Receiver not found'], 404);
-        }
-        
-        $message = Message::create([
-            'sender_id' => $adminId,
-            'receiver_id' => $request->receiver_id,
-            'sender_type' => 'admin',
-            'receiver_type' => $request->receiver_type,
-            'content' => $request->content,
-            'is_read' => false,
-        ]);
-        
-        return response()->json([
-            'success' => true,
-            'message' => [
-                'id' => $message->id,
-                'content' => $message->content,
-                'sender_type' => 'admin',
-                'is_read' => false,
-                'created_at' => $message->created_at->toISOString(),
-                'time' => $message->created_at->format('g:i A'),
-            ]
-        ]);
+public function sendMessage(Request $request)
+{
+    $request->validate([
+        'receiver_id' => 'required|integer',
+        'receiver_type' => 'required|in:alumni,admin',
+        'content' => 'required|string|max:5000',
+    ]);
+    
+    $adminId = $this->getAdminId();
+    
+    if (!$adminId) {
+        return response()->json(['error' => 'Unauthorized'], 401);
     }
+    
+    // Validate receiver exists based on type
+    if ($request->receiver_type === 'alumni') {
+        $exists = Alumni::where('id', $request->receiver_id)->exists();
+    } else {
+        $exists = Admin::where('id', $request->receiver_id)->exists();
+    }
+    
+    if (!$exists) {
+        return response()->json(['error' => 'Receiver not found'], 404);
+    }
+    
+    $message = Message::create([
+        'sender_id' => $adminId,
+        'receiver_id' => $request->receiver_id,
+        'sender_type' => 'admin',
+        'receiver_type' => $request->receiver_type,
+        'content' => $request->content,
+        'is_read' => false,
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => [
+            'id' => $message->id,
+            'content' => $message->content,
+            'sender_id' => $adminId,  // ADD THIS - explicitly include sender_id
+            'sender_type' => 'admin',
+            'is_read' => false,
+            'created_at' => $message->created_at->toISOString(),
+            'time' => $message->created_at->format('g:i A'),
+        ]
+    ]);
+}
 
     /**
      * Search alumni and admins
