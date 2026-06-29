@@ -379,7 +379,7 @@
         </div>
     </div>
 
-    <script>
+     <script>
         // ============================================
         // GLOBAL STATE
         // ============================================
@@ -389,6 +389,10 @@
         let activeTab = 'all';
         let supabaseClient;
         let searchTimeout;
+        let supabaseRealtimeChannel;
+        let pollingInterval;
+        let lastMessageId = 0;
+        let isDecrypting = false; // Prevent multiple simultaneous decrypt requests
         
         // ============================================
         // SUPABASE INITIALIZATION
@@ -398,15 +402,16 @@
             const supabaseKey = '{{ env("SUPABASE_KEY") }}';
             
             if (!supabaseUrl || !supabaseKey) {
-                console.warn('Supabase credentials not configured');
+                console.warn('Supabase credentials not configured - falling back to polling');
+                startPolling();
                 return;
             }
             
-            // Changed from 'supabase =' to 'supabaseClient ='
             supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
             
-            // Subscribe to realtime messages for this admin
-            const channel = supabaseClient  // Changed here too
+            // Subscribe to ALL messages involving this admin (both sent and received)
+            // This handles the case where admin sends from another tab/device
+            supabaseRealtimeChannel = supabaseClient
                 .channel('admin-messages-' + adminId)
                 .on('postgres_changes', {
                     event: 'INSERT',
@@ -414,39 +419,197 @@
                     table: 'messages',
                     filter: `receiver_id=eq.${adminId}`,
                 }, (payload) => {
-                    handleNewMessage(payload.new);
+                    console.log('📨 New incoming message:', payload.new);
+                    handleIncomingMessage(payload.new);
+                })
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `sender_id=eq.${adminId}`,
+                }, (payload) => {
+                    console.log('📤 Message sent (from another session):', payload.new);
+                    handleOutgoingMessageFromOtherSession(payload.new);
                 })
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         console.log('✅ Supabase Realtime connected');
                     } else if (status === 'CHANNEL_ERROR') {
-                        console.error('❌ Supabase Realtime error');
+                        console.error('❌ Supabase Realtime error - falling back to polling');
+                        startPolling();
                     }
                 });
         }
         
-        function handleNewMessage(message) {
-            // Only process if it's an alumni-to-admin message for this admin
-            if (message.receiver_type === 'admin' && message.receiver_id == adminId && message.sender_type === 'alumni') {
-                // Reload conversations to update the list
-                loadConversations();
-                
-                // If currently chatting with this sender, add message to chat
-                if (currentChat && message.sender_id == currentChat) {
-                    appendMessage({
-                        id: message.id,
-                        content: message.content,
-                        sender_type: 'alumni',
-                        is_read: message.is_read,
-                        created_at: message.created_at,
-                        time: formatTime(new Date(message.created_at)),
-                        attachments: []
-                    });
-                    scrollToBottom();
-                    
-                    // Mark as read
-                    markMessagesAsRead(currentChat);
+        // ============================================
+        // MESSAGE HANDLERS
+        // ============================================
+        async function handleIncomingMessage(message) {
+            // Only process if this message is for the current admin
+            if (message.receiver_id != adminId) return;
+            
+            // Update conversations list
+            await loadConversations();
+            
+            // If currently chatting with this sender, decrypt and add message to chat
+            if (currentChat && message.sender_id == currentChat.id) {
+                // Prevent duplicate messages
+                const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
+                if (existingMsg) {
+                    console.log('⚠️ Duplicate message prevented:', message.id);
+                    return;
                 }
+                
+                // Decrypt the message content
+                const decryptedContent = await decryptContent(
+                    message.content, 
+                    message.sender_type, 
+                    message.receiver_type
+                );
+                
+                // Create decrypted message object
+                const decryptedMessage = {
+                    id: message.id,
+                    content: decryptedContent,
+                    sender_id: message.sender_id,
+                    sender_type: message.sender_type,
+                    receiver_id: message.receiver_id,
+                    receiver_type: message.receiver_type,
+                    is_read: message.is_read,
+                    created_at: message.created_at,
+                    time: formatTime(new Date(message.created_at)),
+                    attachments: []
+                };
+                
+                appendMessage(decryptedMessage);
+                scrollToBottom();
+                
+                // Mark as read
+                await markMessagesAsRead(currentChat.id);
+                
+                // Update last message ID for polling fallback
+                lastMessageId = Math.max(lastMessageId, message.id);
+            }
+        }
+        
+        function handleOutgoingMessageFromOtherSession(message) {
+            // This handles messages sent from another admin session (different tab/device)
+            if (message.sender_id != adminId) return;
+            
+            // Update conversations list
+            loadConversations();
+            
+            // If currently chatting with the receiver, add message to chat
+            if (currentChat && message.receiver_id == currentChat.id && message.receiver_type === currentChat.type) {
+                // Prevent duplicate messages
+                const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
+                if (existingMsg) {
+                    console.log('⚠️ Duplicate outgoing message prevented:', message.id);
+                    return;
+                }
+                
+                appendMessage({
+                    id: message.id,
+                    content: message.content, // Messages sent by admin are plain text
+                    sender_id: message.sender_id,
+                    sender_type: message.sender_type,
+                    receiver_id: message.receiver_id,
+                    receiver_type: message.receiver_type,
+                    is_read: message.is_read,
+                    created_at: message.created_at,
+                    time: formatTime(new Date(message.created_at)),
+                    attachments: []
+                });
+                scrollToBottom();
+                
+                lastMessageId = Math.max(lastMessageId, message.id);
+            }
+        }
+        
+        async function decryptContent(content, senderType, receiverType) {
+            // If the content doesn't start with 'enc:', return as is (already decrypted or plain text)
+            if (!content || (typeof content === 'string' && !content.startsWith('enc:') && !content.startsWith('U2FsdGVkX1'))) {
+                return content || '';
+            }
+            
+            // Prevent multiple simultaneous decrypt requests
+            if (isDecrypting) {
+                console.log('⏳ Decryption already in progress...');
+                return '[Decrypting...]';
+            }
+            
+            isDecrypting = true;
+            
+            try {
+                const response = await fetch('/admin/messages/decrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        sender_type: senderType,
+                        receiver_type: receiverType
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Decryption failed with status:', response.status);
+                    return '[Encrypted message]';
+                }
+                
+                const data = await response.json();
+                return data.decrypted || content;
+            } catch (error) {
+                console.error('Decryption error:', error);
+                return '[Error decrypting message]';
+            } finally {
+                isDecrypting = false;
+            }
+        }
+        
+        // ============================================
+        // POLLING FALLBACK
+        // ============================================
+        function startPolling() {
+            console.log('🔄 Starting message polling (every 2 seconds)...');
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(checkForNewMessages, 2000);
+        }
+        
+        async function checkForNewMessages() {
+            if (!currentChat) return;
+            
+            try {
+                const response = await fetch(`/admin/messages/${currentChat.type}/${currentChat.id}`);
+                if (!response.ok) return;
+                
+                const messages = await response.json();
+                if (messages && messages.length > 0) {
+                    let hasNewMessages = false;
+                    
+                    messages.forEach(msg => {
+                        if (msg.id > lastMessageId && msg.sender_id != adminId) {
+                            // Check for duplicates
+                            const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
+                            if (!existingMsg) {
+                                appendMessage(msg);
+                                hasNewMessages = true;
+                            }
+                            lastMessageId = Math.max(lastMessageId, msg.id);
+                        }
+                    });
+                    
+                    if (hasNewMessages) {
+                        scrollToBottom();
+                        // Update conversations list
+                        loadConversations();
+                    }
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
             }
         }
         
@@ -473,7 +636,7 @@
             }
         }
         
-       function renderContacts(contacts) {
+        function renderContacts(contacts) {
             const contactsList = document.getElementById('contactsList');
             
             if (!contacts || contacts.length === 0) {
@@ -529,7 +692,6 @@
             
             let filtered = allContacts;
             
-            // Apply tab filter
             switch(activeTab) {
                 case 'unread':
                     filtered = filtered.filter(c => c.unread_count > 0);
@@ -539,7 +701,6 @@
                     break;
             }
             
-            // Apply search filter
             if (query) {
                 filtered = filtered.filter(contact => 
                     contact.full_name.toLowerCase().includes(query) ||
@@ -563,47 +724,49 @@
         // ============================================
         // CHAT FUNCTIONALITY
         // ============================================
-async function openChat(contactId, type = 'alumni') {
-    currentChat = { id: contactId, type: type };
-    
-    // Update contact list active state
-    document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
-    const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
-    if (activeCard) activeCard.classList.add('active');
-    
-    // Show chat panel, hide empty state
-    document.getElementById('noChatSelected').style.display = 'none';
-    document.getElementById('chatHeader').style.display = 'flex';
-    document.getElementById('chatMessages').style.display = 'block';
-    document.getElementById('chatInput').style.display = 'flex';
-    
-    // Update header
-    const contact = allContacts.find(c => c.id == contactId && c.type === type);
-    if (contact) {
-        const chatAvatar = document.getElementById('chatAvatar');
-        
-        // Show avatar image or fallback to initials
-        if (contact.avatar) {
-            chatAvatar.innerHTML = `<img src="${contact.avatar}" alt="${escapeHtml(contact.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
-        } else {
-            chatAvatar.textContent = contact.initials;
-            chatAvatar.style.background = 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))';
-            chatAvatar.style.color = 'var(--nu-gold)';
+        async function openChat(contactId, type = 'alumni') {
+            // Reset message tracking
+            lastMessageId = 0;
+            
+            currentChat = { id: contactId, type: type };
+            
+            // Update contact list active state
+            document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
+            const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
+            if (activeCard) activeCard.classList.add('active');
+            
+            // Show chat panel, hide empty state
+            document.getElementById('noChatSelected').style.display = 'none';
+            document.getElementById('chatHeader').style.display = 'flex';
+            document.getElementById('chatMessages').style.display = 'block';
+            document.getElementById('chatInput').style.display = 'flex';
+            
+            // Update header
+            const contact = allContacts.find(c => c.id == contactId && c.type === type);
+            if (contact) {
+                const chatAvatar = document.getElementById('chatAvatar');
+                
+                if (contact.avatar) {
+                    chatAvatar.innerHTML = `<img src="${contact.avatar}" alt="${escapeHtml(contact.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+                } else {
+                    chatAvatar.textContent = contact.initials;
+                    chatAvatar.style.background = 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))';
+                    chatAvatar.style.color = 'var(--nu-gold)';
+                }
+                
+                document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
+                document.getElementById('chatStatus').innerHTML = `
+                    <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
+                    ${contact.is_online ? 'Online' : 'Offline'}
+                `;
+            }
+            
+            // Load messages
+            await loadMessages(contactId, type);
+            
+            // Focus input
+            document.getElementById('messageInput').focus();
         }
-        
-        document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
-        document.getElementById('chatStatus').innerHTML = `
-            <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
-            ${contact.is_online ? 'Online' : 'Offline'}
-        `;
-    }
-    
-    // Load messages
-    await loadMessages(contactId, type);
-    
-    // Focus input
-    document.getElementById('messageInput').focus();
-}
         
         async function loadMessages(contactId, type = 'alumni') {
             const container = document.getElementById('chatMessages');
@@ -614,6 +777,11 @@ async function openChat(contactId, type = 'alumni') {
                 if (!response.ok) throw new Error('Failed to load messages');
                 
                 const messages = await response.json();
+                
+                if (messages && messages.length > 0) {
+                    lastMessageId = Math.max(...messages.map(m => m.id));
+                }
+                
                 renderMessages(messages);
                 scrollToBottom();
             } catch (error) {
@@ -629,33 +797,63 @@ async function openChat(contactId, type = 'alumni') {
         }
         
         function renderMessages(messages) {
-        const container = document.getElementById('chatMessages');
-        
-        if (!messages || messages.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-message"></i>
-                    <h3>No messages yet</h3>
-                    <p>Send the first message to start the conversation</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = '';
-        let lastDate = null;
-        
-        messages.forEach(msg => {
-            const msgDate = new Date(msg.created_at).toLocaleDateString();
-            if (msgDate !== lastDate) {
-                html += `<div class="date-divider"><span>${formatDateDivider(new Date(msg.created_at))}</span></div>`;
-                lastDate = msgDate;
+            const container = document.getElementById('chatMessages');
+            
+            if (!messages || messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-message"></i>
+                        <h3>No messages yet</h3>
+                        <p>Send the first message to start the conversation</p>
+                    </div>
+                `;
+                return;
             }
             
-            // FIX: Check sender_id against current admin, not just sender_type
+            let html = '';
+            let lastDate = null;
+            
+            messages.forEach(msg => {
+                const msgDate = new Date(msg.created_at).toLocaleDateString();
+                if (msgDate !== lastDate) {
+                    html += `<div class="date-divider"><span>${formatDateDivider(new Date(msg.created_at))}</span></div>`;
+                    lastDate = msgDate;
+                }
+                
+                const isSent = msg.sender_id == adminId;
+                html += `
+                    <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
+                        <div class="message-bubble">
+                            <p>${escapeHtml(msg.content)}</p>
+                            <span class="msg-time">
+                                ${msg.time}
+                                ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function appendMessage(msg) {
+            const container = document.getElementById('chatMessages');
+            
+            // Prevent duplicate messages
+            if (msg.id && !msg.id.toString().startsWith('temp-')) {
+                const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
+                if (existingMsg) {
+                    console.log('⚠️ Duplicate message prevented in appendMessage:', msg.id);
+                    return;
+                }
+            }
+            
+            // Determine if message is sent by current admin
             const isSent = msg.sender_id == adminId;
-            html += `
-                <div class="message-group ${isSent ? 'sent' : 'received'}">
+            
+            const messageHtml = `
+                <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
                     <div class="message-bubble">
                         <p>${escapeHtml(msg.content)}</p>
                         <span class="msg-time">
@@ -665,129 +863,92 @@ async function openChat(contactId, type = 'alumni') {
                     </div>
                 </div>
             `;
-        });
-        
-        container.innerHTML = html;
-    }
-        
-function appendMessage(msg) {
-    const container = document.getElementById('chatMessages');
-    
-    // FIX: Check if the message is from the current admin
-    // For temp messages, sender_id should match adminId
-    // For server messages, compare sender_id with adminId
-    let isSent = false;
-    
-    if (msg.sender_id == adminId) {
-        isSent = true;
-    } else if (msg.sender_type === 'admin' && msg.sender_id === adminId) {
-        isSent = true;
-    }
-    
-    // For debugging, log the comparison
-    console.log('Message sender_id:', msg.sender_id, 'adminId:', adminId, 'isSent:', isSent);
-    
-    const messageHtml = `
-        <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id && msg.id.toString().startsWith('temp-') ? `data-temp-id="${msg.id}"` : ''}>
-            <div class="message-bubble">
-                <p>${escapeHtml(msg.content)}</p>
-                <span class="msg-time">
-                    ${msg.time}
-                    ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
-                </span>
-            </div>
-        </div>
-    `;
-    
-    // Remove empty state if present
-    const emptyState = container.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
-    
-    container.insertAdjacentHTML('beforeend', messageHtml);
-}
+            
+            // Remove empty state if present
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+            
+            container.insertAdjacentHTML('beforeend', messageHtml);
+        }
         
         async function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const content = input.value.trim();
-    
-    if (!content || !currentChat) return;
-    
-    // Clear input immediately for better UX
-    input.value = '';
-    input.focus();
-    
-    // Optimistically append the message to the chat (show it immediately as sent)
-    const tempMessage = {
-        id: 'temp-' + Date.now(),
-        content: content,
-        sender_id: adminId,  // Use the admin's ID directly
-        sender_type: 'admin',
-        is_read: false,
-        created_at: new Date().toISOString(),
-        time: formatTime(new Date()),
-        attachments: []
-    };
-    
-    appendMessage(tempMessage);
-    scrollToBottom();
-    
-    try {
-        const response = await fetch('/admin/messages/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                receiver_id: currentChat.id,
-                receiver_type: currentChat.type,
-                content: content
-            })
-        });
-        
-        if (!response.ok) throw new Error('Failed to send message');
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Replace the temporary message with the real one
-            const tempElements = document.querySelectorAll('.message-group');
-            const lastTemp = tempElements[tempElements.length - 1];
-            if (lastTemp && lastTemp.querySelector(`[data-temp-id="${tempMessage.id}"]`)) {
-                lastTemp.remove();
-                appendMessage(data.message);
-            }
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
             
-            // Update the contact's last message in the list
-            const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
-            if (contact) {
-                contact.last_message = content;
-                contact.last_message_time = 'Just now';
+            if (!content || !currentChat) return;
+            
+            // Clear input immediately
+            input.value = '';
+            input.focus();
+            
+            // Create temporary message
+            const tempId = 'temp-' + Date.now();
+            const tempMessage = {
+                id: tempId,
+                content: content,
+                sender_id: adminId,
+                sender_type: 'admin',
+                is_read: false,
+                created_at: new Date().toISOString(),
+                time: formatTime(new Date()),
+                attachments: []
+            };
+            
+            appendMessage(tempMessage);
+            scrollToBottom();
+            
+            try {
+                const response = await fetch('/admin/messages/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        receiver_id: currentChat.id,
+                        receiver_type: currentChat.type,
+                        content: content
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to send message');
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Remove temporary message
+                    const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+                    if (tempElement) tempElement.remove();
+                    
+                    // Add the real message
+                    appendMessage(data.message);
+                    scrollToBottom();
+                    
+                    // Update lastMessageId
+                    lastMessageId = Math.max(lastMessageId, data.message.id);
+                    
+                    // Update conversations list
+                    const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+                    if (contact) {
+                        contact.last_message = content;
+                        contact.last_message_time = 'Just now';
+                    }
+                    applyFilter();
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                // Remove temporary message
+                const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+                if (tempElement) tempElement.remove();
+                
+                // Restore input
+                input.value = content;
+                alert('Failed to send message. Please try again.');
             }
-            renderContacts(allContacts.filter(c => {
-                if (activeTab === 'unread') return c.unread_count > 0;
-                if (activeTab === 'online') return c.is_online;
-                return true;
-            }));
         }
-    } catch (error) {
-        console.error('Error sending message:', error);
-        // Remove the temporary message on error
-        const tempElements = document.querySelectorAll('.message-group');
-        const lastTemp = tempElements[tempElements.length - 1];
-        if (lastTemp && lastTemp.querySelector(`[data-temp-id="${tempMessage.id}"]`)) {
-            lastTemp.remove();
-        }
-        // Put the message back in the input if it failed
-        input.value = content;
-        alert('Failed to send message. Please try again.');
-    }
-}
         
         async function markMessagesAsRead(alumniId) {
-            // Messages are marked as read server-side when loading them
-            // Update the unread count locally
             const contact = allContacts.find(c => c.id == alumniId);
             if (contact) {
                 contact.unread_count = 0;
@@ -836,20 +997,15 @@ function appendMessage(msg) {
             
             document.getElementById('searchResults').innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Searching...</div>';
             
-            // Debounce the search
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch(`/admin/messages/search/alumni?q=${encodeURIComponent(query)}`);
-                    
-                    // Try to parse JSON even if response is not OK
                     const data = await response.json();
                     
                     if (!response.ok) {
-                        // Show the actual error from the server
                         const errorMsg = data.error || 'Unknown error';
                         const errorDetails = data.file ? ` (${data.file}:${data.line})` : '';
-                        console.error('Server error:', data);
                         document.getElementById('searchResults').innerHTML = 
                             `<p style="color: #ef4444; text-align: center;">Error: ${errorMsg}${errorDetails}</p>`;
                         return;
@@ -880,14 +1036,12 @@ function appendMessage(msg) {
                 }
             }, 300);
         }
-
+        
         function startNewChat(alumniId, type = 'alumni') {
             closeNewMessageModal();
             
-            // Check if contact already exists
             const existingContact = allContacts.find(c => c.id == alumniId && c.type === type);
             if (!existingContact) {
-                // Add a placeholder contact
                 allContacts.unshift({
                     id: alumniId,
                     type: type,
@@ -905,17 +1059,8 @@ function appendMessage(msg) {
             }
             
             openChat(alumniId, type);
-            
-            // Reload conversations to get proper data
             setTimeout(() => loadConversations(), 500);
         }
-        
-        // Close modal when clicking overlay
-        document.getElementById('newMessageModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeNewMessageModal();
-            }
-        });
         
         // ============================================
         // UTILITY FUNCTIONS
@@ -968,7 +1113,15 @@ function appendMessage(msg) {
             overlay.classList.toggle('active');
             document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
         }
-
+        
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConversations();
+            initSupabase();
+        });
+        
         // Close sidebar when clicking on a nav item (mobile)
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', function() {
@@ -977,7 +1130,14 @@ function appendMessage(msg) {
                 }
             });
         });
-
+        
+        // Close modal when clicking overlay
+        document.getElementById('newMessageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeNewMessageModal();
+            }
+        });
+        
         // Handle window resize
         let resizeTimer;
         window.addEventListener('resize', function() {
@@ -991,13 +1151,16 @@ function appendMessage(msg) {
             }, 250);
         });
         
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        document.addEventListener('DOMContentLoaded', function() {
-            loadConversations();
-            initSupabase();
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (supabaseRealtimeChannel) {
+                supabaseClient.removeChannel(supabaseRealtimeChannel);
+            }
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
         });
     </script>
+
 </body>
 </html>

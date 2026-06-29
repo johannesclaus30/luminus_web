@@ -607,74 +607,96 @@ private function deriveKeyMethod3($password, $salt)
     }
 
     public function testEncryption(Request $request)
-{
-    try {
-        $testString = "Hello World Test";
-        $password = $this->cryptoSecretKey;
-        
-        Log::info('[TEST] Starting encryption test');
-        Log::info('[TEST] Password: ' . $password);
-        Log::info('[TEST] Password length: ' . strlen($password));
-        Log::info('[TEST] Password hex: ' . bin2hex($password));
-        
-        // Generate a random salt (8 bytes)
-        $salt = openssl_random_pseudo_bytes(8);
-        Log::info('[TEST] Salt (hex): ' . bin2hex($salt));
-        
-        // Derive key and IV using EVP_BytesToKey
-        $derived = '';
-        $block = '';
-        
-        while (strlen($derived) < 48) {
-            $block = md5($block . $password . $salt, true);
-            $derived .= $block;
+    {
+        try {
+            $testString = "Hello World Test";
+            $password = $this->cryptoSecretKey;
+            
+            Log::info('[TEST] Starting encryption test');
+            Log::info('[TEST] Password: ' . $password);
+            Log::info('[TEST] Password length: ' . strlen($password));
+            Log::info('[TEST] Password hex: ' . bin2hex($password));
+            
+            // Generate a random salt (8 bytes)
+            $salt = openssl_random_pseudo_bytes(8);
+            Log::info('[TEST] Salt (hex): ' . bin2hex($salt));
+            
+            // Derive key and IV using EVP_BytesToKey
+            $derived = '';
+            $block = '';
+            
+            while (strlen($derived) < 48) {
+                $block = md5($block . $password . $salt, true);
+                $derived .= $block;
+            }
+            
+            $key = substr($derived, 0, 32);
+            $iv = substr($derived, 32, 16);
+            
+            Log::info('[TEST] Derived Key (hex): ' . bin2hex($key));
+            Log::info('[TEST] Derived IV (hex): ' . bin2hex($iv));
+            
+            // Encrypt
+            $encrypted = openssl_encrypt(
+                $testString,
+                'aes-256-cbc',
+                $key,
+                OPENSSL_RAW_DATA,
+                $iv
+            );
+            
+            Log::info('[TEST] Encrypted length: ' . strlen($encrypted));
+            
+            // Format: "Salted__" + salt + encrypted
+            $payload = 'Salted__' . $salt . $encrypted;
+            $base64Payload = base64_encode($payload);
+            $finalOutput = 'enc:' . $base64Payload;
+            
+            Log::info('[TEST] Final output: ' . $finalOutput);
+            
+            // Now try to decrypt it back
+            $decrypted = $this->decryptMessageContent($finalOutput, 'alumni', 'admin');
+            
+            return response()->json([
+                'success' => true,
+                'test_string' => $testString,
+                'password_used' => $password,
+                'password_hex' => bin2hex($password),
+                'salt_hex' => bin2hex($salt),
+                'key_hex' => bin2hex($key),
+                'iv_hex' => bin2hex($iv),
+                'encrypted_output' => $finalOutput,
+                'decrypted_result' => $decrypted,
+                'match' => $decrypted === $testString ? 'YES ✅' : 'NO ❌'
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
         }
         
-        $key = substr($derived, 0, 32);
-        $iv = substr($derived, 32, 16);
-        
-        Log::info('[TEST] Derived Key (hex): ' . bin2hex($key));
-        Log::info('[TEST] Derived IV (hex): ' . bin2hex($iv));
-        
-        // Encrypt
-        $encrypted = openssl_encrypt(
-            $testString,
-            'aes-256-cbc',
-            $key,
-            OPENSSL_RAW_DATA,
-            $iv
-        );
-        
-        Log::info('[TEST] Encrypted length: ' . strlen($encrypted));
-        
-        // Format: "Salted__" + salt + encrypted
-        $payload = 'Salted__' . $salt . $encrypted;
-        $base64Payload = base64_encode($payload);
-        $finalOutput = 'enc:' . $base64Payload;
-        
-        Log::info('[TEST] Final output: ' . $finalOutput);
-        
-        // Now try to decrypt it back
-        $decrypted = $this->decryptMessageContent($finalOutput, 'alumni', 'admin');
-        
-        return response()->json([
-            'success' => true,
-            'test_string' => $testString,
-            'password_used' => $password,
-            'password_hex' => bin2hex($password),
-            'salt_hex' => bin2hex($salt),
-            'key_hex' => bin2hex($key),
-            'iv_hex' => bin2hex($iv),
-            'encrypted_output' => $finalOutput,
-            'decrypted_result' => $decrypted,
-            'match' => $decrypted === $testString ? 'YES ✅' : 'NO ❌'
+    }
+
+    // Add this method to your MessageController
+    public function decryptMessage(Request $request)
+    {
+        $request->validate([
+            'content' => 'required|string',
+            'sender_type' => 'required|string',
+            'receiver_type' => 'required|string',
         ]);
         
-    } catch (\Exception $e) {
+        $decrypted = $this->decryptMessageContent(
+            $request->content,
+            $request->sender_type,
+            $request->receiver_type
+        );
+        
         return response()->json([
-            'success' => false,
-            'error' => $e->getMessage()
-        ], 500);
+            'decrypted' => $decrypted
+        ]);
     }
-}
+
 }
