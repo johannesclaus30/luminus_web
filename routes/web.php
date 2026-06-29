@@ -188,9 +188,12 @@ Route::prefix('admin')->group(function () {
         Route::get('/messages/search/alumni', [MessageController::class, 'searchAlumni'])->name('messages.search');
         Route::get('/messages/{type}/{id}', [MessageController::class, 'getMessages'])->name('messages.get');
         Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
-
-        // ✅ CORRECT - Don't include /admin/ since we're already in the prefix
         Route::post('/messages/decrypt', [MessageController::class, 'decryptMessage'])->name('messages.decrypt');
+
+        // Get alumni info by ID (for chat redirect and new message)
+        Route::get('/messages/{type}/{id}/info', [MessageController::class, 'getContactInfo'])
+            ->where(['type' => 'alumni|admin'])
+            ->name('messages.contact-info');
 
     });
 });

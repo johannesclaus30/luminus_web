@@ -451,81 +451,148 @@ private function deriveKeyMethod3($password, $salt)
             
             $currentAdminId = $this->getAdminId();
             
-            $alumniQuery = Alumni::query();
+            // Log the search query for debugging
+            Log::info('Search query: "' . $query . '"');
             
-            if (Schema::hasColumn('alumnis', 'verification_status')) {
-                $alumniQuery->where('verification_status', 'verified');
-            }
-            
-            $alumni = $alumniQuery->where(function($q) use ($query) {
-                    $q->where('first_name', 'LIKE', "%{$query}%")
-                    ->orWhere('last_name', 'LIKE', "%{$query}%");
+            // Search Alumni by first_name, last_name, student_id_number, or email
+            $alumni = Alumni::where(function($q) use ($query) {
+                    // Search by first name
+                    $q->where('first_name', 'ILIKE', "%{$query}%")
+                    // Search by last name
+                    ->orWhere('last_name', 'ILIKE', "%{$query}%")
+                    // Search by middle name
+                    ->orWhere('middle_name', 'ILIKE', "%{$query}%")
+                    // Search by student ID
+                    ->orWhere('student_id_number', 'ILIKE', "%{$query}%")
+                    // Search by email
+                    ->orWhere('email', 'ILIKE', "%{$query}%")
+                    // Search by program
+                    ->orWhere('program', 'ILIKE', "%{$query}%");
                     
-                    if (Schema::hasColumn('alumnis', 'middle_name')) {
-                        $q->orWhere('middle_name', 'LIKE', "%{$query}%");
-                    }
-                    if (Schema::hasColumn('alumnis', 'student_id_number')) {
-                        $q->orWhere('student_id_number', 'LIKE', "%{$query}%");
-                    }
-                    if (Schema::hasColumn('alumnis', 'program')) {
-                        $q->orWhere('program', 'LIKE', "%{$query}%");
-                    }
-                    if (Schema::hasColumn('alumnis', 'email')) {
-                        $q->orWhere('email', 'LIKE', "%{$query}%");
-                    }
+                    // Also search by full name (first_name + last_name)
+                    $q->orWhereRaw("CONCAT(first_name, ' ', last_name) ILIKE ?", ["%{$query}%"]);
+                    $q->orWhereRaw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name) ILIKE ?", ["%{$query}%"]);
                 })
-                ->limit(10)
+                ->limit(15) // Increased limit for better results
                 ->get()
                 ->map(function ($alumni) {
-                    $fullName = trim(($alumni->first_name ?? '') . ' ' . ($alumni->last_name ?? ''));
-                    $initials = strtoupper(substr($alumni->first_name ?? 'A', 0, 1) . substr($alumni->last_name ?? 'A', 0, 1));
-                    $batch = $alumni->year_graduated ? date('Y', strtotime($alumni->year_graduated)) : 'N/A';
+                    // Build full name with middle initial
+                    $middleInitial = $alumni->middle_name 
+                        ? ' ' . strtoupper(substr($alumni->middle_name, 0, 1)) . '. ' 
+                        : ' ';
+                    $fullName = trim($alumni->first_name . $middleInitial . $alumni->last_name);
+                    
+                    // Build initials
+                    $initials = strtoupper(
+                        substr($alumni->first_name ?? 'A', 0, 1) . 
+                        substr($alumni->last_name ?? 'A', 0, 1)
+                    );
+                    
+                    // Get batch year
+                    $batch = $alumni->year_graduated 
+                        ? date('Y', strtotime($alumni->year_graduated)) 
+                        : 'N/A';
+                    
+                    // Handle avatar photo
+                    $avatar = null;
+                    $photo = $alumni->alumni_photo ?? $alumni->card_photo ?? null;
+                    if ($photo) {
+                        if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                            $avatar = $photo;
+                        } elseif (str_starts_with($photo, '/')) {
+                            $avatar = $photo;
+                        } else {
+                            $avatar = asset('storage/' . ltrim($photo, '/'));
+                        }
+                    }
                     
                     return [
                         'id' => $alumni->id,
                         'type' => 'alumni',
-                        'full_name' => $fullName,
-                        'initials' => $initials,
+                        'full_name' => $fullName ?: 'Unknown Alumni',
+                        'initials' => $initials ?: '??',
                         'program' => $alumni->program ?? 'N/A',
                         'batch' => $batch,
+                        'student_id' => $alumni->student_id_number ?? 'N/A',
+                        'email' => $alumni->email ?? 'N/A',
                         'is_online' => $alumni->is_online ?? false,
-                        'avatar' => $alumni->alumni_photo ?? null,
+                        'avatar' => $avatar,
                     ];
                 });
             
+            // Log alumni search results
+            Log::info('Alumni search results: ' . $alumni->count() . ' found');
+            
+            // Search Admins (excluding current admin)
             $admins = collect();
             
             if ($currentAdminId) {
                 $admins = Admin::where('id', '!=', (int)$currentAdminId)
                     ->where(function($q) use ($query) {
-                        $q->where('admin_first_name', 'LIKE', "%{$query}%")
-                        ->orWhere('admin_last_name', 'LIKE', "%{$query}%")
-                        ->orWhere('admin_email', 'LIKE', "%{$query}%");
+                        $q->where('admin_first_name', 'ILIKE', "%{$query}%")
+                        ->orWhere('admin_last_name', 'ILIKE', "%{$query}%")
+                        ->orWhere('admin_email', 'ILIKE', "%{$query}%")
+                        ->orWhere('admin_role', 'ILIKE', "%{$query}%");
+                        
+                        // Also search by full name
+                        $q->orWhereRaw("CONCAT(admin_first_name, ' ', admin_last_name) ILIKE ?", ["%{$query}%"]);
                     })
                     ->limit(10)
                     ->get()
                     ->map(function ($admin) {
-                        $fullName = trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? ''));
-                        $initials = strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1));
+                        $fullName = trim(
+                            ($admin->admin_first_name ?? '') . ' ' . 
+                            ($admin->admin_last_name ?? '')
+                        );
+                        $initials = strtoupper(
+                            substr($admin->admin_first_name ?? 'A', 0, 1) . 
+                            substr($admin->admin_last_name ?? 'A', 0, 1)
+                        );
+                        
+                        // Handle admin photo
+                        $avatar = null;
+                        $photo = $admin->photo ?? null;
+                        if ($photo) {
+                            if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                                $avatar = $photo;
+                            } elseif (str_starts_with($photo, '/')) {
+                                $avatar = $photo;
+                            } else {
+                                $avatar = asset('storage/' . ltrim($photo, '/'));
+                            }
+                        }
                         
                         return [
                             'id' => $admin->id,
                             'type' => 'admin',
-                            'full_name' => $fullName,
-                            'initials' => $initials,
-                            'program' => 'Admin',
+                            'full_name' => $fullName ?: 'Unknown Admin',
+                            'initials' => $initials ?: 'AD',
+                            'program' => 'Admin Staff',
                             'batch' => '-',
+                            'student_id' => 'N/A',
+                            'email' => $admin->admin_email ?? 'N/A',
                             'is_online' => true,
-                            'avatar' => $admin->photo ?? null,
+                            'avatar' => $avatar,
                         ];
                     });
             }
             
-            return response()->json($alumni->merge($admins)->values());
+            // Log admin search results
+            Log::info('Admin search results: ' . $admins->count() . ' found');
+            
+            // Merge results (alumni first, then admins)
+            $results = $alumni->merge($admins)->values();
+            
+            Log::info('Total search results: ' . $results->count());
+            
+            return response()->json($results);
             
         } catch (\Exception $e) {
             Log::error('Search error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            Log::error('Search error trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'error' => 'Search failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -697,6 +764,81 @@ private function deriveKeyMethod3($password, $salt)
         return response()->json([
             'decrypted' => $decrypted
         ]);
+    }
+
+    /**
+     * Get contact info by ID and type
+     */
+    public function getContactInfo($type, $id)
+    {
+        try {
+            if (!in_array($type, ['alumni', 'admin'])) {
+                return response()->json(['error' => 'Invalid contact type'], 400);
+            }
+            
+            if ($type === 'alumni') {
+                $user = Alumni::find($id);
+            } else {
+                $user = Admin::find($id);
+            }
+            
+            if (!$user) {
+                return response()->json(['error' => 'Contact not found'], 404);
+            }
+            
+            if ($type === 'alumni') {
+                $middleInitial = $user->middle_name 
+                    ? ' ' . strtoupper(substr($user->middle_name, 0, 1)) . '. ' 
+                    : ' ';
+                $fullName = trim($user->first_name . $middleInitial . $user->last_name);
+                $initials = strtoupper(
+                    substr($user->first_name ?? 'A', 0, 1) . 
+                    substr($user->last_name ?? 'A', 0, 1)
+                );
+                $batch = $user->year_graduated 
+                    ? date('Y', strtotime($user->year_graduated)) 
+                    : 'N/A';
+                $program = $user->program ?? 'N/A';
+                $isOnline = $user->is_online ?? false;
+                $photo = $user->alumni_photo ?? $user->card_photo ?? null;
+            } else {
+                $fullName = trim(($user->admin_first_name ?? '') . ' ' . ($user->admin_last_name ?? ''));
+                $initials = strtoupper(
+                    substr($user->admin_first_name ?? 'A', 0, 1) . 
+                    substr($user->admin_last_name ?? 'A', 0, 1)
+                );
+                $batch = '-';
+                $program = 'Admin Staff';
+                $isOnline = true;
+                $photo = $user->photo ?? null;
+            }
+            
+            $avatar = null;
+            if ($photo) {
+                if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                    $avatar = $photo;
+                } elseif (str_starts_with($photo, '/')) {
+                    $avatar = $photo;
+                } else {
+                    $avatar = asset('storage/' . ltrim($photo, '/'));
+                }
+            }
+            
+            return response()->json([
+                'id' => (int)$user->id,
+                'type' => $type,
+                'full_name' => $fullName ?: 'Unknown',
+                'initials' => $initials ?: '??',
+                'program' => $program,
+                'batch' => $batch,
+                'is_online' => $isOnline,
+                'avatar' => $avatar,
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error fetching contact info: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch contact info'], 500);
+        }
     }
 
 }

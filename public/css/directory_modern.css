@@ -436,6 +436,23 @@ body {
     transform: none;
 }
 
+/* Message Button - Active State */
+.btn-action.btn-message {
+    background: var(--nu-blue-soft);
+    color: var(--nu-blue);
+}
+
+.btn-action.btn-message:hover {
+    background: var(--nu-blue);
+    color: var(--white);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(50, 65, 140, 0.2);
+}
+
+.btn-action.btn-message:active {
+    transform: translateY(0);
+}
+
 /* Stats Grid */
 .stats-grid {
     display: grid;

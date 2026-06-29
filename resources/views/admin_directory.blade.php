@@ -277,27 +277,30 @@
                                     <span>Active Member</span>
                                 </div>
                                 
-                                <!-- Find this block in your directory page -->
-                                <div class="alumni-actions">
-                                    <button type="button" class="btn-action btn-reserved" title="Coming Soon" disabled>
-                                        <i class="fa-solid fa-comment-dots"></i>
-                                    </button>
-                                    
-                                    <!-- CHANGE THE ROUTE AND TITLE HERE -->
-                                    <a href="{{ route('admin.alumni.show', $alumnus->id) }}" 
-                                    class="btn-action btn-edit" 
-                                    title="View Profile">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </a>
-                                    
-                                    <!-- Replace your current 'i' button with this -->
-                                    <button type="button" class="btn-action btn-info-action manage-btn" 
-                                            data-id="{{ $alumnus->id }}" 
-                                            data-name="{{ $displayName }}" 
-                                            title="Manage Account">
-                                        <i class="fa-solid fa-circle-info"></i>
-                                    </button>
-                                </div>
+                                    <div class="alumni-actions">
+                                        <!-- Message Button - Direct link with alumni ID -->
+                                        <a href="/admin/messages?chat={{ $alumnus->id }}" 
+                                        class="btn-action btn-message" 
+                                        title="Message {{ $displayName }}">
+                                            <i class="fa-solid fa-comment-dots"></i>
+                                        </a>
+                                        
+                                        <!-- View Profile Button -->
+                                        <a href="{{ route('admin.alumni.show', $alumnus->id) }}" 
+                                        class="btn-action btn-edit" 
+                                        title="View Profile">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        
+                                        <!-- Manage Account Button -->
+                                        <button type="button" 
+                                                class="btn-action btn-info-action manage-btn" 
+                                                data-id="{{ $alumnus->id }}" 
+                                                data-name="{{ addslashes($displayName) }}" 
+                                                title="Manage Account">
+                                            <i class="fa-solid fa-circle-info"></i>
+                                        </button>
+                                    </div>
 
                             </div>
                         </div>
@@ -1037,6 +1040,19 @@
                 showAlert('An error occurred.', 'error');
                 hideDeleteConfirm();
             }
+        }
+
+        // Add this function to your existing script section
+        function redirectToMessages(alumniId, alumniName) {
+            // Store the alumni info in sessionStorage so the messages page can pick it up
+            sessionStorage.setItem('openChat', JSON.stringify({
+                id: alumniId,
+                name: alumniName,
+                timestamp: Date.now()
+            }));
+            
+            // Redirect to messages page
+            window.location.href = '/admin/messages';
         }
 
     </script>
