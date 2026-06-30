@@ -747,11 +747,13 @@
     // MESSAGE HANDLERS
     // ============================================
     async function handleIncomingMessage(message) {
-        if (message.receiver_id != adminId) return;
+        // 🔧 FIXED: Check both ID AND type
+        if (message.receiver_id != adminId || message.receiver_type !== 'admin') return;
         
         await loadConversations();
         
-        if (currentChat && message.sender_id == currentChat.id) {
+        // 🔧 FIXED: Match by ID AND type
+        if (currentChat && message.sender_id == currentChat.id && message.sender_type === currentChat.type) {
             const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
             if (existingMsg) {
                 console.log('⚠️ Duplicate message prevented:', message.id);
@@ -779,16 +781,18 @@
             
             appendMessage(decryptedMessage);
             scrollToBottom();
-            await markMessagesAsRead(currentChat.id);
+            await markMessagesAsRead(currentChat.id, currentChat.type);
             lastMessageId = Math.max(lastMessageId, message.id);
         }
     }
     
     function handleOutgoingMessageFromOtherSession(message) {
-        if (message.sender_id != adminId) return;
+        // 🔧 FIXED: Check both ID AND type
+        if (message.sender_id != adminId || message.sender_type !== 'admin') return;
         
         loadConversations();
         
+        // 🔧 FIXED: Match by ID AND type
         if (currentChat && message.receiver_id == currentChat.id && message.receiver_type === currentChat.type) {
             const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
             if (existingMsg) {
@@ -1340,8 +1344,8 @@
         }
     }
     
-    async function markMessagesAsRead(alumniId) {
-        const contact = allContacts.find(c => c.id == alumniId);
+    async function markMessagesAsRead(contactId, contactType = 'alumni') {
+        const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
         if (contact) {
             contact.unread_count = 0;
             updateUnreadBadge();

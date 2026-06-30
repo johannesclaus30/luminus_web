@@ -247,19 +247,29 @@ private function deriveKeyMethod3($password, $salt)
         try {
             $type = is_string($type) ? $type : 'alumni';
             
+            // 🔧 FIXED: Added sender_type and receiver_type to last message query
             $lastMessage = Message::where(function($query) use ($adminId, $user, $type) {
+                    // Messages sent BY admin TO this user
                     $query->where('sender_id', $adminId)
-                        ->where('receiver_id', $user->id);
+                        ->where('sender_type', 'admin')
+                        ->where('receiver_id', $user->id)
+                        ->where('receiver_type', $type);
                 })
                 ->orWhere(function($query) use ($adminId, $user, $type) {
+                    // Messages sent BY this user TO admin
                     $query->where('sender_id', $user->id)
-                        ->where('receiver_id', $adminId);
+                        ->where('sender_type', $type)
+                        ->where('receiver_id', $adminId)
+                        ->where('receiver_type', 'admin');
                 })
                 ->latest()
                 ->first();
             
+            // 🔧 FIXED: Added type check to unread count
             $unreadCount = Message::where('sender_id', $user->id)
+                ->where('sender_type', $type)
                 ->where('receiver_id', $adminId)
+                ->where('receiver_type', 'admin')
                 ->where('is_read', false)
                 ->count();
             
@@ -346,13 +356,20 @@ private function deriveKeyMethod3($password, $salt)
         }
         
         try {
+            // 🔧 FIXED: Added sender_type and receiver_type to the query
             $messages = Message::where(function($query) use ($adminId, $contactId, $type) {
+                    // Messages sent BY admin TO this contact
                     $query->where('sender_id', $adminId)
-                        ->where('receiver_id', $contactId);
+                        ->where('sender_type', 'admin')
+                        ->where('receiver_id', $contactId)
+                        ->where('receiver_type', $type);
                 })
                 ->orWhere(function($query) use ($adminId, $contactId, $type) {
+                    // Messages sent BY this contact TO admin
                     $query->where('sender_id', $contactId)
-                        ->where('receiver_id', $adminId);
+                        ->where('sender_type', $type)
+                        ->where('receiver_id', $adminId)
+                        ->where('receiver_type', 'admin');
                 })
                 ->orderBy('created_at', 'asc')
                 ->get()
@@ -378,8 +395,11 @@ private function deriveKeyMethod3($password, $salt)
                     ];
                 });
             
+            // 🔧 FIXED: Mark messages as read with type check
             Message::where('sender_id', $contactId)
+                ->where('sender_type', $type)
                 ->where('receiver_id', $adminId)
+                ->where('receiver_type', 'admin')
                 ->where('is_read', false)
                 ->update(['is_read' => true]);
             
