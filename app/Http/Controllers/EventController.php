@@ -12,31 +12,41 @@ use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $filter = $request->get('filter', 'all'); // all, In-Person, Online, Hybrid
+        
         // Get counts from the FULL database (not filtered)
         $totalEvents = Event::count();
         $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
         $archivedEvents = Event::where('status', 0)->count();
         $totalCapacity = Event::sum('max_capacity');
         
-        // Get paginated active events for display
-        $events = Event::where(function($query) {
+        // Build query for active events with optional type filter
+        $query = Event::where(function($query) {
             $query->where('status', 1)->orWhereNull('status');
-        })
-        ->orderBy('created_at', 'desc')
-        ->paginate(6);
+        });
+        
+        // Apply event type filter if not 'all'
+        if ($filter !== 'all') {
+            $query->where('event_type', $filter);
+        }
+        
+        $events = $query->orderBy('created_at', 'desc')->paginate(6);
         
         return view('admin_events', compact(
             'events',
             'totalEvents',
             'activeEvents',
-            'archivedEvents'
+            'archivedEvents',
+            'filter'
         ));
     }
 
     public function archived()
     {
+        $filter = null; // No filter on archived page
+        
         // Get counts from the FULL database (not filtered)
         $totalEvents = Event::count();
         $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
@@ -52,7 +62,8 @@ class EventController extends Controller
             'events',
             'totalEvents',
             'activeEvents',
-            'archivedEvents'
+            'archivedEvents',
+            'filter'
         ));
     }
 
@@ -81,7 +92,11 @@ class EventController extends Controller
             'venue_latitude' => 'nullable|numeric|between:-90,90',
             'venue_longitude' => 'nullable|numeric|between:-180,180',
             'images' => 'nullable|array|max:5',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ], [
+            'images.max' => 'You can only upload a maximum of 5 images.',
+            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.*.mimes' => 'Images must be JPG, PNG, or WEBP format.',
         ]);
 
         $adminId = $request->session()->get('admin_id');
@@ -141,10 +156,29 @@ class EventController extends Controller
             'venue_address' => 'required_if:event_type,In-Person,Hybrid|nullable|string|max:255',
             'venue_latitude' => 'nullable|numeric|between:-90,90',
             'venue_longitude' => 'nullable|numeric|between:-180,180',
+            'deleted_media' => 'nullable|array',
+            'deleted_media.*' => 'integer|exists:event_images,id',
             'images' => 'nullable|array|max:5',
-            'images.*' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ], [
+            'images.max' => 'You can only upload a maximum of 5 images.',
+            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.*.mimes' => 'Images must be JPG, PNG, or WEBP format.',
         ]);
 
+        // Check total image count after deletions and new uploads
+        $deletedCount = count($request->deleted_media ?? []);
+        $existingImageCount = $event->images()->count();
+        $newImageCount = $request->hasFile('images') ? count($request->file('images')) : 0;
+        $totalAfterUpdate = ($existingImageCount - $deletedCount) + $newImageCount;
+
+        if ($totalAfterUpdate > 5) {
+            throw ValidationException::withMessages([
+                'images' => "You can only have 5 images total. You have {$existingImageCount} existing, marked {$deletedCount} for removal, and are adding {$newImageCount} new. That would leave {$totalAfterUpdate} images.",
+            ]);
+        }
+
+        // Process deletions
         if ($request->has('deleted_media')) {
             foreach ($request->deleted_media as $mediaId) {
                 $media = $event->images()->find($mediaId);
@@ -195,6 +229,36 @@ class EventController extends Controller
         $event->update(['status' => 1]);
 
         return redirect()->route('events.archived')->with('success', 'Event restored.');
+    }
+
+        public function permanentDelete(Event $event)
+    {
+        // Only allow permanent deletion of archived events
+        if ((int) $event->status !== 0) {
+            return redirect()->back()->with('error', 'Only archived events can be permanently deleted.');
+        }
+
+        // Delete all associated image files from storage
+        foreach ($event->images as $media) {
+            $this->deleteStoredImage($media->image_path);
+            $media->delete();
+        }
+
+        // Delete venue if it exists and is only associated with this event
+        if ($event->venue) {
+            $venueUsageCount = Event::where('venue_id', $event->venue_id)
+                ->where('id', '!=', $event->id)
+                ->count();
+            
+            if ($venueUsageCount === 0) {
+                $event->venue->delete();
+            }
+        }
+
+        // Hard delete the event
+        $event->delete();
+
+        return redirect()->route('events.archived')->with('success', 'Event permanently deleted.');
     }
 
     protected function syncVenue(Request $request, ?int $existingVenueId = null): ?int

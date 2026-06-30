@@ -458,6 +458,49 @@ body {
     transform: translateY(-2px);
 }
 
+/* Filter Buttons */
+.filter-buttons .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: var(--radius-lg);
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+/* Active filter button — NU Blue (overrides gold .btn-primary) */
+.filter-buttons .btn-primary {
+    background: var(--nu-blue) !important;
+    color: var(--white) !important;
+    border-color: var(--nu-blue) !important;
+    box-shadow: var(--shadow-blue) !important;
+}
+
+.filter-buttons .btn-primary:hover {
+    background: var(--nu-blue-dark) !important;
+    border-color: var(--nu-blue-dark) !important;
+}
+
+/* Inactive filter button */
+.filter-buttons .btn-secondary {
+    background: var(--white);
+    color: var(--gray-600);
+    border-color: var(--gray-300);
+}
+
+.filter-buttons .btn-secondary:hover {
+    background: var(--gray-100);
+    border-color: var(--nu-blue);
+    color: var(--nu-blue);
+}
+
+/* Hide filter button text on small screens, show icons only */
+@media (max-width: 768px) {
+    .filter-buttons .btn-sm i {
+        margin: 0;
+    }
+}
+
 /* Stats Grid */
 .stats-grid {
     display: grid;
@@ -1232,4 +1275,702 @@ html, body {
         max-width: 100% !important;
         padding: 5rem 1.5rem 5rem !important;
     }
+}
+
+/* ========================================
+   CREATE / EDIT EVENT FORM STYLES
+   ======================================== */
+
+/* Form Card */
+.form-card {
+    background: var(--white);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Form Info Alert */
+.rule-alert {
+    background: var(--info-light);
+    color: var(--info);
+    border: 1px solid var(--info);
+    border-radius: var(--radius-lg);
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.rule-alert i {
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
+.rule-alert strong {
+    color: var(--nu-blue-dark);
+}
+
+/* Form Group */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    font-family: 'Poppins', sans-serif;
+    color: var(--gray-700);
+    background: var(--white);
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition);
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    box-shadow: 0 0 0 3px rgb(50 65 140 / 0.1);
+}
+
+select.form-control {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+textarea.form-control {
+    min-height: 150px;
+    resize: vertical;
+}
+
+.textarea-description {
+    min-height: 200px;
+}
+
+/* Two Column Row */
+.form-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+}
+
+/* Date Inputs Row */
+.date-inputs-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.date-input-group {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.date-label {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--gray-600);
+    white-space: nowrap;
+    min-width: 45px;
+}
+
+/* Section Card (Venue & Online) */
+.section-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all var(--transition);
+}
+
+.section-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+}
+
+.section-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--nu-blue);
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.25rem;
+}
+
+.section-card-subtitle {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+.hidden-section {
+    display: none !important;
+}
+
+/* Venue Map */
+.venue-map {
+    height: 280px;
+    width: 100%;
+    border-radius: var(--radius-lg);
+    margin-top: 1rem;
+    border: 2px solid var(--gray-300);
+    overflow: hidden;
+    background: var(--gray-200);
+}
+
+.venue-status {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+/* Venue Suggestions Dropdown */
+.venue-suggestions {
+    position: absolute;
+    z-index: 10;
+    width: 100%;
+    background: var(--white);
+    border: 2px solid var(--nu-blue);
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    max-height: 220px;
+    overflow-y: auto;
+    margin-top: -2px;
+}
+
+.venue-input-wrap {
+    position: relative;
+}
+
+.venue-suggestion-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-100);
+    transition: background var(--transition-fast);
+}
+
+.venue-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.venue-suggestion-item:hover {
+    background: var(--nu-blue-soft);
+    color: var(--nu-blue);
+}
+
+/* ========================================
+   EVENTS DETAILS LAYOUT (Two Panel)
+   ======================================== */
+.events-details-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 2rem;
+    align-items: start;
+}
+
+.form-left-panel {
+    min-width: 0;
+}
+
+.form-right-panel {
+    position: sticky;
+    top: 1rem;
+}
+
+/* Attachments Card */
+.attachments-card {
+    background: var(--gray-50);
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-xl);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    transition: all var(--transition);
+}
+
+.attachments-card:hover {
+    border-color: var(--nu-blue);
+}
+
+.attachments-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.attachments-title i {
+    color: var(--nu-blue);
+}
+
+.attachments-count {
+    font-weight: 400;
+    color: var(--gray-500);
+    font-size: 0.8125rem;
+}
+
+/* Attachment Grid */
+.attachment-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    min-height: 40px;
+}
+
+/* Individual Attachment Item */
+.attachment-item {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+}
+
+.attachment-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.attachment-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.remove-attachment-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    background: var(--danger);
+    color: var(--white);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: all var(--transition-fast);
+    padding: 0;
+    line-height: 1;
+}
+
+.remove-attachment-btn:hover {
+    background: #dc2626;
+    transform: scale(1.15);
+}
+
+/* Add Attachment Button */
+.add-attachment-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--white);
+    color: var(--nu-blue);
+    border: 2px solid var(--nu-blue);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+
+.add-attachment-btn:hover {
+    background: var(--nu-blue);
+    color: var(--white);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-blue);
+}
+
+.file-limit-info {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.form-actions .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+/* ========================================
+   RESPONSIVE - Form Specific
+   ======================================== */
+
+@media (max-width: 1024px) {
+    .events-details-layout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .form-right-panel {
+        position: static;
+    }
+
+    .form-card {
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .form-row-2col {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .date-inputs-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .date-input-group {
+        width: 100%;
+    }
+
+    .venue-map {
+        height: 220px;
+    }
+
+    .section-card {
+        padding: 1.25rem;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 640px) {
+    .form-card {
+        padding: 1.25rem;
+    }
+}
+
+/* ========================================
+   VENUE MAP MODAL
+   ======================================== */
+
+.venue-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 1200;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    backdrop-filter: blur(6px);
+    animation: fadeInOverlay 0.25s ease-out;
+    overflow-y: auto; /* Allow scrolling if modal is taller than viewport */
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.venue-modal-container {
+    background: var(--white);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: slideUpModal 0.3s ease-out;
+    overflow: hidden; /* Container itself hides overflow, body scrolls */
+    margin: auto; /* Center vertically when overlay is scrollable */
+}
+
+@keyframes slideUpModal {
+    from { 
+        opacity: 0; 
+        transform: translateY(30px) scale(0.97); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
+}
+
+/* Modal Header - Sticky */
+.venue-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem 1.75rem;
+    background: linear-gradient(135deg, var(--nu-blue) 0%, var(--nu-blue-dark) 100%);
+    color: var(--white);
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.venue-modal-title-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.venue-modal-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--white);
+    word-break: break-word;
+}
+
+.venue-modal-title i {
+    color: var(--nu-gold);
+    flex-shrink: 0;
+}
+
+.venue-modal-subtitle {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.75);
+    font-weight: 400;
+}
+
+.venue-modal-close {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--white);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    flex-shrink: 0;
+}
+
+.venue-modal-close:hover {
+    background: var(--danger);
+    transform: rotate(90deg);
+}
+
+/* Scrollable Body */
+.venue-modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0; /* Important: allows flex child to shrink */
+}
+
+/* Map Container */
+.venue-modal-map {
+    height: 350px;
+    width: 100%;
+    background: var(--gray-200);
+    flex-shrink: 0;
+}
+
+/* Footer - Sticky at bottom */
+.venue-modal-footer {
+    padding: 1.25rem 1.75rem;
+    background: var(--white);
+    border-top: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.venue-modal-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.venue-modal-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.venue-info-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-lg);
+    background: var(--nu-blue-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--nu-blue);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.venue-info-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.venue-info-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+    margin-bottom: 0.125rem;
+}
+
+.venue-info-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.venue-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.venue-modal-actions .btn {
+    flex: 1;
+    justify-content: center;
+    max-width: 200px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .venue-modal-overlay {
+        padding: 0.5rem;
+        align-items: flex-start; /* Align to top on mobile for better scrolling */
+    }
+    
+    .venue-modal-container {
+        max-height: 95vh;
+        border-radius: var(--radius-xl);
+        margin: 0;
+    }
+    
+    .venue-modal-header {
+        padding: 1.25rem;
+    }
+    
+    .venue-modal-title {
+        font-size: 1.125rem;
+    }
+    
+    .venue-modal-map {
+        height: 250px;
+    }
+    
+    .venue-modal-footer {
+        padding: 1.25rem;
+    }
+    
+    .venue-modal-info-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    
+    .venue-modal-actions {
+        flex-direction: column;
+    }
+    
+    .venue-modal-actions .btn {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .venue-modal-overlay {
+        padding: 0;
+    }
+    
+    .venue-modal-container {
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .venue-modal-map {
+        height: 220px;
+    }
+    
+    .venue-modal-info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .venue-modal-header {
+        padding: 1rem 1.25rem;
+    }
+    
+    .venue-modal-footer {
+        padding: 1rem 1.25rem;
+    }
+}
+
+/* Permanent Delete Button (Red) */
+.btn-delete-permanent {
+    background: #fee2e2 !important;
+    color: #ef4444 !important;
+}
+
+.btn-delete-permanent:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    transform: translateY(-2px);
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Perks;        // FIX 1: Must be plural to match your Perks.php file
+use App\Models\Perks;
 use App\Models\PerkImage;   
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -35,16 +35,18 @@ class PerksController extends Controller
             'valid_until' => 'required|date',
             'status' => 'nullable',
             'images' => 'nullable|array|max:5', 
-            'images.*' => 'image|mimes:jpg,jpeg,png|max:2048',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+        ], [
+            'images.max' => 'You can only upload a maximum of 5 images.',
+            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.*.mimes' => 'Images must be JPG, PNG, or WEBP format.',
         ]);
 
-        // Use Perks:: (plural)
         $perk = Perks::create([
             'title'       => $request->title,
             'description' => $request->description,
             'valid_until' => $request->valid_until,
             'status'      => $this->normalizeStatus($request->input('status'), 1),
-            // ✅ Defaults to admin 1 if not authenticated
             'admin_id'    => Auth::id() ?? 1,
         ]);
 
@@ -57,23 +59,27 @@ class PerksController extends Controller
             }
         }
 
-        return redirect()->route('perks.index')->with('success', 'Perk and gallery images created successfully.');
+        return redirect()->route('perks.index')->with('success', 'Perk created successfully.');
     }
 
-    public function edit(Perks $perk) // Plural type-hint
+    public function edit(Perks $perk)
     {
         $perk->load('images');
         return view('perks.edit', compact('perk'));
     }
 
-    public function update(Request $request, Perks $perk) // Plural type-hint
+    public function update(Request $request, Perks $perk)
     {
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'valid_until' => 'required|date',
             'images' => 'nullable|array|max:5',
-            'images.*' => 'image|mimes:jpg,jpeg,png|max:2048',
+            'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+        ], [
+            'images.max' => 'You can only upload a maximum of 5 images.',
+            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.*.mimes' => 'Images must be JPG, PNG, or WEBP format.',
         ]);
 
         $toRemove = $request->input('remove_existing', []);
@@ -119,16 +125,12 @@ class PerksController extends Controller
         return redirect()->route('perks.index')->with('success', 'Perk updated successfully.');
     }
 
-    // FIX 2: Changed from (Perk $perk) to (Perks $perk)
     public function destroy(Perks $perk) 
     {
         $perk->update(['status' => 0]);
         return redirect()->route('perks.index')->with('success', 'Perk archived.');
     }
 
-    /**
-     * Show archived perks (by `status = archived` if the column exists).
-     */
     public function archived()
     {
         $perks = Perks::with('images')
@@ -139,13 +141,29 @@ class PerksController extends Controller
         return view('admin_perks', compact('perks'));
     }
 
-    /**
-     * Restore (unarchive) a perk by setting status back to active.
-     */
     public function restore(Perks $perk)
     {
         $perk->update(['status' => 1]);
         return redirect()->route('perks.archived')->with('success', 'Perk restored.');
+    }
+
+    public function permanentDelete(Perks $perk)
+    {
+        // Only allow permanent deletion of archived perks
+        if ((int) $perk->status !== 0) {
+            return redirect()->back()->with('error', 'Only archived perks can be permanently deleted.');
+        }
+
+        // Delete all associated image files from storage
+        foreach ($perk->images as $media) {
+            $this->deleteStoredImage($media->image_path);
+            $media->delete();
+        }
+
+        // Hard delete the perk
+        $perk->delete();
+
+        return redirect()->route('perks.archived')->with('success', 'Perk permanently deleted.');
     }
 
     protected function storePerkImage(Perks $perk, $file): string

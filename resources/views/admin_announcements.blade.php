@@ -100,7 +100,7 @@
                         @if (!request()->routeIs('announcements.archived'))
                             <a href="{{ route('announcements.create') }}" class="btn btn-primary">
                                 <i class="fa-solid fa-plus"></i> 
-                                <span>Add New Announcement</span>
+                                <span>Add New</span>
                             </a>
                             
                             <!-- Filter Buttons - Only show on active announcements page -->

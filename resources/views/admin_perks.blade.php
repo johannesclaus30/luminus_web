@@ -227,28 +227,33 @@
                                 </div>
                                 <div class="perk-actions">
                                     @if ((int) $perk->status === 1 || is_null($perk->status))
-                                        <a href="{{ route('perks.edit', $perk->id) }}" class="btn-action btn-edit" title="Edit Perk">
+                                        {{-- Active: Show Edit + Archive --}}
+                                        <a href="{{ route('perks.edit', $perk) }}" class="btn-action btn-edit" title="Edit Perk">
                                             <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
-                                        <form action="{{ route('perks.destroy', $perk->id) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              onsubmit="return confirm('Archive this perk?')">
-                                            @csrf
-                                            @method('DELETE')
+                                        <form action="{{ route('perks.destroy', $perk) }}" method="POST" class="inline-form">
+                                            @csrf @method('DELETE')
                                             <button type="submit" class="btn-action btn-archive" title="Archive Perk">
                                                 <i class="fa-solid fa-box-archive"></i>
                                             </button>
                                         </form>
                                     @else
-                                        <form action="{{ route('perks.restore', $perk->id) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              onsubmit="return confirm('Unarchive this perk?')">
-                                            @csrf
-                                            @method('PUT')
+                                        {{-- Archived: Show Restore + Permanent Delete --}}
+                                        <form action="{{ route('perks.restore', $perk) }}" method="POST" class="inline-form">
+                                            @csrf @method('PUT')
                                             <button type="submit" class="btn-action btn-unarchive" title="Restore Perk">
                                                 <i class="fa-solid fa-rotate-left"></i>
+                                            </button>
+                                        </form>
+                                        
+                                        {{-- Permanent Delete (only for archived) --}}
+                                        <form action="{{ route('perks.permanent-delete', $perk->id) }}" 
+                                            method="POST" class="inline-form"
+                                            onsubmit="return confirm('Permanently delete this perk? This cannot be undone. All associated images will be removed.')">
+                                            @csrf 
+                                            @method('DELETE')
+                                            <button type="submit" class="btn-action" style="background:#fee; color:#ef4444;" title="Delete Permanently">
+                                                <i class="fa-solid fa-trash-can"></i>
                                             </button>
                                         </form>
                                     @endif

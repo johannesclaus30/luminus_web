@@ -92,12 +92,16 @@
             </header>
 
             @if ($errors->any())
-                <div class="upload-status status-error" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: var(--radius-lg); background: #fee2e2; color: #ef4444; border: 1px solid #ef4444;">
-                    <ul style="margin:0; padding-left:1.25rem;">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+                <div class="upload-status status-error" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: var(--radius-lg); background: #fee2e2; color: #ef4444; border: 1px solid #ef4444; display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <i class="fa-solid fa-circle-exclamation" style="margin-top: 0.125rem; flex-shrink: 0;"></i>
+                    <div>
+                        <strong style="display: block; margin-bottom: 0.375rem;">Please fix the following errors:</strong>
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             @endif
 
@@ -137,12 +141,16 @@
                         $existingVideos = $announcement->images->filter(fn($i) => in_array(strtolower(pathinfo($i->image_path, PATHINFO_EXTENSION)), ['mp4', 'mov', 'avi']));
                         $existingImageCount = $existingImages->count();
                         $existingVideoCount = $existingVideos->count();
+                        $hasExistingMedia = $announcement->images->count() > 0;
                     @endphp
 
                     <!-- Existing Media Display -->
-                    @if($announcement->images->count() > 0)
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--gray-700); margin-bottom: 0.75rem;">Current Attachments <span style="font-weight: 400; color: var(--gray-500); font-size: 0.8rem;">(Click 'X' to remove)</span></h4>
+                    @if($hasExistingMedia)
+                        <div style="margin-bottom: 1.5rem;" id="existingMediaSection">
+                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--gray-700); margin-bottom: 0.75rem;">
+                                Current Attachments 
+                                <span style="font-weight: 400; color: var(--gray-500); font-size: 0.8rem;">(Click 'X' to mark for removal — changes save when you click Update)</span>
+                            </h4>
                             <div class="preview-container" id="existingMediaContainer">
                                 @foreach($announcement->images as $media)
                                     @php
@@ -155,7 +163,7 @@
                                         @else
                                             <img src="{{ $media->image_url }}" alt="Attachment">
                                         @endif
-                                        <button type="button" class="preview-remove" onclick="markForDeletion({{ $media->id }}, '{{ $isVideo ? 'video' : 'image' }}')">
+                                        <button type="button" class="preview-remove" onclick="window.markForDeletion({{ $media->id }}, '{{ $isVideo ? 'video' : 'image' }}')" title="Mark for removal">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
                                     </div>
@@ -169,19 +177,27 @@
                         <div class="upload-zone" id="imageZone" onclick="handleZoneClick('image')">
                             <input type="file" id="imageInput" name="images[]" multiple accept="image/jpeg,image/png,image/webp" hidden>
                             <div class="upload-icon"><i class="fa-regular fa-images"></i></div>
-                            <div class="upload-title">Upload Images</div>
-                            <div class="upload-desc">Max 5 files total • 3MB each • JPG, PNG, WEBP</div>
+                            <div class="upload-title">Upload New Images</div>
+                            <div class="upload-desc">Max 5 files total • 5MB each • JPG, PNG, WEBP</div>
                         </div>
 
                         <div class="upload-zone" id="videoZone" onclick="handleZoneClick('video')">
                             <input type="file" id="videoInput" name="video" accept="video/mp4" hidden>
                             <div class="upload-icon"><i class="fa-solid fa-video"></i></div>
-                            <div class="upload-title">Upload Video</div>
+                            <div class="upload-title">Upload New Video</div>
                             <div class="upload-desc">Max 1 file • 30MB limit • MP4 only</div>
                         </div>
                     </div>
                     
                     <div id="uploadError" class="error-message"></div>
+                    
+                    <!-- Clear new images button -->
+                    <div id="clearImagesBtn" style="display: none; margin: 0.75rem 0; text-align: right;">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.removeAllNewImages()" style="font-size: 0.8125rem;">
+                            <i class="fa-solid fa-trash-can"></i> Clear All New Images
+                        </button>
+                    </div>
+                    
                     <div id="previewContainer" class="preview-container"></div>
                 </div>
 
@@ -196,11 +212,39 @@
         </main>
     </div>
 
-    <!-- Include your shared JS from index.blade.php here -->
-    <script src="/js/admin-shared.js"></script>
-    
-    <!-- Form-specific JS -->
     <script>
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        }
+
+        // Close sidebar when clicking on a nav item (mobile)
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 1024) {
+                    toggleMobileMenu();
+                }
+            });
+        });
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                if (window.innerWidth > 1024) {
+                    document.getElementById('adminSidebar').classList.remove('mobile-open');
+                    document.getElementById('mobileOverlay').classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
+        });
+
+        // Form-specific JS
         document.addEventListener('DOMContentLoaded', function() {
             const imageInput = document.getElementById('imageInput');
             const videoInput = document.getElementById('videoInput');
@@ -209,18 +253,42 @@
             const uploadError = document.getElementById('uploadError');
             const previewContainer = document.getElementById('previewContainer');
             const deletedMediaContainer = document.getElementById('deletedMediaContainer');
+            const existingMediaSection = document.getElementById('existingMediaSection');
+            const clearImagesBtn = document.getElementById('clearImagesBtn');
 
-            // Track existing counts from PHP
+            // Track counts — these update dynamically as things are removed
             let existingImageCount = {{ $existingImageCount }};
             let existingVideoCount = {{ $existingVideoCount }};
+            
+            // Track if a NEW video has been uploaded (separate from existing)
+            let newVideoUploaded = false;
+            let newImagesUploaded = false;
 
             // Initial state: Disable zones based on existing media
-            if (existingImageCount > 0) {
-                videoZone.classList.add('disabled');
-                videoInput.disabled = true;
-            } else if (existingVideoCount > 0) {
-                imageZone.classList.add('disabled');
-                imageInput.disabled = true;
+            updateZoneStates();
+
+            function updateZoneStates() {
+                // Determine total active images (existing not marked for deletion + new)
+                const totalActiveImages = existingImageCount + (newImagesUploaded ? imageInput.files.length : 0);
+                const totalActiveVideos = existingVideoCount + (newVideoUploaded ? 1 : 0);
+                
+                if (totalActiveImages > 0) {
+                    // Has images — disable video zone
+                    videoZone.classList.add('disabled');
+                    videoInput.disabled = true;
+                } else {
+                    videoZone.classList.remove('disabled');
+                    videoInput.disabled = false;
+                }
+                
+                if (totalActiveVideos > 0) {
+                    // Has videos — disable image zone
+                    imageZone.classList.add('disabled');
+                    imageInput.disabled = true;
+                } else {
+                    imageZone.classList.remove('disabled');
+                    imageInput.disabled = false;
+                }
             }
 
             window.handleZoneClick = function(type) {
@@ -237,14 +305,14 @@
                 if (files.length === 0) return;
 
                 let errorMsg = '';
-                // Check total limit (existing + new)
+                // Check total limit (existing not-deleted + new)
                 if ((existingImageCount + files.length) > 5) {
-                    errorMsg = `You can only have 5 images total. You already have ${existingImageCount}.`;
+                    errorMsg = `You can only have 5 images total. You currently have ${existingImageCount} existing image(s).`;
                 }
 
                 for (let file of files) {
-                    if (file.size > 3 * 1024 * 1024) {
-                        errorMsg = `Image "${file.name}" exceeds the 3MB limit.`;
+                    if (file.size > 5 * 1024 * 1024) {
+                        errorMsg = `Image "${file.name}" exceeds the 5MB limit.`;
                         break;
                     }
                     const ext = file.name.split('.').pop().toLowerCase();
@@ -261,9 +329,11 @@
                 }
 
                 clearError();
+                newImagesUploaded = true;
                 videoZone.classList.add('disabled');
                 videoInput.disabled = true;
                 videoInput.value = ''; 
+                newVideoUploaded = false;
                 imageZone.classList.add('active');
                 
                 updateImagePreviews(files);
@@ -275,7 +345,8 @@
                 if (!file) return;
 
                 let errorMsg = '';
-                if (existingVideoCount > 0) errorMsg = 'You can only have 1 video per announcement.';
+                if (existingVideoCount > 0) errorMsg = 'This announcement already has a video. Remove the existing video first.';
+                if (newVideoUploaded) errorMsg = 'You already uploaded a new video. Clear it first.';
                 if (file.size > 30 * 1024 * 1024) errorMsg = 'Video exceeds the 30MB limit.';
                 
                 const ext = file.name.split('.').pop().toLowerCase();
@@ -288,10 +359,14 @@
                 }
 
                 clearError();
+                newVideoUploaded = true;
                 imageZone.classList.add('disabled');
                 imageInput.disabled = true;
                 imageInput.value = ''; 
+                newImagesUploaded = false;
                 videoZone.classList.add('active');
+                clearImagesBtn.style.display = 'none';
+                previewContainer.innerHTML = '';
 
                 updateVideoPreview(file);
             });
@@ -307,16 +382,24 @@
 
             function updateImagePreviews(files) {
                 previewContainer.innerHTML = '';
-                files.forEach(file => {
+                files.forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const div = document.createElement('div');
                         div.className = 'preview-item';
-                        div.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        div.style.position = 'relative';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview">
+                            <button type="button" class="preview-remove" onclick="window.removeSingleNewImage(${index})" title="Remove image">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        `;
                         previewContainer.appendChild(div);
                     };
                     reader.readAsDataURL(file);
                 });
+                
+                clearImagesBtn.style.display = 'block';
             }
 
             function updateVideoPreview(file) {
@@ -327,19 +410,63 @@
                     div.className = 'preview-item';
                     div.style.width = '200px';
                     div.style.height = '150px';
-                    div.innerHTML = `<video src="${e.target.result}" controls></video>`;
+                    div.style.position = 'relative';
+                    div.innerHTML = `
+                        <video src="${e.target.result}" controls style="width:100%; height:100%; object-fit:cover;"></video>
+                        <button type="button" class="preview-remove" onclick="window.removeVideoPreview()" title="Remove video">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
                     previewContainer.appendChild(div);
                 };
                 reader.readAsDataURL(file);
             }
 
-            // Handle marking existing attachments for deletion
+            // Remove single new image
+            window.removeSingleNewImage = function(index) {
+                const dt = new DataTransfer();
+                const files = Array.from(imageInput.files);
+                
+                files.splice(index, 1);
+                files.forEach(file => dt.items.add(file));
+                imageInput.files = dt.files;
+                
+                if (files.length === 0) {
+                    removeAllNewImages();
+                } else {
+                    updateImagePreviews(files);
+                }
+            };
+
+            // Remove all new images
+            window.removeAllNewImages = function() {
+                previewContainer.innerHTML = '';
+                imageInput.value = '';
+                newImagesUploaded = false;
+                clearImagesBtn.style.display = 'none';
+                imageZone.classList.remove('active');
+                updateZoneStates();
+                clearError();
+            };
+
+            // Remove new video preview
+            window.removeVideoPreview = function() {
+                previewContainer.innerHTML = '';
+                videoInput.value = '';
+                newVideoUploaded = false;
+                videoZone.classList.remove('active');
+                updateZoneStates();
+                clearError();
+            };
+
+            // Mark existing attachment for deletion
             window.markForDeletion = function(id, type) {
                 if(!confirm('Are you sure you want to remove this attachment? It will be deleted when you save.')) return;
 
                 const item = document.getElementById(`existing-media-${id}`);
                 if (item) {
-                    item.style.display = 'none';
+                    item.style.opacity = '0.3';
+                    item.style.pointerEvents = 'none';
                 }
 
                 // Add hidden input for the controller
@@ -349,38 +476,33 @@
                 input.value = id;
                 deletedMediaContainer.appendChild(input);
 
-                // Update counts and re-enable zones if necessary
+                // Update counts
                 if (type === 'image') {
                     existingImageCount--;
-                    if (existingImageCount === 0 && existingVideoCount === 0) {
-                        enableAllZones();
-                    } else if (existingImageCount === 0) {
-                        enableZone('image');
-                    }
                 } else {
                     existingVideoCount--;
-                    if (existingImageCount === 0 && existingVideoCount === 0) {
-                        enableAllZones();
-                    } else if (existingVideoCount === 0) {
-                        enableZone('video');
-                    }
                 }
+
+                // Check if all existing media is now marked for deletion
+                const remainingVisible = document.querySelectorAll('.existing-media-item:not([style*="opacity: 0.3"])');
+                if (remainingVisible.length === 0 && existingMediaSection) {
+                    existingMediaSection.style.opacity = '0.5';
+                }
+
+                // Update zone states
+                updateZoneStates();
+                
+                // If removing a video, clear any new video upload too
+                if (type === 'video' && newVideoUploaded) {
+                    window.removeVideoPreview();
+                }
+                // If removing all images, clear any new image uploads too
+                if (type === 'image' && existingImageCount === 0 && newImagesUploaded) {
+                    window.removeAllNewImages();
+                }
+
+                clearError();
             };
-
-            function enableZone(type) {
-                if (type === 'image') {
-                    imageZone.classList.remove('disabled', 'active');
-                    imageInput.disabled = false;
-                } else {
-                    videoZone.classList.remove('disabled', 'active');
-                    videoInput.disabled = false;
-                }
-            }
-
-            function enableAllZones() {
-                enableZone('image');
-                enableZone('video');
-            }
         });
     </script>
 </body>

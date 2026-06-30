@@ -94,12 +94,16 @@
             </header>
 
             @if ($errors->any())
-                <div class="upload-status status-error" style="margin-bottom: 1.5rem; padding: 1rem; border-radius: var(--radius-lg); background: #fee2e2; color: #ef4444; border: 1px solid #ef4444;">
-                    <ul style="margin:0; padding-left:1.25rem;">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+                <div class="upload-status status-error" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: var(--radius-lg); background: #fee2e2; color: #ef4444; border: 1px solid #ef4444; display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <i class="fa-solid fa-circle-exclamation" style="margin-top: 0.125rem; flex-shrink: 0;"></i>
+                    <div>
+                        <strong style="display: block; margin-bottom: 0.375rem;">Please fix the following errors:</strong>
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             @endif
 
@@ -135,7 +139,7 @@
                             <input type="file" id="imageInput" name="images[]" multiple accept="image/jpeg,image/png,image/webp" hidden>
                             <div class="upload-icon"><i class="fa-regular fa-images"></i></div>
                             <div class="upload-title">Upload Images</div>
-                            <div class="upload-desc">Max 5 files • 3MB each • JPG, PNG, WEBP</div>
+                            <div class="upload-desc">Max 5 files • 5MB each • JPG, PNG, WEBP</div>
                         </div>
 
                         <div class="upload-zone" id="videoZone" onclick="handleZoneClick('video')">
@@ -146,6 +150,13 @@
                         </div>
                     </div>
                     <div id="uploadError" class="error-message"></div>
+                    
+                    <div id="clearImagesBtn" style="display: none; margin-bottom: 0.75rem; text-align: right;">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.removeAllImages()" style="font-size: 0.8125rem;">
+                            <i class="fa-solid fa-xmark"></i> Clear All Images
+                        </button>
+                    </div>
+
                     <div id="previewContainer" class="preview-container"></div>
                 </div>
 
@@ -169,6 +180,28 @@
             overlay.classList.toggle('active');
             document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
         }
+
+        // Close sidebar when clicking on a nav item (mobile)
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 1024) {
+                    toggleMobileMenu();
+                }
+            });
+        });
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                if (window.innerWidth > 1024) {
+                    document.getElementById('adminSidebar').classList.remove('mobile-open');
+                    document.getElementById('mobileOverlay').classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
+        });
 
         // Form-specific JS for file uploads
         document.addEventListener('DOMContentLoaded', function() {
@@ -196,8 +229,8 @@
                 if (files.length > 5) errorMsg = 'Maximum of 5 images allowed.';
 
                 for (let file of files) {
-                    if (file.size > 3 * 1024 * 1024) {
-                        errorMsg = `Image "${file.name}" exceeds the 3MB limit.`;
+                    if (file.size > 5 * 1024 * 1024) {
+                        errorMsg = `Image "${file.name}" exceeds the 5MB limit.`;
                         break;
                     }
                     const ext = file.name.split('.').pop().toLowerCase();
@@ -259,17 +292,67 @@
 
             function updateImagePreviews(files) {
                 previewContainer.innerHTML = '';
-                files.forEach(file => {
+                files.forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const div = document.createElement('div');
                         div.className = 'preview-item';
-                        div.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        div.style.position = 'relative';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview">
+                            <button type="button" class="preview-remove" onclick="window.removeSingleImage(${index})" title="Remove image">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        `;
                         previewContainer.appendChild(div);
                     };
                     reader.readAsDataURL(file);
                 });
+                
+                // Show the clear all button
+                document.getElementById('clearImagesBtn').style.display = 'block';
             }
+
+            // Expose to global scope
+            window.removeSingleImage = function(index) {
+                const dt = new DataTransfer();
+                const files = Array.from(imageInput.files);
+                
+                // Remove the file at the given index
+                files.splice(index, 1);
+                
+                // Rebuild the FileList
+                files.forEach(file => dt.items.add(file));
+                imageInput.files = dt.files;
+                
+                // If no files left, reset everything
+                if (files.length === 0) {
+                    removeAllImages();
+                } else {
+                    // Refresh previews with remaining files
+                    updateImagePreviews(files);
+                }
+            };
+
+            window.removeAllImages = function() {
+                // Clear the preview
+                previewContainer.innerHTML = '';
+                
+                // Clear the file input
+                imageInput.value = '';
+                
+                // Hide the clear button
+                document.getElementById('clearImagesBtn').style.display = 'none';
+                
+                // Re-enable both zones
+                imageZone.classList.remove('active');
+                videoZone.classList.remove('disabled');
+                videoInput.disabled = false;
+                imageInput.disabled = false;
+                
+                // Clear any error messages
+                clearError();
+            };
 
             function updateVideoPreview(file) {
                 previewContainer.innerHTML = '';
@@ -279,12 +362,37 @@
                     div.className = 'preview-item';
                     div.style.width = '200px';
                     div.style.height = '150px';
-                    div.innerHTML = `<video src="${e.target.result}" controls></video>`;
+                    div.style.position = 'relative';
+                    div.innerHTML = `
+                        <video src="${e.target.result}" controls style="width:100%; height:100%; object-fit:cover;"></video>
+                        <button type="button" class="preview-remove" onclick="window.removeVideoPreview()" title="Remove video">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
                     previewContainer.appendChild(div);
                 };
                 reader.readAsDataURL(file);
             }
+
+            // Expose to global scope so inline onclick works
+            window.removeVideoPreview = function() {
+                // Clear the preview
+                previewContainer.innerHTML = '';
+                
+                // Clear the video input
+                videoInput.value = '';
+                
+                // Re-enable both zones
+                videoZone.classList.remove('active', 'disabled');
+                imageZone.classList.remove('disabled', 'active');
+                videoInput.disabled = false;
+                imageInput.disabled = false;
+                
+                // Clear any error messages
+                clearError();
+            };
         });
+        
     </script>
 </body>
 </html>

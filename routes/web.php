@@ -92,6 +92,9 @@ Route::prefix('admin')->group(function () {
         Route::put('/events/{event}/restore', [EventController::class, 'restore'])
             ->name('events.restore');
 
+        Route::delete('/events/{event}/permanent-delete', [EventController::class, 'permanentDelete'])
+        ->name('events.permanent-delete');
+        
         // Perks
         Route::get('/perks', [PerksController::class, 'index'])
             ->name('perks.index');
@@ -110,6 +113,10 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/perks/{perk}', [PerksController::class, 'destroy'])
             ->name('perks.destroy');
+
+        // Add this new route:
+        Route::delete('/perks/{perk}/permanent-delete', [PerksController::class, 'permanentDelete'])
+            ->name('perks.permanent-delete');
 
         Route::get('/perks/{perk}/edit', [PerksController::class, 'edit'])
             ->name('perks.edit');

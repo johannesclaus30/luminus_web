@@ -106,10 +106,35 @@
                                 <i class="fa-solid fa-plus"></i> 
                                 <span>Add New Event</span>
                             </a>
+                            
+                            <!-- Filter Buttons - Only show on active events page -->
+                            <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                                <a href="{{ route('events.index', ['filter' => 'all']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'all' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    All
+                                </a>
+                                <a href="{{ route('events.index', ['filter' => 'In-Person']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'In-Person' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    <i class="fa-solid fa-building" style="font-size: 0.75rem;"></i> On-Site
+                                </a>
+                                <a href="{{ route('events.index', ['filter' => 'Online']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'Online' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    <i class="fa-solid fa-globe" style="font-size: 0.75rem;"></i> Online
+                                </a>
+                                <a href="{{ route('events.index', ['filter' => 'Hybrid']) }}" 
+                                class="btn btn-sm {{ ($filter ?? 'all') === 'Hybrid' ? 'btn-primary' : 'btn-secondary' }}"
+                                style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                    <i class="fa-solid fa-rotate" style="font-size: 0.75rem;"></i> Hybrid
+                                </a>
+                            </div>
                         @endif
+                        
                         <a id="archiveToggleBtn"
-                           href="{{ route('events.archived') }}"
-                           class="btn btn-secondary archived-toggle">
+                        href="{{ route('events.archived') }}"
+                        class="btn btn-secondary archived-toggle">
                             <i class="fa-solid fa-box-archive"></i> 
                             <span class="btn-text">Archived</span>
                         </a>
@@ -240,11 +265,22 @@
                                         </div>
 
                                         {{-- Right: Map --}}
-                                        <div class="event-mini-map-wrapper split-right">
+                                        <div class="event-mini-map-wrapper split-right" style="cursor: pointer;">
                                             <div id="venue-map-{{ $event->id }}" 
                                                 class="venue-mini-map" 
                                                 data-lat="{{ $event->venue->latitude }}" 
-                                                data-lng="{{ $event->venue->longitude }}">
+                                                data-lng="{{ $event->venue->longitude }}"
+                                                onclick="openVenueModal(
+                                                    '{{ $event->venue->latitude }}', 
+                                                    '{{ $event->venue->longitude }}', 
+                                                    '{{ addslashes($event->title) }}', 
+                                                    '{{ addslashes($event->venue->name ?? 'No venue name') }}', 
+                                                    '{{ addslashes($event->venue->address ?? 'No address') }}',
+                                                    '{{ $event->max_capacity }}',
+                                                    '{{ $event->event_type }}',
+                                                    '{{ $event->start_date ? $event->start_date->format('M d, Y') : 'TBA' }}',
+                                                    '{{ $event->end_date ? $event->end_date->format('M d, Y') : 'TBA' }}'
+                                                )">
                                             </div>
                                         </div>
                                     </div>
@@ -273,18 +309,17 @@
                                         <span>{{ $event->start_date ? $event->start_date->format('M d') : 'TBA' }}</span>
                                     </div>
                                 </div>
+
                                 <div class="event-actions">
                                     @if ((int) $event->status === 1 || is_null($event->status))
+                                        {{-- Active: Show Edit + Archive --}}
                                         <a href="{{ route('events.edit', $event) }}" class="btn-action btn-edit" title="Edit Event">
                                             <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
-                                        <a href="#" class="btn-action btn-manage" title="Manage Attendees">
-                                            <i class="fa-solid fa-clipboard-list"></i>
-                                        </a>
                                         <form action="{{ route('events.destroy', $event) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              data-confirm="Archive this event?">
+                                            method="POST" 
+                                            class="inline-form"
+                                            data-confirm="Archive this event?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn-action btn-archive" title="Archive Event">
@@ -292,18 +327,31 @@
                                             </button>
                                         </form>
                                     @else
+                                        {{-- Archived: Show Restore + Permanent Delete --}}
                                         <form action="{{ route('events.restore', $event) }}" 
-                                              method="POST" 
-                                              class="inline-form"
-                                              data-confirm="Restore this event?">
+                                            method="POST" 
+                                            class="inline-form"
+                                            data-confirm="Restore this event?">
                                             @csrf
                                             @method('PUT')
                                             <button type="submit" class="btn-action btn-unarchive" title="Restore Event">
                                                 <i class="fa-solid fa-rotate-left"></i>
                                             </button>
                                         </form>
+                                        
+                                        {{-- Permanent Delete (only for archived) --}}
+                                        <form action="{{ route('events.permanent-delete', $event->id) }}" 
+                                            method="POST" class="inline-form"
+                                            data-confirm="Permanently delete this event? This cannot be undone. All associated data including images will be removed.">
+                                            @csrf 
+                                            @method('DELETE')
+                                            <button type="submit" class="btn-action btn-delete-permanent" title="Delete Permanently">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </form>
                                     @endif
                                 </div>
+
                             </div>
                         </div>
                     </article>
@@ -338,6 +386,82 @@
                 {{ $events->links() }}
             </div>
             @endif
+
+            <!-- Venue Map Modal -->
+            <div id="venueModal" class="venue-modal-overlay" onclick="closeVenueModal(event)">
+                <div class="venue-modal-container" onclick="event.stopPropagation()">
+                    <!-- Modal Header -->
+                    <div class="venue-modal-header">
+                        <div class="venue-modal-title-section">
+                            <h2 class="venue-modal-title" id="venueModalEventTitle">
+                                <i class="fa-solid fa-location-dot"></i> 
+                                Event Venue
+                            </h2>
+                            <p class="venue-modal-subtitle" id="venueModalEventDate"></p>
+                        </div>
+                        <button class="venue-modal-close" onclick="closeVenueModal()" title="Close">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Scrollable Body -->
+                    <div class="venue-modal-body">
+                        <!-- Map -->
+                        <div class="venue-modal-map" id="venueModalMap"></div>
+                    </div>
+                    
+                    <!-- Venue Details Footer -->
+                    <div class="venue-modal-footer">
+                        <div class="venue-modal-info-grid">
+                            <div class="venue-modal-info-item">
+                                <div class="venue-info-icon">
+                                    <i class="fa-solid fa-building"></i>
+                                </div>
+                                <div class="venue-info-content">
+                                    <span class="venue-info-label">Venue</span>
+                                    <span class="venue-info-value" id="venueModalVenueName">-</span>
+                                </div>
+                            </div>
+                            <div class="venue-modal-info-item">
+                                <div class="venue-info-icon">
+                                    <i class="fa-solid fa-map-pin"></i>
+                                </div>
+                                <div class="venue-info-content">
+                                    <span class="venue-info-label">Address</span>
+                                    <span class="venue-info-value" id="venueModalAddress">-</span>
+                                </div>
+                            </div>
+                            <div class="venue-modal-info-item">
+                                <div class="venue-info-icon">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                                <div class="venue-info-content">
+                                    <span class="venue-info-label">Capacity</span>
+                                    <span class="venue-info-value" id="venueModalCapacity">-</span>
+                                </div>
+                            </div>
+                            <div class="venue-modal-info-item">
+                                <div class="venue-info-icon">
+                                    <i class="fa-solid fa-globe"></i>
+                                </div>
+                                <div class="venue-info-content">
+                                    <span class="venue-info-label">Event Mode</span>
+                                    <span class="venue-info-value" id="venueModalEventType">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="venue-modal-actions">
+                            <button class="btn btn-secondary" onclick="closeVenueModal()">
+                                <i class="fa-solid fa-xmark"></i> Close
+                            </button>
+                            <a href="#" class="btn btn-primary" id="venueModalDirections" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-solid fa-map-location-dot"></i> Get Directions
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -501,6 +625,107 @@
                 setTimeout(function () { map.invalidateSize(); }, 100);
             });
         });
+
+        // Venue Map Modal
+        let venueModalMap = null;
+        let venueModalMarker = null;
+
+        function openVenueModal(lat, lng, eventTitle, venueName, address, capacity, eventType, startDate, endDate) {
+            const modal = document.getElementById('venueModal');
+            
+            // Populate event details
+            document.getElementById('venueModalEventTitle').innerHTML = 
+                '<i class="fa-solid fa-location-dot"></i> ' + eventTitle;
+            
+            // Format date string
+            let dateStr = startDate;
+            if (endDate && endDate !== startDate) {
+                dateStr += ' – ' + endDate;
+            }
+            document.getElementById('venueModalEventDate').textContent = dateStr;
+            document.getElementById('venueModalVenueName').textContent = venueName;
+            document.getElementById('venueModalAddress').textContent = address;
+            document.getElementById('venueModalCapacity').textContent = capacity;
+            document.getElementById('venueModalEventType').textContent = eventType;
+            
+            // Set directions link
+            const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
+            document.getElementById('venueModalDirections').href = directionsUrl;
+            
+            // Show modal
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // Initialize or update map after a short delay (needed for hidden elements)
+            setTimeout(function() {
+                initVenueModalMap(parseFloat(lat), parseFloat(lng), venueName);
+            }, 150);
+        }
+
+        function closeVenueModal(event) {
+            // Allow clicking overlay to close, but not clicks inside the container
+            if (event && event.target !== document.getElementById('venueModal')) return;
+            
+            const modal = document.getElementById('venueModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+            
+            // Clean up map
+            if (venueModalMap) {
+                venueModalMap.remove();
+                venueModalMap = null;
+                venueModalMarker = null;
+            }
+        }
+
+        function initVenueModalMap(lat, lng, venueName) {
+            const mapContainer = document.getElementById('venueModalMap');
+            
+            // If map already exists, remove it first
+            if (venueModalMap) {
+                venueModalMap.remove();
+                venueModalMap = null;
+            }
+            
+            // Ensure the container has dimensions
+            if (mapContainer.offsetHeight === 0) {
+                mapContainer.style.height = '450px';
+            }
+            
+            venueModalMap = L.map('venueModalMap', {
+                center: [lat, lng],
+                zoom: 17,
+                zoomControl: true,
+                scrollWheelZoom: true
+            });
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(venueModalMap);
+            
+            // Add marker with popup
+            venueModalMarker = L.marker([lat, lng])
+                .addTo(venueModalMap)
+                .bindPopup(`<strong>${venueName}</strong>`)
+                .openPopup();
+            
+            // Force map to recalculate size
+            setTimeout(function() {
+                venueModalMap.invalidateSize();
+            }, 100);
+        }
+
+        // Close venue modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                const venueModal = document.getElementById('venueModal');
+                if (venueModal && venueModal.style.display === 'flex') {
+                    closeVenueModal();
+                }
+            }
+        });
+
     </script>
 </body>
 </html>
