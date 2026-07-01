@@ -9,6 +9,7 @@ use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema; 
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class MessageController extends Controller
 {
@@ -295,11 +296,20 @@ private function deriveKeyMethod3($password, $salt)
                 $isOnline = $user->is_online ?? false;
             }
             
+            // 🔧 FIX: Use proper URL resolution
             $avatar = null;
             if ($photo) {
-                $avatar = filter_var($photo, FILTER_VALIDATE_URL) 
-                    ? $photo 
-                    : asset('storage/' . ltrim($photo, '/'));
+                if ($type === 'admin') {
+                    // Use the resolveAdminPhotoUrl method for admins
+                    $avatar = $this->resolveAdminPhotoUrl($photo);
+                } else {
+                    // For alumni, check if it's a URL or use asset()
+                    if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                        $avatar = $photo;
+                    } else {
+                        $avatar = asset('storage/' . ltrim($photo, '/'));
+                    }
+                }
             }
             
             $lastMessageContent = null;
@@ -495,47 +505,29 @@ private function deriveKeyMethod3($password, $salt)
                 })
                 ->limit(15) // Increased limit for better results
                 ->get()
-                ->map(function ($alumni) {
-                    // Build full name with middle initial
-                    $middleInitial = $alumni->middle_name 
-                        ? ' ' . strtoupper(substr($alumni->middle_name, 0, 1)) . '. ' 
-                        : ' ';
-                    $fullName = trim($alumni->first_name . $middleInitial . $alumni->last_name);
-                    
-                    // Build initials
+                ->map(function ($admin) {
+                    $fullName = trim(
+                        ($admin->admin_first_name ?? '') . ' ' . 
+                        ($admin->admin_last_name ?? '')
+                    );
                     $initials = strtoupper(
-                        substr($alumni->first_name ?? 'A', 0, 1) . 
-                        substr($alumni->last_name ?? 'A', 0, 1)
+                        substr($admin->admin_first_name ?? 'A', 0, 1) . 
+                        substr($admin->admin_last_name ?? 'A', 0, 1)
                     );
                     
-                    // Get batch year
-                    $batch = $alumni->year_graduated 
-                        ? date('Y', strtotime($alumni->year_graduated)) 
-                        : 'N/A';
-                    
-                    // Handle avatar photo
-                    $avatar = null;
-                    $photo = $alumni->alumni_photo ?? $alumni->card_photo ?? null;
-                    if ($photo) {
-                        if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                            $avatar = $photo;
-                        } elseif (str_starts_with($photo, '/')) {
-                            $avatar = $photo;
-                        } else {
-                            $avatar = asset('storage/' . ltrim($photo, '/'));
-                        }
-                    }
+                    // 🔧 FIX: Use resolveAdminPhotoUrl for admins
+                    $avatar = $this->resolveAdminPhotoUrl($admin->photo ?? null);
                     
                     return [
-                        'id' => $alumni->id,
-                        'type' => 'alumni',
-                        'full_name' => $fullName ?: 'Unknown Alumni',
-                        'initials' => $initials ?: '??',
-                        'program' => $alumni->program ?? 'N/A',
-                        'batch' => $batch,
-                        'student_id' => $alumni->student_id_number ?? 'N/A',
-                        'email' => $alumni->email ?? 'N/A',
-                        'is_online' => $alumni->is_online ?? false,
+                        'id' => $admin->id,
+                        'type' => 'admin',
+                        'full_name' => $fullName ?: 'Unknown Admin',
+                        'initials' => $initials ?: 'AD',
+                        'program' => 'Admin Staff',
+                        'batch' => '-',
+                        'student_id' => 'N/A',
+                        'email' => $admin->admin_email ?? 'N/A',
+                        'is_online' => true,
                         'avatar' => $avatar,
                     ];
                 });
@@ -830,17 +822,21 @@ private function deriveKeyMethod3($password, $salt)
                 $batch = '-';
                 $program = 'Admin Staff';
                 $isOnline = true;
+                // 🔧 FIX: Use resolveAdminPhotoUrl for admins
                 $photo = $user->photo ?? null;
             }
             
+            // 🔧 FIX: Use proper URL resolution
             $avatar = null;
             if ($photo) {
-                if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                    $avatar = $photo;
-                } elseif (str_starts_with($photo, '/')) {
-                    $avatar = $photo;
+                if ($type === 'admin') {
+                    $avatar = $this->resolveAdminPhotoUrl($photo);
                 } else {
-                    $avatar = asset('storage/' . ltrim($photo, '/'));
+                    if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                        $avatar = $photo;
+                    } else {
+                        $avatar = asset('storage/' . ltrim($photo, '/'));
+                    }
                 }
             }
             
@@ -859,6 +855,33 @@ private function deriveKeyMethod3($password, $salt)
             Log::error('Error fetching contact info: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to fetch contact info'], 500);
         }
+    }
+
+    protected function resolveAdminPhotoUrl(?string $photoPath): ?string
+    {
+        $photoPath = trim((string) $photoPath);
+
+        if ($photoPath === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $photoPath)) {
+            return $photoPath;
+        }
+
+        if (str_starts_with($photoPath, '/storage/')) {
+            return $photoPath;
+        }
+
+        if (str_starts_with($photoPath, 'storage/')) {
+            return '/' . $photoPath;
+        }
+
+        if (str_starts_with($photoPath, '/')) {
+            return $photoPath;
+        }
+
+        return Storage::disk('supabase_admin')->url($photoPath);
     }
 
 }

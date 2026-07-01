@@ -93,7 +93,7 @@
 
                 {{-- Forgot Password Link --}}
                 <div class="forgot-password-wrapper">
-                    <a href="#" class="forgot-password-link" onclick="event.preventDefault();">
+                    <a href="{{ route('admin.forgot-password') }}" class="forgot-password-link">
                         Forgot Password?
                     </a>
                 </div>
