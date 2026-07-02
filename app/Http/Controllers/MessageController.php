@@ -248,7 +248,7 @@ private function deriveKeyMethod3($password, $salt)
         try {
             $type = is_string($type) ? $type : 'alumni';
             
-            // 🔧 FIXED: Added sender_type and receiver_type to last message query
+            // Get last message with sender info
             $lastMessage = Message::where(function($query) use ($adminId, $user, $type) {
                     // Messages sent BY admin TO this user
                     $query->where('sender_id', $adminId)
@@ -266,7 +266,7 @@ private function deriveKeyMethod3($password, $salt)
                 ->latest()
                 ->first();
             
-            // 🔧 FIXED: Added type check to unread count
+            // Get unread count
             $unreadCount = Message::where('sender_id', $user->id)
                 ->where('sender_type', $type)
                 ->where('receiver_id', $adminId)
@@ -274,36 +274,35 @@ private function deriveKeyMethod3($password, $salt)
                 ->where('is_read', false)
                 ->count();
             
+            // Build user info
             if ($type === 'admin') {
                 $firstName = $user->admin_first_name ?? '';
                 $lastName = $user->admin_last_name ?? '';
                 $fullName = trim($firstName . ' ' . $lastName);
                 $initials = strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1));
-                
                 $photo = $user->photo ?? null;
                 $program = 'Admin Staff';
                 $batch = '-';
                 $isOnline = true;
+                $adminRole = strtoupper($user->admin_role ?? 'ADMIN');
             } else {
                 $firstName = $user->first_name ?? '';
                 $lastName = $user->last_name ?? '';
                 $fullName = trim($firstName . ' ' . $lastName);
                 $initials = strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1));
-                
                 $photo = $user->alumni_photo ?? null;
                 $program = $user->program ?? 'N/A';
                 $batch = $user->year_graduated ? date('Y', strtotime($user->year_graduated)) : 'N/A';
                 $isOnline = $user->is_online ?? false;
+                $adminRole = null; // Not an admin
             }
             
-            // 🔧 FIX: Use proper URL resolution
+            // Resolve avatar URL
             $avatar = null;
             if ($photo) {
                 if ($type === 'admin') {
-                    // Use the resolveAdminPhotoUrl method for admins
                     $avatar = $this->resolveAdminPhotoUrl($photo);
                 } else {
-                    // For alumni, check if it's a URL or use asset()
                     if (filter_var($photo, FILTER_VALIDATE_URL)) {
                         $avatar = $photo;
                     } else {
@@ -312,15 +311,19 @@ private function deriveKeyMethod3($password, $salt)
                 }
             }
             
+            // Decrypt last message content
             $lastMessageContent = null;
+            $lastMessageFromMe = false;
             if ($lastMessage) {
                 $lastMessageContent = $this->decryptMessageContent(
                     $lastMessage->content, 
                     $lastMessage->sender_type, 
                     $lastMessage->receiver_type
                 );
+                $lastMessageFromMe = ($lastMessage->sender_id == $adminId && $lastMessage->sender_type === 'admin');
             }
             
+            // Format timestamp
             $lastMessageTimestamp = $lastMessage ? strtotime($lastMessage->created_at) : 0;
             $lastMessageTime = null;
             if ($lastMessage && $lastMessage->created_at) {
@@ -342,8 +345,10 @@ private function deriveKeyMethod3($password, $salt)
                 'last_message' => $lastMessageContent,
                 'last_message_time' => $lastMessageTime,
                 'last_message_timestamp' => $lastMessageTimestamp,
+                'last_message_from_me' => $lastMessageFromMe,
                 'unread_count' => $unreadCount,
                 'avatar' => $avatar,
+                'admin_role' => $adminRole, // Add admin role to the response
             ];
         } catch (\Exception $e) {
             Log::error('Error building contact data: ' . $e->getMessage());
@@ -503,31 +508,43 @@ private function deriveKeyMethod3($password, $salt)
                     $q->orWhereRaw("CONCAT(first_name, ' ', last_name) ILIKE ?", ["%{$query}%"]);
                     $q->orWhereRaw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name) ILIKE ?", ["%{$query}%"]);
                 })
-                ->limit(15) // Increased limit for better results
+                ->limit(15)
                 ->get()
-                ->map(function ($admin) {
+                ->map(function ($alumni) {  // ✅ Fixed: Parameter renamed to $alumni
                     $fullName = trim(
-                        ($admin->admin_first_name ?? '') . ' ' . 
-                        ($admin->admin_last_name ?? '')
+                        ($alumni->first_name ?? '') . ' ' .  // ✅ Using alumni fields
+                        ($alumni->last_name ?? '')
                     );
                     $initials = strtoupper(
-                        substr($admin->admin_first_name ?? 'A', 0, 1) . 
-                        substr($admin->admin_last_name ?? 'A', 0, 1)
+                        substr($alumni->first_name ?? 'A', 0, 1) .  // ✅ Using alumni fields
+                        substr($alumni->last_name ?? 'A', 0, 1)
                     );
                     
-                    // 🔧 FIX: Use resolveAdminPhotoUrl for admins
-                    $avatar = $this->resolveAdminPhotoUrl($admin->photo ?? null);
+                    // ✅ Handle alumni photo properly
+                    $avatar = null;
+                    $photo = $alumni->alumni_photo ?? null;
+                    if ($photo) {
+                        if (filter_var($photo, FILTER_VALIDATE_URL)) {
+                            $avatar = $photo;
+                        } else {
+                            $avatar = asset('storage/' . ltrim($photo, '/'));
+                        }
+                    }
+                    
+                    $batch = $alumni->year_graduated 
+                        ? date('Y', strtotime($alumni->year_graduated)) 
+                        : 'N/A';
                     
                     return [
-                        'id' => $admin->id,
-                        'type' => 'admin',
-                        'full_name' => $fullName ?: 'Unknown Admin',
-                        'initials' => $initials ?: 'AD',
-                        'program' => 'Admin Staff',
-                        'batch' => '-',
-                        'student_id' => 'N/A',
-                        'email' => $admin->admin_email ?? 'N/A',
-                        'is_online' => true,
+                        'id' => $alumni->id,
+                        'type' => 'alumni',  // ✅ Fixed: Setting correct type
+                        'full_name' => $fullName ?: 'Unknown Alumni',
+                        'initials' => $initials ?: 'AL',
+                        'program' => $alumni->program ?? 'N/A',  // ✅ Using actual program
+                        'batch' => $batch,  // ✅ Using actual batch
+                        'student_id' => $alumni->student_id_number ?? 'N/A',
+                        'email' => $alumni->email ?? 'N/A',  // ✅ Using alumni email
+                        'is_online' => $alumni->is_online ?? false,
                         'avatar' => $avatar,
                     ];
                 });
@@ -535,9 +552,8 @@ private function deriveKeyMethod3($password, $salt)
             // Log alumni search results
             Log::info('Alumni search results: ' . $alumni->count() . ' found');
             
-            // Search Admins (excluding current admin)
             $admins = collect();
-            
+
             if ($currentAdminId) {
                 $admins = Admin::where('id', '!=', (int)$currentAdminId)
                     ->where(function($q) use ($query) {
@@ -546,7 +562,6 @@ private function deriveKeyMethod3($password, $salt)
                         ->orWhere('admin_email', 'ILIKE', "%{$query}%")
                         ->orWhere('admin_role', 'ILIKE', "%{$query}%");
                         
-                        // Also search by full name
                         $q->orWhereRaw("CONCAT(admin_first_name, ' ', admin_last_name) ILIKE ?", ["%{$query}%"]);
                     })
                     ->limit(10)
@@ -561,18 +576,7 @@ private function deriveKeyMethod3($password, $salt)
                             substr($admin->admin_last_name ?? 'A', 0, 1)
                         );
                         
-                        // Handle admin photo
-                        $avatar = null;
-                        $photo = $admin->photo ?? null;
-                        if ($photo) {
-                            if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                                $avatar = $photo;
-                            } elseif (str_starts_with($photo, '/')) {
-                                $avatar = $photo;
-                            } else {
-                                $avatar = asset('storage/' . ltrim($photo, '/'));
-                            }
-                        }
+                        $avatar = $this->resolveAdminPhotoUrl($admin->photo ?? null);
                         
                         return [
                             'id' => $admin->id,
@@ -585,6 +589,7 @@ private function deriveKeyMethod3($password, $salt)
                             'email' => $admin->admin_email ?? 'N/A',
                             'is_online' => true,
                             'avatar' => $avatar,
+                            'admin_role' => $admin->admin_role ?? 'Admin', // Add admin role
                         ];
                     });
             }
@@ -813,6 +818,7 @@ private function deriveKeyMethod3($password, $salt)
                 $program = $user->program ?? 'N/A';
                 $isOnline = $user->is_online ?? false;
                 $photo = $user->alumni_photo ?? $user->card_photo ?? null;
+                $adminRole = null;
             } else {
                 $fullName = trim(($user->admin_first_name ?? '') . ' ' . ($user->admin_last_name ?? ''));
                 $initials = strtoupper(
@@ -822,11 +828,12 @@ private function deriveKeyMethod3($password, $salt)
                 $batch = '-';
                 $program = 'Admin Staff';
                 $isOnline = true;
-                // 🔧 FIX: Use resolveAdminPhotoUrl for admins
                 $photo = $user->photo ?? null;
+                $adminRole = strtoupper($user->admin_role ?? 'ADMIN');
+
             }
             
-            // 🔧 FIX: Use proper URL resolution
+            // Resolve avatar URL
             $avatar = null;
             if ($photo) {
                 if ($type === 'admin') {
@@ -849,6 +856,7 @@ private function deriveKeyMethod3($password, $salt)
                 'batch' => $batch,
                 'is_online' => $isOnline,
                 'avatar' => $avatar,
+                'admin_role' => $adminRole, // Add admin role to response
             ]);
             
         } catch (\Exception $e) {

@@ -942,29 +942,52 @@
             return;
         }
         
-        contactsList.innerHTML = contacts.map(contact => `
-            <div class="contact-card ${currentChat?.id == contact.id && currentChat?.type === contact.type ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''}" 
-                onclick="openChat(${contact.id}, '${contact.type || 'alumni'}')">
-                ${contact.avatar 
-                    ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${escapeHtml(contact.full_name)}">`
-                    : `<div class="contact-avatar">${contact.initials || '??'}</div>`
-                }
-                <div class="contact-details">
-                    <div class="contact-top">
-                        <span class="contact-name">
-                            ${escapeHtml(contact.full_name)}
-                            ${contact.type === 'admin' ? '<span style="font-size: 0.6rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 1px 6px; border-radius: 8px; margin-left: 6px; font-weight: 600; vertical-align: middle;">ADMIN</span>' : ''}
-                        </span>
-                        <span class="contact-time">${contact.last_message_time || ''}</span>
-                    </div>
-                    <div class="contact-bottom">
-                        <span class="contact-batch">${contact.type === 'admin' ? 'Admin Staff' : `Batch ${contact.batch || 'N/A'} | ${contact.program || 'N/A'}`}</span>
-                        <span class="contact-preview">${contact.last_message ? truncateText(contact.last_message, 25) : 'Start a conversation'}</span>
-                        ${contact.unread_count > 0 ? `<span class="unread-count">${contact.unread_count}</span>` : ''}
+        contactsList.innerHTML = contacts.map(contact => {
+            // Determine if last message was sent by admin
+            const isLastMessageFromMe = contact.last_message_from_me || false;
+            const lastMessagePreview = contact.last_message 
+                ? (isLastMessageFromMe 
+                    ? `<span class="you-prefix">You: </span>${escapeHtml(truncateText(contact.last_message, 30))}`
+                    : escapeHtml(truncateText(contact.last_message, 30)))
+                : '<span class="no-message">Start a conversation</span>';
+            
+            // Get the admin role or default to 'Admin'
+            const adminRole = contact.admin_role || 'Admin';
+            
+            return `
+                <div class="contact-card ${currentChat?.id == contact.id && currentChat?.type === contact.type ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''}" 
+                    onclick="openChat(${contact.id}, '${contact.type || 'alumni'}')">
+                    ${contact.avatar 
+                        ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${escapeHtml(contact.full_name)}">`
+                        : `<div class="contact-avatar">${contact.initials || '??'}</div>`
+                    }
+                    <div class="contact-details">
+                        <!-- Row 1: Name and Time -->
+                        <div class="contact-row-1">
+                            <span class="contact-name" title="${escapeHtml(contact.full_name)}">${escapeHtml(contact.full_name)}</span>
+                            <span class="contact-time">${contact.last_message_time || ''}</span>
+                        </div>
+                        
+                        <!-- Row 2: Admin Role Badge or Alumni Info -->
+                        <div class="contact-row-2">
+                            ${contact.type === 'admin' 
+                                ? `<span class="admin-role-badge">${escapeHtml(adminRole)}</span>`
+                                : `<span class="alumni-info-text">Batch ${escapeHtml(contact.batch || 'N/A')} | ${escapeHtml(contact.program || 'N/A')}</span>`
+                            }
+                        </div>
+                        
+                        <!-- Row 3: Last Message Preview -->
+                        <div class="contact-row-3">
+                            <span class="contact-preview">${lastMessagePreview}</span>
+                            ${contact.unread_count > 0 
+                                ? `<span class="unread-count">${contact.unread_count}</span>` 
+                                : ''
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
     
     function filterContacts() {
