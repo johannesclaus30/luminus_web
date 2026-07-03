@@ -12,9 +12,79 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Stylesheets -->
-    {{-- <link rel="stylesheet" href="/css/admin.css"> --}}
     <link rel="stylesheet" href="/css/settings_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+    
+    <style>
+        /* Photo Preview Styles */
+        .photo-preview-container {
+            display: none;
+            margin-top: 1rem;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .photo-preview-container.active {
+            display: block;
+        }
+        
+        .photo-preview-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .photo-preview-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid var(--white);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .photo-preview-remove {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--danger);
+            color: var(--white);
+            border: 2px solid var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            transition: all var(--transition-bounce);
+            box-shadow: var(--shadow);
+        }
+        
+        .photo-preview-remove:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+        
+        .photo-preview-filename {
+            margin-top: 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--gray-500);
+            font-weight: 500;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Upload zone transition */
+        .upload-zone.has-preview {
+            border-style: solid;
+            border-color: var(--success);
+            background: var(--success-light);
+        }
+    </style>
 </head>
 <body>
     
@@ -411,16 +481,25 @@
 
                                     <div class="form-group full-width">
                                         <label class="form-label">Photo</label>
-                                        <div class="upload-zone">
+                                        <div class="upload-zone" id="add-admin-upload-zone">
                                             <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
                                             <p class="upload-title">Click to upload profile photo</p>
                                             <p class="upload-desc">JPG, PNG, or WEBP format.</p>
-                                            <input type="file" name="photo" accept="image/*" class="settings-file-input">
+                                            <input type="file" name="photo" accept="image/*" class="settings-file-input" onchange="previewPhoto(this, 'add-admin-photo-preview', 'add-admin-upload-zone')">
+                                        </div>
+                                        <div class="photo-preview-container" id="add-admin-photo-preview">
+                                            <div class="photo-preview-wrapper">
+                                                <img class="photo-preview-image" src="" alt="Photo preview">
+                                                <button type="button" class="photo-preview-remove" onclick="removePhoto('add-admin-photo-input', 'add-admin-photo-preview', 'add-admin-upload-zone')" title="Remove photo">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                </button>
+                                            </div>
+                                            <p class="photo-preview-filename"></p>
                                         </div>
                                     </div>
 
                                     <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="resetForm('add-admin-form')">Clear</button>
+                                        <button type="button" class="btn btn-secondary" onclick="resetForm('add-admin-form'); removePhoto(null, 'add-admin-photo-preview', 'add-admin-upload-zone')">Clear</button>
                                         <button type="submit" class="btn btn-primary">Add Admin</button>
                                     </div>
                                 </form>
@@ -530,9 +609,9 @@
                                 <div class="profile-pic-section">
                                     <div class="profile-avatar-wrapper {{ $currentAdminPhotoUrl ? 'has-photo' : 'is-initials' }}">
                                         @if ($currentAdminPhotoUrl)
-                                            <img src="{{ $currentAdminPhotoUrl }}" alt="Profile photo">
+                                            <img src="{{ $currentAdminPhotoUrl }}" alt="Profile photo" id="current-profile-photo">
                                         @else
-                                            <span class="profile-initials">{{ $initials }}</span>
+                                            <span class="profile-initials" id="current-profile-initials">{{ $initials }}</span>
                                         @endif
                                     </div>
                                     <div class="profile-pic-copy">
@@ -581,15 +660,8 @@
                                         <label class="form-label">Email</label>
                                         <input type="email" name="admin_email" class="form-control" value="{{ old('admin_email', $currentAdmin->admin_email ?? '') }}">
                                     </div>
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Profile Photo</label>
-                                        <div class="upload-zone">
-                                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                                            <p class="upload-title">Click to upload new photo</p>
-                                            <p class="upload-desc">Uploading a new photo will replace the current admin photo.</p>
-                                            <input id="account-photo-input" type="file" name="photo" accept="image/*" class="settings-file-input">
-                                        </div>
-                                    </div>
+                                    <!-- Hidden file input for the Upload New Photo button above -->
+                                    <input id="account-photo-input" type="file" name="photo" accept="image/*" class="settings-file-input" style="display: none;" onchange="handleAccountPhotoUpload(this)">
                                     <div class="form-actions full-width">
                                         <button type="button" class="btn btn-secondary" onclick="resetForm('account-form')">Discard Changes</button>
                                         <button type="submit" class="btn btn-primary">Save Profile Information</button>
@@ -634,6 +706,22 @@
             }, 250);
         });
 
+        // Toggle password visibility
+        function togglePassword(button) {
+            const input = button.parentElement.querySelector('input');
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
         // Toggle 2FA settings visibility
         document.addEventListener('DOMContentLoaded', function(){
             var t2 = document.getElementById('toggle-2fa');
@@ -655,6 +743,95 @@
 
         function fakeSave(msg){
             alert(msg);
+        }
+
+        // Photo Preview Function
+        function previewPhoto(input, previewContainerId, uploadZoneId) {
+            const previewContainer = document.getElementById(previewContainerId);
+            const uploadZone = document.getElementById(uploadZoneId);
+            
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const previewImage = previewContainer.querySelector('.photo-preview-image');
+                    const filenameEl = previewContainer.querySelector('.photo-preview-filename');
+                    
+                    previewImage.src = e.target.result;
+                    filenameEl.textContent = file.name;
+                    
+                    previewContainer.classList.add('active');
+                    if (uploadZone) {
+                        uploadZone.classList.add('has-preview');
+                    }
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Remove Photo Function
+        function removePhoto(inputId, previewContainerId, uploadZoneId) {
+            const previewContainer = document.getElementById(previewContainerId);
+            const uploadZone = document.getElementById(uploadZoneId);
+            
+            // Reset file input if ID provided
+            if (inputId) {
+                const fileInput = document.getElementById(inputId);
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+            }
+            
+            // Hide preview
+            if (previewContainer) {
+                previewContainer.classList.remove('active');
+                const previewImage = previewContainer.querySelector('.photo-preview-image');
+                if (previewImage) {
+                    previewImage.src = '';
+                }
+            }
+            
+            // Remove has-preview class
+            if (uploadZone) {
+                uploadZone.classList.remove('has-preview');
+            }
+        }
+        
+        // Handle account photo upload (shows preview in the profile avatar)
+        function handleAccountPhotoUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const profileWrapper = document.querySelector('.profile-avatar-wrapper');
+                    const existingImg = profileWrapper.querySelector('img');
+                    const initialsSpan = document.getElementById('current-profile-initials');
+                    
+                    // Remove initials if present
+                    if (initialsSpan) {
+                        initialsSpan.style.display = 'none';
+                    }
+                    
+                    if (existingImg) {
+                        existingImg.src = e.target.result;
+                    } else {
+                        // Create new image element
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = 'Profile photo';
+                        img.id = 'current-profile-photo';
+                        profileWrapper.innerHTML = '';
+                        profileWrapper.appendChild(img);
+                    }
+                    
+                    profileWrapper.classList.add('has-photo');
+                    profileWrapper.classList.remove('is-initials');
+                };
+                
+                reader.readAsDataURL(input.files[0]);
+            }
         }
 
         // Remove photo logic

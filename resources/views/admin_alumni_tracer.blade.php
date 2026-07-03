@@ -3,1368 +3,1549 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Digital Alumni Tracer | LumiNUs Admin</title>
+    <title>Alumni Tracer | LumiNUs Admin</title>
 
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="/css/admin.css">
-    <link rel="stylesheet" href="/css/alumni_tracer.css">
+    <link rel="stylesheet" href="/css/alumni_tracer_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 </head>
 <body>
     
     @include('partials.admin-navbar')
 
-    <div class="layout-wrapper">
-        <div class="admin-menu">
-            <div>
-                <p class="text-titles">Admin Menu</p>
-                <a href="{{ url('/admin/dashboard') }}" class="admin-menu-buttons">Admin Dashboard</a>
-                <a href="{{ route('admin.directory') }}" class="admin-menu-buttons">Alumni Directory</a>
-                <a href="{{ route('announcements.index') }}" class="admin-menu-buttons">Announcement Editor</a>
-                <a href="{{ route('events.index') }}" class="admin-menu-buttons">Event Organizer</a>
-                <a href="{{ route('perks.index') }}" class="admin-menu-buttons">Perks and Discounts</a>
-                <a href="{{ url('/admin/alumni_tracer') }}" class="admin-menu-current">NU Alumni Tracer</a>
-                <a href="{{ url('/admin/messages') }}" class="admin-menu-buttons">Messages</a>
-                <a href="{{ route('admin.settings') }}" class="admin-menu-buttons">Settings</a>
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+
+    <div class="admin-layout">
+        <!-- Sidebar Navigation (Unchanged) -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="/assets/logos/LumiNUs_Logo_Landscape_Blue.png" alt="LumiNUs Logo" class="logo-luminus">
+                </div>
+                <button class="sidebar-close" id="sidebarClose" onclick="toggleMobileMenu()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            <a href="{{ route('admin.logout') }}" class="admin-menu-signout">Sign Out</a>
-        </div>
+            
+            <nav class="sidebar-nav">
+                <p class="nav-section-title">Admin Menu</p>
+                <a href="/admin/dashboard" class="nav-item">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/directory" class="nav-item">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Alumni Directory</span>
+                </a>
+                <a href="{{ route('announcements.index') }}" class="nav-item">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    <span>Announcements</span>
+                </a>
+                <a href="{{ route('events.index') }}" class="nav-item">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Events</span>
+                </a>
+                <a href="{{ route('perks.index') }}" class="nav-item">
+                    <i class="fa-solid fa-gift"></i>
+                    <span>Perks & Discounts</span>
+                </a>
+                <a href="/admin/alumni_tracer" class="nav-item active">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span>Alumni Tracer</span>
+                </a>
+                <a href="/admin/messages" class="nav-item">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span>Messages</span>
+                </a>
+                <a href="{{ route('admin.settings') }}" class="nav-item">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Sign Out</span>
+                </a>
+            </div>
+        </aside>
 
-        <div class="div-dashboard-container">
-            <div class="tracer-layout">
-        
-                <!-- ========== MAIN PANEL ========== -->
-                <div class="tracer-main-panel" id="mainPanel">
-                    <div id="editorView">
-                        <div class="panel-header">
-                            <div class="header-logo-placeholder" id="surveyLogoContainer">
-                                <span id="surveyLogoText">NU</span>
-                                <button class="change-logo-btn" id="changeLogoBtn" title="Change icon">🖉</button>
-                                <input type="file" id="logoFileInput" accept="image/*" style="display: none;">
-                            </div>
-                            <div class="header-titles">
-                                <h2 id="surveyTitleDisplay">New Alumni Tracer Survey</h2>
-                                <span class="status-badge" id="surveyStatusDisplay">Draft</span>
-                            </div>
-                            <div class="panel-actions">
-                                <button class="btn-gray" id="previewBtn">👁 Preview</button>
-                                <button class="btn-primary" id="saveBtn">💾 Save</button>
-                            </div>
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <!-- Replace the header-actions div in the page-header -->
+            <header class="page-header">
+                <div class="header-content">
+                    <div class="header-title-section">
+                        <h1 class="page-title">
+                            <i class="fa-solid fa-location-dot"></i>
+                            Alumni Tracer
+                        </h1>
+                        <p class="page-subtitle">Track and manage alumni employment and career progress</p>
+                    </div>
+                    
+                    <div class="header-actions">
+                        <div class="quick-actions-header">
+                            {{-- <button class="quick-action-btn-sm" onclick="document.querySelector('[data-tab=builder]').click()">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                                <span>Edit Tracer</span>
+                            </button>
+                            <button class="quick-action-btn-sm" onclick="document.querySelector('[data-tab=responses]').click()">
+                                <i class="fa-solid fa-inbox"></i>
+                                <span>View Responses</span>
+                            </button>
+                            <button class="quick-action-btn-sm" onclick="document.querySelector('[data-tab=analytics]').click()">
+                                <i class="fa-solid fa-chart-bar"></i>
+                                <span>Analytics</span>
+                            </button> --}}
+                            <button class="quick-action-btn-sm">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span>Send Reminders</span>
+                            </button>
                         </div>
+                    </div>
+                </div>
+                <div class="header-tabs-row">
+                    <div class="tracer-tabs">
+                        <button class="tracer-tab active" data-tab="dashboard">
+                            <i class="fa-solid fa-chart-pie"></i>
+                            <span>Dashboard</span>
+                        </button>
+                        <button class="tracer-tab" data-tab="builder">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                            <span>Tracer Builder</span>
+                        </button>
+                        <button class="tracer-tab" data-tab="responses">
+                            <i class="fa-solid fa-inbox"></i>
+                            <span>Responses</span>
+                        </button>
+                        <button class="tracer-tab" data-tab="analytics">
+                            <i class="fa-solid fa-chart-bar"></i>
+                            <span>Analytics</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
 
-                        <div class="survey-builder-container">
-                            <div class="form-group">
-                                <label>Header Photo:</label>
-                                <div class="photo-upload-box" id="headerPhotoBox">
-                                    <img id="headerPhotoImg" src="/assets/FINAL-NULIPA.jpg" alt="National University Banner" class="banner-img">
-                                    <button class="change-photo-btn" id="changePhotoBtn">Change Photo</button>
-                                    <input type="file" id="photoFileInput" accept="image/*" style="display: none;">
+            <!-- ============================================ -->
+            <!-- TAB: DASHBOARD -->
+            <!-- ============================================ -->
+            <div class="tracer-panel active" id="dashboard-panel">
+                <!-- Stats Overview -->
+                <div class="stats-overview">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">247</span>
+                            <span class="stat-label">Total Alumni</span>
+                            <span class="stat-sub">+12 this month</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <i class="fa-solid fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">156</span>
+                            <span class="stat-label">Completed</span>
+                            <span class="stat-sub">63.2% completion rate</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon amber">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">91</span>
+                            <span class="stat-label">In Progress</span>
+                            <span class="stat-sub">36.8% still answering</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <i class="fa-solid fa-circle-question"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">49</span>
+                            <span class="stat-label">Total Questions</span>
+                            <span class="stat-sub">5 phases · 10 sections</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Replace the dashboard-grid-2col section -->
+                <div class="dashboard-grid-2col">
+                    <div class="chart-card">
+                        <h3><i class="fa-solid fa-clock-rotate-left" style="color:#3b82f6;"></i> Recent Activity</h3>
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <div class="activity-icon green"><i class="fa-solid fa-check"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text"><strong>Maria Santos</strong> completed the tracer survey.</p>
+                                    <span class="activity-time">2 hours ago</span>
                                 </div>
                             </div>
-
-                            <div class="form-group">
-                                <label>Survey Title:</label>
-                                <input type="text" class="form-control title-input" id="surveyTitleInput" value="New Alumni Tracer Survey">
+                            <div class="activity-item">
+                                <div class="activity-icon blue"><i class="fa-solid fa-pen"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text"><strong>Jose Reyes</strong> updated employment status.</p>
+                                    <span class="activity-time">5 hours ago</span>
+                                </div>
                             </div>
-
-                            <div class="builder-container" id="formBuilder">
-                                <!-- Dynamic question cards rendered here -->
+                            <div class="activity-item">
+                                <div class="activity-icon amber"><i class="fa-solid fa-plus"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text">New phase <strong>"Professional Development"</strong> added.</p>
+                                    <span class="activity-time">1 day ago</span>
+                                </div>
                             </div>
-                            <div class="add-question-footer">
-                                <button id="addQuestionBtn">+ Add Question</button>
+                            <div class="activity-item">
+                                <div class="activity-icon purple"><i class="fa-solid fa-download"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text">Analytics report exported by <strong>Admin</strong>.</p>
+                                    <span class="activity-time">2 days ago</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Manage Surveys view (hidden) -->
-                    <div id="manageView" style="display: none;">
-                        <div class="panel-header">
-                            <div class="header-titles">
-                                <h2>Manage Surveys</h2>
+                    
+                    <div class="chart-card">
+                        <h3><i class="fa-solid fa-bullseye" style="color:#ef4444;"></i> Survey Completion Funnel</h3>
+                        <div class="funnel-chart">
+                            <div class="funnel-item" style="width: 100%;">
+                                <span class="funnel-label">Invited</span>
+                                <span class="funnel-value">247</span>
                             </div>
-                        </div>
-                        <div style="overflow-x: auto; margin-bottom: 28px;">
-                            <table style="width: 100%; border-collapse: collapse;" id="manageTable">
-                                <thead>
-                                    <tr style="background: #f3f4f6; text-align: left;">
-                                        <th style="padding: 12px;">Title</th>
-                                        <th style="padding: 12px;">Status</th>
-                                        <th style="padding: 12px;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="manageTableBody"></tbody>
-                            </table>
-                        </div>
-                        <div class="panel-header" style="margin-top: 12px;">
-                            <div class="header-titles">
-                                <h2>Recently Deleted Surveys</h2>
+                            <div class="funnel-item" style="width: 82%;">
+                                <span class="funnel-label">Opened</span>
+                                <span class="funnel-value">203</span>
                             </div>
-                        </div>
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse;" id="deletedTable">
-                                <thead>
-                                    <tr style="background: #f3f4f6; text-align: left;">
-                                        <th style="padding: 12px;">Title</th>
-                                        <th style="padding: 12px;">Deleted At</th>
-                                        <th style="padding: 12px;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="deletedTableBody"></tbody>
-                            </table>
+                            <div class="funnel-item" style="width: 63%;">
+                                <span class="funnel-label">Completed</span>
+                                <span class="funnel-value">156</span>
+                            </div>
+                            <div class="funnel-item" style="width: 48%;">
+                                <span class="funnel-label">Verified</span>
+                                <span class="funnel-value">118</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ========== RIGHT SIDEBAR ========== -->
-                <div class="tracer-sidebar">
-                    <h2 class="sidebar-title">Alumni Tracer</h2>
-                    <button id="addNewTracerBtn" class="add-tracer-btn">+ Add New Alumni Tracer</button>
-                    <div class="sidebar-tabs">
-                        <button class="tab-btn active" id="tabAddNew">All Surveys</button>
-                        <button class="tab-btn" id="tabManage">Manage Surveys</button>
+                <!-- Charts Row -->
+                <div class="charts-grid">
+                    <!-- Phase Completion Chart -->
+                    <div class="chart-card">
+                        <h3>Phase Completion Rate</h3>
+                        <div class="bar-chart">
+                            <div class="bar-chart-item">
+                                <span class="bar-value">87%</span>
+                                <div class="bar-fill" style="height: 122px; background: #3b82f6;"></div>
+                                <span class="bar-label">Personal</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">72%</span>
+                                <div class="bar-fill" style="height: 101px; background: #10b981;"></div>
+                                <span class="bar-label">Education</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">65%</span>
+                                <div class="bar-fill" style="height: 91px; background: #f59e0b;"></div>
+                                <span class="bar-label">Employment</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">48%</span>
+                                <div class="bar-fill" style="height: 67px; background: #8b5cf6;"></div>
+                                <span class="bar-label">Dev't</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">41%</span>
+                                <div class="bar-fill" style="height: 57px; background: #ef4444;"></div>
+                                <span class="bar-label">Assessment</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="survey-list" id="surveyList"></div>
+
+                    <!-- Employment Status -->
+                    <div class="chart-card">
+                        <h3>Employment Status</h3>
+                        <div class="employment-list">
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#10b981;"></span> Employed (Full-time)</span>
+                                    <span class="employment-count">124</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:50%; background:#10b981;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#3b82f6;"></span> Employed (Part-time)</span>
+                                    <span class="employment-count">28</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:11%; background:#3b82f6;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#f59e0b;"></span> Self-employed</span>
+                                    <span class="employment-count">18</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:7%; background:#f59e0b;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#8b5cf6;"></span> Continuing Education</span>
+                                    <span class="employment-count">35</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:14%; background:#8b5cf6;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#ef4444;"></span> Unemployed</span>
+                                    <span class="employment-count">20</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:8%; background:#ef4444;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#06b6d4;"></span> OFW</span>
+                                    <span class="employment-count">22</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:9%; background:#06b6d4;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Submissions Table -->
+                <div class="recent-submissions">
+                    <div class="recent-submissions-header">
+                        <h3>Recent Submissions</h3>
+                        <div class="header-actions-table">
+                            <select class="filter-select-sm">
+                                <option>All Programs</option>
+                                <option>BS IT</option>
+                                <option>BS ME</option>
+                                <option>BS Accountancy</option>
+                            </select>
+                            <a href="#" class="view-all-link">View All →</a>
+                        </div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="tracer-table">
+                            <thead>
+                                <tr>
+                                    <th>Alumni</th>
+                                    <th>Program</th>
+                                    <th>Year</th>
+                                    <th>Progress</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">MS</div>
+                                            <span class="alumni-name">Maria Santos</span>
+                                        </div>
+                                    </td>
+                                    <td>BS IT</td>
+                                    <td>2023</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-14</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">JR</div>
+                                            <span class="alumni-name">Jose Reyes</span>
+                                        </div>
+                                    </td>
+                                    <td>BS ME</td>
+                                    <td>2022</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:60%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">60%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-13</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">AC</div>
+                                            <span class="alumni-name">Ana Cruz</span>
+                                        </div>
+                                    </td>
+                                    <td>BS Accountancy</td>
+                                    <td>2023</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:40%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">40%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-12</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">CM</div>
+                                            <span class="alumni-name">Carlo Mendoza</span>
+                                        </div>
+                                    </td>
+                                    <td>BS CS</td>
+                                    <td>2024</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-11</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">LB</div>
+                                            <span class="alumni-name">Liza Bautista</span>
+                                        </div>
+                                    </td>
+                                    <td>BS Tourism</td>
+                                    <td>2022</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:20%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">20%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-10</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">RV</div>
+                                            <span class="alumni-name">Ryan Villanueva</span>
+                                        </div>
+                                    </td>
+                                    <td>BS CE</td>
+                                    <td>2021</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-09</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
+            <!-- ============================================ -->
+            <!-- TAB: TRACER BUILDER (Unchanged) -->
+            <!-- ============================================ -->
+            <div class="tracer-panel" id="builder-panel">
+                <div class="builder-layout">
+                    <!-- Phases Sidebar -->
+                    <div class="phases-sidebar">
+                        <div class="phases-header">
+                            <h3>Phases</h3>
+                            <button class="btn-add-phase" onclick="openPhaseModal()">
+                                <i class="fa-solid fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <div class="phases-list" id="phasesList">
+                            <!-- Phase cards will be rendered by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Builder Content Area -->
+                    <div class="builder-content" id="builderContent">
+                        <div class="empty-builder-state" id="emptyBuilderState">
+                            <i class="fa-solid fa-layer-group empty-builder-icon"></i>
+                            <h3>Select a phase to manage its content</h3>
+                            <p>Choose a phase from the left panel or create a new one to get started.</p>
+                        </div>
+                        <div id="phaseDetailContent" style="display: none;">
+                            <!-- Phase detail content rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- TAB: RESPONSES (Unchanged) -->
+            <!-- ============================================ -->
+            <div class="tracer-panel" id="responses-panel">
+                <div class="responses-toolbar">
+                    <div class="search-box">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" class="search-input" placeholder="Search by name or program..." id="responsesSearch">
+                    </div>
+                    <select class="filter-select" id="responsesFilter">
+                        <option value="all">All Status</option>
+                        <option value="complete">Complete</option>
+                        <option value="in-progress">In Progress</option>
+                    </select>
+                    <button class="btn-export">
+                        <i class="fa-solid fa-download"></i> Export CSV
+                    </button>
+                </div>
+
+                <div class="responses-table-container">
+                    <table class="tracer-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Alumni</th>
+                                <th>Program</th>
+                                <th>Year</th>
+                                <th>Completion</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="responsesTableBody">
+                            <!-- Rendered by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <span id="responsesCount">8 results</span>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- TAB: ANALYTICS -->
+            <!-- ============================================ -->
+            <div class="tracer-panel" id="analytics-panel">
+                <!-- Analytics Header -->
+                <div class="analytics-header">
+                    <div>
+                        <h2 class="analytics-title">Tracer Analytics Overview</h2>
+                        <p class="analytics-subtitle">Insights from alumni employment and feedback data</p>
+                    </div>
+                    <button class="btn-export">
+                        <i class="fa-solid fa-file-export"></i> Export Full Report
+                    </button>
+                </div>
+
+                <!-- KPI Cards with Trends -->
+                <div class="analytics-kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon green"><i class="fa-solid fa-percent"></i></div>
+                        <div class="kpi-value" style="color:#10b981;">87.2%</div>
+                        <div class="kpi-label">Response Rate</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 5.2% from last month</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon blue"><i class="fa-solid fa-chart-simple"></i></div>
+                        <div class="kpi-value" style="color:#3b82f6;">63%</div>
+                        <div class="kpi-label">Avg. Completion</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 2.1% from last month</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon amber"><i class="fa-solid fa-star"></i></div>
+                        <div class="kpi-value" style="color:#f59e0b;">4.1 / 5</div>
+                        <div class="kpi-label">Avg. Rating (Overall)</div>
+                        <div class="kpi-trend down"><i class="fa-solid fa-arrow-down"></i> 0.2 from last month</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon purple"><i class="fa-solid fa-briefcase"></i></div>
+                        <div class="kpi-value" style="color:#8b5cf6;">68.4%</div>
+                        <div class="kpi-label">Job Relevance</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 1.5% from last month</div>
+                    </div>
+                </div>
+
+                <!-- Analytics Charts Grid -->
+                <div class="analytics-grid">
+                    <!-- Monthly Submissions -->
+                    <div class="analytics-card">
+                        <h3>Monthly Submissions</h3>
+                        <div class="bar-chart">
+                            <div class="bar-chart-item">
+                                <span class="bar-value">12</span>
+                                <div class="bar-fill" style="height: 43px; background: #32418C;"></div>
+                                <span class="bar-label">Jan</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">18</span>
+                                <div class="bar-fill" style="height: 64px; background: #32418C;"></div>
+                                <span class="bar-label">Feb</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">25</span>
+                                <div class="bar-fill" style="height: 89px; background: #32418C;"></div>
+                                <span class="bar-label">Mar</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">31</span>
+                                <div class="bar-fill" style="height: 111px; background: #32418C;"></div>
+                                <span class="bar-label">Apr</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">28</span>
+                                <div class="bar-fill" style="height: 100px; background: #32418C;"></div>
+                                <span class="bar-label">May</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">42</span>
+                                <div class="bar-fill" style="height: 150px; background: #32418C;"></div>
+                                <span class="bar-label">Jun</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Salary Distribution -->
+                    <div class="analytics-card">
+                        <h3>Monthly Salary Distribution</h3>
+                        <div class="h-bar-list">
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> Below ₱15k</span>
+                                    <span class="h-bar-percent">18%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:18%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱15–25k</span>
+                                    <span class="h-bar-percent">34%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:34%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱25–50k</span>
+                                    <span class="h-bar-percent">29%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:29%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱50–100k</span>
+                                    <span class="h-bar-percent">14%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:14%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> Above ₱100k</span>
+                                    <span class="h-bar-percent">5%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:5%; background:#FBD117;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Average Ratings -->
+                    <div class="analytics-card">
+                        <h3>Average Ratings by Criterion</h3>
+                        <div class="rating-list">
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Overall Education Quality</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 4.1 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:82%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Curriculum Relevance</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.8 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:76%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Teaching Effectiveness</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 4.3 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:86%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Facilities & Resources</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.5 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:70%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Career Guidance Services</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.2 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:64%;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Job Relevance -->
+                    <div class="analytics-card">
+                        <h3>Job Relevance to Degree</h3>
+                        <div class="h-bar-list">
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#10b981;"></span> Directly related</span>
+                                    <span class="h-bar-percent" style="color:#10b981;">40%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:40%; background:#10b981;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#3b82f6;"></span> Somewhat related</span>
+                                    <span class="h-bar-percent" style="color:#3b82f6;">28%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:28%; background:#3b82f6;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#f59e0b;"></span> Not related</span>
+                                    <span class="h-bar-percent" style="color:#f59e0b;">22%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:22%; background:#f59e0b;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#ef4444;"></span> Not yet employed</span>
+                                    <span class="h-bar-percent" style="color:#ef4444;">10%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:10%; background:#ef4444;"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals (Unchanged) -->
+    <div class="modal-overlay" id="questionModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="questionModalTitle">Add New Question</h3>
+                <button class="modal-close" onclick="closeQuestionModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Question Label <span class="required">*</span></label>
+                    <textarea class="form-control" id="qLabel" rows="2" placeholder="Enter the question text..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select class="form-control" id="qType" onchange="handleTypeChange()">
+                        <option value="text">Short Text</option>
+                        <option value="email">Email</option>
+                        <option value="tel">Phone Number</option>
+                        <option value="textarea">Paragraph</option>
+                        <option value="radio">Multiple Choice</option>
+                        <option value="checkbox">Checkboxes</option>
+                        <option value="select">Dropdown</option>
+                        <option value="scale">Rating (1–5)</option>
+                    </select>
+                    <p class="help-text" id="typeHelp">Short single-line text input.</p>
+                </div>
+                <div class="form-group" id="optionsGroup" style="display:none;">
+                    <label>Answer Options</label>
+                    <div id="optionsList" class="options-list"></div>
+                    <div class="options-input-row">
+                        <input type="text" class="form-control" id="newOption" placeholder="Type an option and press Enter..." onkeydown="handleOptionKeydown(event)">
+                        <button class="btn btn-primary" onclick="addOption()" style="white-space:nowrap;">Add</button>
+                    </div>
+                </div>
+                <div class="form-group" id="placeholderGroup">
+                    <label>Placeholder Text</label>
+                    <input type="text" class="form-control" id="qPlaceholder" placeholder="e.g. Enter your answer here...">
+                </div>
+                <div class="toggle-row">
+                    <div>
+                        <p class="toggle-label">Required Question</p>
+                        <p class="toggle-sub">Alumni must answer before submitting</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="qRequired" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeQuestionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveQuestion()">Save Question</button>
+            </div>
         </div>
     </div>
 
-    <!-- ========== PREVIEW MODAL ========== -->
-    <div class="modal-overlay" id="previewModal">
-        <div class="modal-content">
-            <button class="modal-close" id="closePreview">&times;</button>
-            <div id="previewContent"></div>
+    <div class="modal-overlay" id="phaseModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="phaseModalTitle">Add New Phase</h3>
+                <button class="modal-close" onclick="closePhaseModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Phase Title <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="phaseTitle" placeholder="e.g. Personal Profile">
+                </div>
+                <div class="form-group">
+                    <label>Subtitle</label>
+                    <input type="text" class="form-control" id="phaseSubtitle" placeholder="e.g. Basic & contact info">
+                </div>
+                <div class="form-group">
+                    <label>Icon</label>
+                    <div class="icon-grid" id="iconGrid"></div>
+                </div>
+                <div class="form-group">
+                    <label>Accent Color</label>
+                    <div class="color-grid" id="colorGrid"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePhaseModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="savePhase()">Save Phase</button>
+            </div>
         </div>
     </div>
 
-    <!-- ========== ALERT MODAL ========== -->
-    <div class="modal-overlay" id="alertModal" style="display: none; z-index: 2000;">
-        <div class="modal-content alert-modal">
-            <div class="alert-modal-header">
-                <h3 id="alertModalTitle">Notification</h3>
-                <button class="modal-close" id="closeAlertModal">&times;</button>
+    <div class="modal-overlay" id="sectionModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="sectionModalTitle">Add New Section</h3>
+                <button class="modal-close" onclick="closeSectionModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="alert-modal-body">
-                <p id="alertModalMessage"></p>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Section Title <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="sectionTitle" placeholder="e.g. Basic Information">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" class="form-control" id="sectionDesc" placeholder="Brief description of this section">
+                </div>
             </div>
-            <div class="alert-modal-footer">
-                <button class="btn-primary" id="alertModalConfirm">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========== CONFIRM MODAL ========== -->
-    <div class="modal-overlay" id="confirmModal" style="display: none; z-index: 2000;">
-        <div class="modal-content alert-modal">
-            <div class="alert-modal-header">
-                <h3 id="confirmModalTitle">Confirm Action</h3>
-                <button class="modal-close" id="closeConfirmModal">&times;</button>
-            </div>
-            <div class="alert-modal-body">
-                <p id="confirmModalMessage"></p>
-            </div>
-            <div class="alert-modal-footer">
-                <button class="btn-gray" id="confirmModalCancel">Cancel</button>
-                <button class="btn-primary" id="confirmModalConfirm">Confirm</button>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSectionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSection()">Save Section</button>
             </div>
         </div>
     </div>
 
     <script>
-        (function() {
-            // ===================== DATA STATE (NO HARDCODED MOCK DATA) =====================
-            let surveys = []; // ← Empty array: data loads from backend only
-            let currentSurveyId = null; // ← Start with no selection
-            let questionCounter = 0;
-            let deletedSurveys = [];
+        // ═══════════════════════════════════════
+        // GLOBAL STATE
+        // ═══════════════════════════════════════
+        
+        const typeHelpText = {
+            text: 'Short single-line text input.',
+            email: 'Email address with validation.',
+            tel: 'Phone number input.',
+            textarea: 'Multi-line text for longer answers.',
+            radio: 'Alumni pick exactly one answer.',
+            checkbox: 'Alumni can pick multiple answers.',
+            select: 'Alumni choose from a dropdown.',
+            scale: 'Alumni rate from 1 (Poor) to 5 (Excellent).'
+        };
 
-            // DOM references
-            const formBuilder = document.getElementById('formBuilder');
-            const surveyTitleInput = document.getElementById('surveyTitleInput');
-            const surveyTitleDisplay = document.getElementById('surveyTitleDisplay');
-            const surveyStatusDisplay = document.getElementById('surveyStatusDisplay');
-            const surveyLogoText = document.getElementById('surveyLogoText');
-            const headerPhotoImg = document.getElementById('headerPhotoImg');
-            const surveyListContainer = document.getElementById('surveyList');
-            const manageTableBody = document.getElementById('manageTableBody');
-            const deletedTableBody = document.getElementById('deletedTableBody');
-            const tabAddNew = document.getElementById('tabAddNew');
-            const tabManage = document.getElementById('tabManage');
-            const editorView = document.getElementById('editorView');
-            const manageView = document.getElementById('manageView');
-            const previewModal = document.getElementById('previewModal');
-            const previewContent = document.getElementById('previewContent');
-            const closePreview = document.getElementById('closePreview');
-            const previewBtn = document.getElementById('previewBtn');
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const tracerListUrl = "{{ route('admin.alumni_tracer.list') }}";
-            const tracerDeletedUrl = "{{ route('admin.alumni_tracer.deleted') }}";
-            const tracerStoreUrl = "{{ route('admin.alumni_tracer.store') }}";
-            const tracerUpdateBaseUrl = "{{ url('/admin/alumni_tracer') }}";
+        const typeLabels = {
+            text: 'Short Text', email: 'Email', tel: 'Phone Number',
+            textarea: 'Paragraph', radio: 'Multiple Choice', checkbox: 'Checkboxes',
+            select: 'Dropdown', scale: 'Rating (1–5)'
+        };
 
-            // Branding upload elements
-            const changeLogoBtn = document.getElementById('changeLogoBtn');
-            const logoFileInput = document.getElementById('logoFileInput');
-            const changePhotoBtn = document.getElementById('changePhotoBtn');
-            const photoFileInput = document.getElementById('photoFileInput');
+        const typeIcons = {
+            text: 'fa-input-cursor-text', email: 'fa-envelope', tel: 'fa-phone',
+            textarea: 'fa-text-paragraph', radio: 'fa-circle-dot', checkbox: 'fa-check-square',
+            select: 'fa-chevron-down', scale: 'fa-star-half-stroke'
+        };
 
-            // ========== MODAL ALERT FUNCTIONS ==========
-            function showAlert(message, title = 'Notification', type = 'info', onConfirm = null) {
-                const modal = document.getElementById('alertModal');
-                const modalContent = modal.querySelector('.alert-modal');
-                const titleEl = document.getElementById('alertModalTitle');
-                const messageEl = document.getElementById('alertModalMessage');
-                const confirmBtn = document.getElementById('alertModalConfirm');
-                
-                // Set content
-                titleEl.textContent = title;
-                messageEl.textContent = message;
-                
-                // Reset and set type styling
-                modalContent.className = 'modal-content alert-modal';
-                if (['success', 'error', 'warning', 'info'].includes(type)) {
-                    modalContent.classList.add(type);
-                }
-                
-                // Show modal
-                modal.style.display = 'flex';
-                
-                // Handle confirm
-                const handleConfirm = () => {
-                    modal.style.display = 'none';
-                    confirmBtn.removeEventListener('click', handleConfirm);
-                    if (typeof onConfirm === 'function') onConfirm();
-                };
-                
-                confirmBtn.addEventListener('click', handleConfirm);
-            }
+        const icons = [
+            { key: 'fa-user', label: 'Person' },
+            { key: 'fa-book', label: 'Book' },
+            { key: 'fa-briefcase', label: 'Briefcase' },
+            { key: 'fa-bolt', label: 'Lightning' },
+            { key: 'fa-clipboard-check', label: 'Clipboard' },
+            { key: 'fa-graduation-cap', label: 'Graduation' },
+            { key: 'fa-chart-line', label: 'Growth' },
+            { key: 'fa-star', label: 'Stars' }
+        ];
 
-            function showConfirm(message, title = 'Confirm Action', onConfirm = null, onCancel = null) {
-                return new Promise((resolve) => {
-                    const modal = document.getElementById('confirmModal');
-                    const titleEl = document.getElementById('confirmModalTitle');
-                    const messageEl = document.getElementById('confirmModalMessage');
-                    const confirmBtn = document.getElementById('confirmModalConfirm');
-                    const cancelBtn = document.getElementById('confirmModalCancel');
-                    
-                    // Set content
-                    titleEl.textContent = title;
-                    messageEl.textContent = message;
-                    
-                    // Show modal
-                    modal.style.display = 'flex';
-                    
-                    const cleanup = () => {
-                        modal.style.display = 'none';
-                        confirmBtn.removeEventListener('click', handleConfirm);
-                        cancelBtn.removeEventListener('click', handleCancel);
-                        document.getElementById('closeConfirmModal').removeEventListener('click', handleCancel);
-                    };
-                    
-                    const handleConfirm = () => {
-                        cleanup();
-                        if (typeof onConfirm === 'function') onConfirm();
-                        resolve(true);
-                    };
-                    
-                    const handleCancel = () => {
-                        cleanup();
-                        if (typeof onCancel === 'function') onCancel();
-                        resolve(false);
-                    };
-                    
-                    confirmBtn.addEventListener('click', handleConfirm);
-                    cancelBtn.addEventListener('click', handleCancel);
-                    document.getElementById('closeConfirmModal').addEventListener('click', handleCancel);
-                });
-            }
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#1f2b67', '#ec4899'];
 
-            function closeModal(modalId) {
-                document.getElementById(modalId).style.display = 'none';
-            }
-
-            // ---------- Utility ----------
-            function generateQuestionId() {
-                return Date.now() + Math.floor(Math.random()*1000) + questionCounter++;
-            }
-
-            function generateStatementId() {
-                return 'stmt_' + Date.now() + Math.floor(Math.random()*1000) + questionCounter++;
-            }
-
-            function createEmptyQuestion(type = 'text') {
-                const base = { id: generateQuestionId(), type, question_text: '', subtitle: '', required: false };
-                if (type === 'choice' || type === 'checkbox') {
-                    base.options = [{ label: '', go_to: null }];
-                    base.other_enabled = false;
-                    base.display_type = 'list';
-                } else if (type === 'likert') {
-                    base.scale_points = 5;
-                    base.scale_labels = Array(5).fill('');
-                    base.statements = [{ id: generateStatementId(), text: '' }];
-                }
-                return base;
-            }
-
-            function getCurrentSurvey() {
-                return surveys.find(s => s.id === currentSurveyId);
-            }
-
-            function normalizeServerSurvey(form) {
-                const statusMap = {
-                    0: 'Deleted',
-                    1: 'Active',
-                    2: 'Draft',
-                    3: 'Closed'
-                };
-                
-                const statusCode = form.status;
-                const statusText = statusMap[statusCode] || 'Unknown';
-                const displayStatus = statusCode === 1 ? 'Accepting Responses' : 
-                                    statusCode === 2 ? 'Draft' : 
-                                    statusCode === 3 ? 'Closed' : 'Deleted';
-                
-                return {
-                    id: form.id,
-                    title: form.form_title || '',
-                    status: statusText,
-                    displayStatus: displayStatus,
-                    statusCode: statusCode,
-                    logo: 'NU',
-                    headerPhoto: form.form_header || '/assets/logos/nu_banner.png',
-                    persisted: true,
-                    deletedAt: form.status === 0 ? form.updated_at : null,
-                    questions: (form.questions || []).map(question => {
-                        const settings = question.settings || {};
-                        const normalized = {
-                            id: question.id,
-                            type: question.type || 'text',
-                            question_text: question.question_text || '',
-                            subtitle: question.description || '',
-                            required: !!question.is_required,
-                        };
-
-                        if (normalized.type === 'choice' || normalized.type === 'checkbox') {
-                            normalized.options = (question.options || []).map(option => ({
-                                label: option.option_label || option.option_value || '',
-                                go_to: null,
-                            }));
-                            normalized.other_enabled = !!settings.other_enabled;
-                            normalized.display_type = settings.display_type || 'list';
-                        } else if (normalized.type === 'likert') {
-                            const points = settings.scale_points || 5;
-                            normalized.scale_points = points;
-                            normalized.scale_labels = settings.scale_labels || Array(points).fill('');
-                            normalized.statements = (settings.statements || []).map(statement => ({
-                                id: statement.id || generateStatementId(),
-                                text: statement.text || '',
-                            }));
-                        }
-
-                        return normalized;
-                    }),
-                };
-            }
-
-            async function loadTracerData() {
-                try {
-                    const [activeResponse, deletedResponse] = await Promise.all([
-                        fetch(tracerListUrl, { headers: { Accept: 'application/json' } }),
-                        fetch(tracerDeletedUrl, { headers: { Accept: 'application/json' } }),
-                    ]);
-
-                    if (!activeResponse.ok || !deletedResponse.ok) {
-                        throw new Error('Failed to load tracer forms.');
+        let phases = [
+            {
+                id: 1, title: 'Personal Profile', subtitle: 'Basic & contact information',
+                icon: 'fa-user', color: '#3b82f6',
+                sections: [
+                    {
+                        id: '1-0', title: 'Basic Information', description: 'Personal details',
+                        questions: [
+                            { id: '1-0-1', label: 'Full Name', type: 'text', placeholder: 'Juan dela Cruz', required: true },
+                            { id: '1-0-2', label: 'Date of Birth', type: 'text', placeholder: 'MM/DD/YYYY', required: true },
+                            { id: '1-0-3', label: 'Civil Status', type: 'radio', options: ['Single','Married','Widowed','Separated'], required: true },
+                            { id: '1-0-4', label: 'Gender', type: 'radio', options: ['Male','Female','Prefer not to say'], required: true },
+                            { id: '1-0-5', label: 'Region of Residence', type: 'select', options: ['Region III – Central Luzon','Region IV-A – CALABARZON','NCR – Metro Manila','Others'], required: true }
+                        ]
+                    },
+                    {
+                        id: '1-1', title: 'Contact Details', description: 'How to reach you',
+                        questions: [
+                            { id: '1-1-1', label: 'Mobile Number', type: 'tel', placeholder: '09XX-XXX-XXXX', required: true },
+                            { id: '1-1-2', label: 'Email Address', type: 'email', placeholder: 'juandelacruz@email.com', required: true },
+                            { id: '1-1-3', label: 'Present Address', type: 'textarea', placeholder: 'Street, Barangay, City/Municipality', required: true },
+                            { id: '1-1-4', label: 'Province / City', type: 'text', placeholder: 'e.g. Batangas / Lipa City', required: true }
+                        ]
                     }
-
-                    const activeForms = await activeResponse.json();
-                    const deletedForms = await deletedResponse.json();
-
-                    // Populate from backend only — no mock data fallback
-                    surveys.splice(0, surveys.length, ...activeForms.map(normalizeServerSurvey));
-                    deletedSurveys = deletedForms.map(normalizeServerSurvey);
-                    
-                    // Set initial selection if surveys exist
-                    if (surveys.length && !currentSurveyId) {
-                        currentSurveyId = surveys[0].id;
+                ]
+            },
+            {
+                id: 2, title: 'Educational Background', subtitle: 'Academic history at NU Lipa',
+                icon: 'fa-book', color: '#10b981',
+                sections: [
+                    {
+                        id: '2-0', title: 'Academic History', description: 'Your credentials',
+                        questions: [
+                            { id: '2-0-1', label: 'College / Department', type: 'select', options: ['College of Engineering','College of Business & Accountancy','College of Computing and IT','College of Arts and Sciences','Others'], required: true },
+                            { id: '2-0-2', label: 'Degree Program', type: 'text', placeholder: 'e.g. BS Computer Science', required: true },
+                            { id: '2-0-3', label: 'Year Graduated', type: 'select', options: ['2024','2023','2022','2021','2020','2019','2018','2017','2016 or earlier'], required: true },
+                            { id: '2-0-4', label: 'Academic Honors Received', type: 'radio', options: ['Summa Cum Laude','Magna Cum Laude','Cum Laude','With Honors','None'], required: true },
+                            { id: '2-0-5', label: 'Did you graduate on time?', type: 'radio', options: ['Yes, on schedule','Extended by 1 semester','Extended by 1 year or more'], required: true }
+                        ]
+                    },
+                    {
+                        id: '2-1', title: 'Further Studies', description: 'Post-graduate education',
+                        questions: [
+                            { id: '2-1-1', label: 'Are you pursuing graduate studies?', type: 'radio', options: ['Yes, currently enrolled','Planning to enroll','Already finished','Not interested'], required: true },
+                            { id: '2-1-2', label: 'Graduate Program (if applicable)', type: 'text', placeholder: 'e.g. Master in IT' },
+                            { id: '2-1-3', label: 'Licensure Exams Passed', type: 'checkbox', options: ['Board Exam (PRC)','Civil Service Exam','CPA Board Exam','Engineering Board Exam','None / Not Applicable'] }
+                        ]
                     }
-                } catch (error) {
-                    console.warn('Tracer data load warning:', error.message);
-                    // Keep arrays empty — UI will show "no surveys" state
-                    surveys = [];
-                    deletedSurveys = [];
-                    currentSurveyId = null;
-                }
-            }
-
-            function collectSurveyFromBuilder() {
-                const currentSurvey = getCurrentSurvey();
-                const questions = [];
-
-                document.querySelectorAll('.question-card-builder').forEach(card => {
-                    const question = {
-                        id: parseInt(card.dataset.questionId),
-                        type: card.querySelector('.type-select').value,
-                        question_text: card.querySelector('.question-text-input').value,
-                        subtitle: card.querySelector('.subtitle-input').value,
-                        required: card.querySelector('.required-toggle input').checked,
-                    };
-
-                    if (question.type === 'choice' || question.type === 'checkbox') {
-                        question.options = [];
-                        card.querySelectorAll('.option-row').forEach(row => {
-                            question.options.push({
-                                label: row.querySelector('.option-label').value,
-                                go_to: row.querySelector('.goto-select')?.value || null,
-                            });
-                        });
-                        question.other_enabled = card.querySelector('.other-toggle input')?.checked || false;
-                        question.display_type = card.querySelector('.display-type-toggle input')?.checked ? 'dropdown' : 'list';
-                    } else if (question.type === 'likert') {
-                        question.scale_points = parseInt(card.querySelector('.scale-points-input').value) || 5;
-                        question.scale_labels = Array.from(card.querySelectorAll('.scale-label-item input')).map(inp => inp.value);
-                        question.statements = [];
-                        card.querySelectorAll('.likert-statement-row').forEach(row => {
-                            question.statements.push({
-                                id: row.dataset.statementId,
-                                text: row.querySelector('.statement-text-input').value,
-                            });
-                        });
+                ]
+            },
+            {
+                id: 3, title: 'Employment Profile', subtitle: 'Career and work details',
+                icon: 'fa-briefcase', color: '#f59e0b',
+                sections: [
+                    {
+                        id: '3-0', title: 'Current Employment', description: 'Present work situation',
+                        questions: [
+                            { id: '3-0-1', label: 'Employment Status', type: 'radio', options: ['Employed (full-time)','Employed (part-time)','Self-employed / Freelance','Unemployed – seeking work','Continuing Education','OFW'], required: true },
+                            { id: '3-0-2', label: 'Job Title / Position', type: 'text', placeholder: 'e.g. Software Developer' },
+                            { id: '3-0-3', label: 'Company / Employer', type: 'text', placeholder: 'Company or organization name' },
+                            { id: '3-0-4', label: 'Industry / Type of Work', type: 'select', options: ['Information Technology','Business / Finance','Engineering','Healthcare','Education / Academe','Government','Tourism / Hospitality','Others'] },
+                            { id: '3-0-5', label: 'Monthly Salary Range', type: 'radio', options: ['Below ₱15,000','₱15,000 – ₱25,000','₱25,001 – ₱50,000','₱50,001 – ₱100,000','Above ₱100,000','Prefer not to disclose'] }
+                        ]
+                    },
+                    {
+                        id: '3-1', title: 'First Job Details', description: 'Journey to first employment',
+                        questions: [
+                            { id: '3-1-1', label: 'How long to find your first job?', type: 'radio', options: ['Before graduation','Within 1 month','1–6 months','6 months–1 year','More than 1 year','Still looking'], required: true },
+                            { id: '3-1-2', label: 'How did you find your first job?', type: 'radio', options: ['Online job portal','School placement / OJT','Referral from family or friends','Walk-in / direct application','Self-employed'], required: true },
+                            { id: '3-1-3', label: 'Is your job related to your degree?', type: 'radio', options: ['Yes, directly related','Somewhat related','Not related at all','Not yet employed'], required: true }
+                        ]
                     }
-
-                    questions.push(question);
-                });
-
-                // Get the actual status code from the current survey or default to draft (2)
-                let statusCode = 2; // default to draft
-                if (currentSurvey) {
-                    statusCode = currentSurvey.statusCode || 2;
-                }
-
-                return {
-                    id: currentSurvey ? currentSurvey.id : null,
-                    title: surveyTitleInput.value,
-                    status: statusCode,
-                    logo: surveyLogoText.innerText === '' ? 'NU' : surveyLogoText.innerText,
-                    headerPhoto: headerPhotoImg.src,
-                    persisted: currentSurvey ? !!currentSurvey.persisted : false,
-                    questions,
-                };
+                ]
+            },
+            {
+                id: 4, title: 'Professional Development', subtitle: 'Skills, training & growth',
+                icon: 'fa-bolt', color: '#8b5cf6',
+                sections: [
+                    {
+                        id: '4-0', title: 'Skills & Competencies', description: 'What you learned and applied',
+                        questions: [
+                            { id: '4-0-1', label: 'Technical skills you use most', type: 'checkbox', options: ['Programming / Coding','Data Analysis','Design / Drawing','Engineering Calculation','Accounting / Bookkeeping','Project Management','Research / Writing'] },
+                            { id: '4-0-2', label: 'Rate: Critical Thinking skills from NU Lipa', type: 'scale', required: true },
+                            { id: '4-0-3', label: 'Rate: Communication skills from NU Lipa', type: 'scale', required: true },
+                            { id: '4-0-4', label: 'Rate: Problem Solving skills from NU Lipa', type: 'scale', required: true }
+                        ]
+                    },
+                    {
+                        id: '4-1', title: 'Trainings & Certifications', description: 'Professional development',
+                        questions: [
+                            { id: '4-1-1', label: 'Attended professional trainings / seminars?', type: 'radio', options: ['Yes, many times','Yes, once or twice','Not yet, but planning to','No'], required: true },
+                            { id: '4-1-2', label: 'Types of development activities', type: 'checkbox', options: ['Technical / skills training','Leadership / management','Industry certification','Online courses','Government-sponsored (TESDA)','None'] },
+                            { id: '4-1-3', label: 'Remarks about your professional growth', type: 'textarea', placeholder: 'Share your career development journey...' }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: 5, title: 'Program Assessment', subtitle: 'Evaluate your NU Lipa education',
+                icon: 'fa-clipboard-check', color: '#ef4444',
+                sections: [
+                    {
+                        id: '5-0', title: 'Curriculum Evaluation', description: 'Help us improve our programs',
+                        questions: [
+                            { id: '5-0-1', label: 'Overall quality of your NU Lipa education', type: 'scale', required: true },
+                            { id: '5-0-2', label: 'Relevance of curriculum to your career', type: 'scale', required: true },
+                            { id: '5-0-3', label: 'Effectiveness of your instructors', type: 'scale', required: true },
+                            { id: '5-0-4', label: 'Adequacy of facilities and resources', type: 'scale', required: true },
+                            { id: '5-0-5', label: 'Quality of career guidance services', type: 'scale', required: true }
+                        ]
+                    },
+                    {
+                        id: '5-1', title: 'Suggestions & Recommendations', description: 'Your feedback shapes our future',
+                        questions: [
+                            { id: '5-1-1', label: 'Aspects of the curriculum to improve', type: 'checkbox', options: ['More industry-relevant subjects','More practical/OJT exposure','Updated course materials','Better lab equipment','Stronger industry linkages','Better career counseling'] },
+                            { id: '5-1-2', label: 'Would you recommend NU Lipa?', type: 'radio', options: ['Definitely yes','Probably yes','Probably not','Definitely not'], required: true },
+                            { id: '5-1-3', label: 'Other suggestions or comments', type: 'textarea', placeholder: 'Share your thoughts and recommendations...' }
+                        ]
+                    }
+                ]
             }
+        ];
 
-            // Sync DOM back to survey object
-            function syncBuilderToSurvey() {
-                const survey = getCurrentSurvey();
-                if (!survey) return;
-                Object.assign(survey, collectSurveyFromBuilder());
-                refreshAllGoToDropdowns();
+        const MOCK_RESPONSES = [
+            { id: 1, name: 'Maria Santos', program: 'BS IT', year: 2023, completion: 100, date: '2025-06-14', status: 'complete' },
+            { id: 2, name: 'Jose Reyes', program: 'BS ME', year: 2022, completion: 60, date: '2025-06-13', status: 'in-progress' },
+            { id: 3, name: 'Ana Cruz', program: 'BS Accountancy', year: 2023, completion: 40, date: '2025-06-12', status: 'in-progress' },
+            { id: 4, name: 'Carlo Mendoza', program: 'BS CS', year: 2024, completion: 100, date: '2025-06-11', status: 'complete' },
+            { id: 5, name: 'Liza Bautista', program: 'BS Tourism', year: 2022, completion: 20, date: '2025-06-10', status: 'in-progress' },
+            { id: 6, name: 'Ryan Villanueva', program: 'BS CE', year: 2021, completion: 100, date: '2025-06-09', status: 'complete' },
+            { id: 7, name: 'Grace Domingo', program: 'BS BA', year: 2023, completion: 80, date: '2025-06-08', status: 'in-progress' },
+            { id: 8, name: 'Ken Flores', program: 'BS EE', year: 2022, completion: 100, date: '2025-06-07', status: 'complete' }
+        ];
+
+        let selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+        let expandedSections = new Set();
+        let currentEditQuestion = null;
+        let currentEditPhase = null;
+        let currentEditSection = null;
+        let tempOptions = [];
+        let selectedIcon = 'fa-user';
+        let selectedColor = '#3b82f6';
+
+        // ═══════════════════════════════════════
+        // MOBILE MENU
+        // ═══════════════════════════════════════
+
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        }
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 1024) toggleMobileMenu();
+            });
+        });
+
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
             }
+        });
 
-            function refreshAllGoToDropdowns() {
-                const survey = getCurrentSurvey();
-                if (!survey || !survey.questions) return;
-                const questionList = survey.questions;
-                document.querySelectorAll('.option-row .goto-select').forEach(select => {
-                    const currentValue = select.dataset.currentValue || select.value;
-                    select.innerHTML = '<option value="">Continue to next</option>';
-                    questionList.forEach((q, idx) => {
-                        const displayText = q.question_text || 'Question #' + (idx + 1);
-                        select.innerHTML += `<option value="${q.id}">Go to: ${displayText}</option>`;
-                    });
-                    select.innerHTML += '<option value="end">End of Form</option>';
-                    const options = Array.from(select.options).map(o => o.value);
-                    select.value = options.includes(currentValue) ? currentValue : '';
-                    select.dataset.currentValue = select.value;
-                });
-            }
+        // ═══════════════════════════════════════
+        // TAB SWITCHING
+        // ═══════════════════════════════════════
 
-            function buildFormFromSurvey() {
-                const survey = getCurrentSurvey();
-                formBuilder.innerHTML = '';
-                if (!survey || !survey.questions) return;
-                survey.questions.forEach((q, index) => appendQuestionCard(q, index));
-                addBetweenButtons();
-                enableDragDrop();
-                refreshAllGoToDropdowns();
-            }
+        document.querySelectorAll('.tracer-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tracer-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tracer-panel').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.dataset.tab + '-panel').classList.add('active');
 
-            function appendQuestionCard(questionData, index = null) {
-                const q = questionData;
-                const card = document.createElement('div');
-                card.className = `question-card-builder ${q.type === 'section_header' ? 'section-header' : ''}`;
-                card.dataset.questionId = q.id;
-                card.draggable = true;
-                card.innerHTML = `
-                    <div class="card-drag-handle" title="Drag to reorder">&#x2630;</div>
-                    <div class="card-question-row">
-                        <input type="text" class="form-control question-text-input" value="${q.question_text || ''}" placeholder="Question text">
-                    </div>
-                    <div class="card-subtitle-row">
-                        <input type="text" class="form-control subtitle-input" value="${q.subtitle || ''}" placeholder="Subtitle (optional)">
-                    </div>
-                    <div class="card-toolbar">
-                        <span class="question-number">#${index !== null ? index + 1 : ''}</span>
-                        <select class="form-control type-select">
-                            <option value="text" ${q.type === 'text' ? 'selected' : ''}>Text</option>
-                            <option value="choice" ${q.type === 'choice' ? 'selected' : ''}>Choice</option>
-                            <option value="checkbox" ${q.type === 'checkbox' ? 'selected' : ''}>Checkbox</option>
-                            <option value="likert" ${q.type === 'likert' ? 'selected' : ''}>Likert Scale</option>
-                            <option value="section_header" ${q.type === 'section_header' ? 'selected' : ''}>Section Header</option>
-                        </select>
-                        <label class="required-toggle"><input type="checkbox" ${q.required ? 'checked' : ''}> Required</label>
-                        <div class="card-actions">
-                            <button class="btn-icon duplicate" title="Duplicate question">&#x2398;</button>
-                            <button class="btn-icon delete" title="Delete question">&#x2715;</button>
-                        </div>
-                    </div>
-                    <div class="card-body"></div>
-                `;
-                const body = card.querySelector('.card-body');
-                loadTypeBody(body, q);
-                formBuilder.appendChild(card);
-                attachCardEvents(card);
-            }
+                if (this.dataset.tab === 'builder') renderBuilder();
+                if (this.dataset.tab === 'responses') renderResponsesTable();
+            });
+        });
 
-            function loadTypeBody(bodyElement, question) {
-                bodyElement.innerHTML = '';
-                const type = question.type;
-                if (type === 'choice' || type === 'checkbox') {
-                    const isDropdown = question.display_type === 'dropdown';
-                    bodyElement.innerHTML = `
-                        <div class="options-list">
-                            ${(question.options || []).map(opt => `
-                                <div class="option-row">
-                                    <input type="text" class="form-control option-label" placeholder="Option label" value="${opt.label || ''}">
-                                    <select class="goto-select" data-current-value="${opt.go_to || ''}">
-                                        <option value="">Continue to next</option>
-                                    </select>
-                                    <button class="remove-option" title="Remove option">&times;</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                            <button class="add-option-btn">+ Add Option</button>
-                            <label class="other-toggle"><input type="checkbox" ${question.other_enabled ? 'checked' : ''}> Add "Other" option</label>
-                            <label class="display-type-toggle"><input type="checkbox" ${isDropdown ? 'checked' : ''}> Display as Dropdown</label>
-                        </div>
-                        ${question.other_enabled ? '<div class="other-placeholder">Other: [manual text entry]</div>' : ''}
-                    `;
-                } else if (type === 'likert') {
-                    const points = question.scale_points || 5;
-                    const labels = question.scale_labels || Array(points).fill('');
-                    const statements = question.statements || [{ id: generateStatementId(), text: '' }];
-                    bodyElement.innerHTML = `
-                        <div class="likert-setup">
-                            <div>
-                                <label>Scale Points</label>
-                                <input type="number" class="form-control scale-points-input" min="2" max="10" value="${points}">
+        // ═══════════════════════════════════════
+        // BUILDER RENDERING
+        // ═══════════════════════════════════════
+
+        function renderPhasesList() {
+            const container = document.getElementById('phasesList');
+            container.innerHTML = phases.map(phase => {
+                const isSel = selectedPhaseId === phase.id;
+                const totalQ = phase.sections.reduce((s, sec) => s + sec.questions.length, 0);
+                return `
+                    <div class="phase-card ${isSel ? 'active' : ''}" onclick="selectPhase(${phase.id})">
+                        <div class="phase-card-header">
+                            <div class="phase-card-icon" style="background:${isSel ? 'rgba(255,255,255,0.15)' : phase.color + '20'}; color:${isSel ? '#fff' : phase.color};">
+                                <i class="fa-solid ${phase.icon}"></i>
+                            </div>
+                            <div class="phase-card-info">
+                                <p class="phase-card-title">${phase.title}</p>
+                                <p class="phase-card-meta">${phase.sections.length} sections · ${totalQ} questions</p>
+                            </div>
+                            <div class="phase-card-actions">
+                                <button onclick="event.stopPropagation(); openPhaseModal(${phase.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="event.stopPropagation(); deletePhase(${phase.id})" title="Delete"><i class="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
-                        <div class="scale-labels-editor">
-                            ${labels.map((label, i) => `
-                                <div class="scale-label-item">
-                                    <div class="point-number">${i+1}</div>
-                                    <input type="text" class="form-control" value="${label || ''}" placeholder="Point ${i+1} label">
-                                </div>
-                            `).join('')}
-                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
 
-                        <div class="likert-statements-section">
-                            <label style="margin-top: 15px;">Statements (rows)</label>
-                            <div class="likert-statements-list">
-                                ${statements.map(stmt => `
-                                    <div class="likert-statement-row" data-statement-id="${stmt.id}">
-                                        <input type="text" class="form-control statement-text-input" value="${stmt.text || ''}" placeholder="Enter statement">
-                                        <button class="remove-statement-btn" title="Remove statement">&times;</button>
+        function selectPhase(id) {
+            selectedPhaseId = id;
+            renderBuilder();
+        }
+
+        function renderBuilder() {
+            renderPhasesList();
+            const phase = phases.find(p => p.id === selectedPhaseId);
+            const emptyState = document.getElementById('emptyBuilderState');
+            const detailContent = document.getElementById('phaseDetailContent');
+
+            if (!phase) {
+                emptyState.style.display = 'block';
+                detailContent.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            detailContent.style.display = 'block';
+
+            detailContent.innerHTML = `
+                <div class="builder-content-header">
+                    <div class="builder-phase-info">
+                        <div class="builder-phase-icon" style="background:${phase.color}20; color:${phase.color};">
+                            <i class="fa-solid ${phase.icon}"></i>
+                        </div>
+                        <div class="builder-phase-details">
+                            <h2>${phase.title}</h2>
+                            <p>${phase.subtitle || 'No subtitle'}</p>
+                        </div>
+                    </div>
+                    <button class="btn-add-section" onclick="openSectionModal(null, ${phase.id})">
+                        <i class="fa-solid fa-plus"></i> Add Section
+                    </button>
+                </div>
+                ${phase.sections.length === 0 ? `
+                    <div class="empty-builder-state" style="border: 2px dashed var(--gray-200); border-radius: var(--radius-xl); padding: 3rem;">
+                        <i class="fa-solid fa-folder-plus" style="font-size: 3rem; color: var(--gray-300);"></i>
+                        <p style="color: var(--gray-500); font-weight: 500; margin-top: 0.75rem;">No sections yet</p>
+                        <p style="color: var(--gray-400); font-size: 0.875rem; margin-top: 0.25rem;">Click "Add Section" to get started.</p>
+                    </div>
+                ` : `
+                    <div class="sections-list">
+                        ${phase.sections.map((section, secIdx) => {
+                            const isOpen = expandedSections.has(section.id);
+                            return `
+                                <div class="section-card ${isOpen ? 'expanded' : ''}">
+                                    <div class="section-header" onclick="toggleSection('${section.id}')">
+                                        <div class="section-number" style="background:${phase.color};">${secIdx + 1}</div>
+                                        <div class="section-info">
+                                            <h4>${section.title}</h4>
+                                            <p>${section.description ? section.description + ' · ' : ''}${section.questions.length} question${section.questions.length !== 1 ? 's' : ''}</p>
+                                        </div>
+                                        <div class="section-actions" onclick="event.stopPropagation();">
+                                            <button class="btn-icon" onclick="openSectionModal('${section.id}', ${phase.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="btn-icon delete" onclick="deleteSection(${phase.id}, '${section.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                        </div>
+                                        <i class="fa-solid fa-chevron-${isOpen ? 'up' : 'down'} section-toggle"></i>
                                     </div>
-                                `).join('')}
-                            </div>
-                            <button class="add-statement-btn">+ Add Statement</button>
-                        </div>
-
-                        <div class="scale-preview" id="scalePreview">${generateScalePoints(points)}</div>
-                    `;
-                } else if (type === 'text') {
-                    bodyElement.innerHTML = '<div class="text-preview">Long answer text...</div>';
-                }
-            }
-
-            function generateScalePoints(count) {
-                let html = '';
-                for (let i = 1; i <= count; i++) html += `<div class="scale-point">${i}</div>`;
-                return html;
-            }
-
-            function attachCardEvents(card) {
-                const typeSelect = card.querySelector('.type-select');
-                typeSelect.addEventListener('change', function(e) {
-                    const newType = e.target.value;
-                    card.classList.toggle('section-header', newType === 'section_header');
-                    const body = card.querySelector('.card-body');
-                    const qText = card.querySelector('.question-text-input').value;
-                    const subtitle = card.querySelector('.subtitle-input').value;
-                    const required = card.querySelector('.required-toggle input').checked;
-                    loadTypeBody(body, { type: newType, question_text: qText, subtitle, required, options: [], scale_points: 5, scale_labels: [], statements: [], other_enabled: false, display_type: 'list' });
-                    attachBodyEvents(card);
-                    syncBuilderToSurvey();
-                    refreshAllGoToDropdowns();
-                });
-
-                card.querySelector('.delete').addEventListener('click', () => {
-                    card.remove();
-                    updateQuestionNumbers();
-                    addBetweenButtons();
-                    syncBuilderToSurvey();
-                    refreshAllGoToDropdowns();
-                });
-
-                card.querySelector('.duplicate').addEventListener('click', () => {
-                    syncBuilderToSurvey();
-                    const survey = getCurrentSurvey();
-                    const origId = parseInt(card.dataset.questionId);
-                    const origQ = survey.questions.find(q => q.id === origId);
-                    if (!origQ) return;
-                    const clone = JSON.parse(JSON.stringify(origQ));
-                    clone.id = generateQuestionId();
-                    // regen statement IDs for duplicate
-                    if (clone.statements) clone.statements = clone.statements.map(s => ({ ...s, id: generateStatementId() }));
-                    const newCard = buildCardElement(clone);
-                    card.after(newCard);
-                    updateQuestionNumbers();
-                    addBetweenButtons();
-                    syncBuilderToSurvey();
-                    enableDragDrop();
-                    refreshAllGoToDropdowns();
-                });
-
-                card.querySelector('.required-toggle input').addEventListener('change', syncBuilderToSurvey);
-                card.querySelector('.question-text-input').addEventListener('input', () => { syncBuilderToSurvey(); refreshAllGoToDropdowns(); });
-                card.querySelector('.subtitle-input').addEventListener('input', syncBuilderToSurvey);
-                attachBodyEvents(card);
-            }
-
-            function attachBodyEvents(card) {
-                const addBtn = card.querySelector('.add-option-btn');
-                if (addBtn) {
-                    addBtn.addEventListener('click', () => {
-                        const list = card.querySelector('.options-list');
-                        const newRow = document.createElement('div');
-                        newRow.className = 'option-row';
-                        newRow.innerHTML = `
-                            <input type="text" class="form-control option-label" placeholder="Option label">
-                            <select class="goto-select"><option value="">Continue to next</option></select>
-                            <button class="remove-option" title="Remove option">&times;</button>
-                        `;
-                        list.appendChild(newRow);
-                        newRow.querySelector('.remove-option').addEventListener('click', () => { newRow.remove(); syncBuilderToSurvey(); });
-                        newRow.querySelector('.option-label').addEventListener('input', syncBuilderToSurvey);
-                        newRow.querySelector('.goto-select').addEventListener('change', function() { this.dataset.currentValue = this.value; syncBuilderToSurvey(); });
-                        syncBuilderToSurvey();
-                        refreshAllGoToDropdowns();
-                    });
-                }
-
-                card.querySelectorAll('.remove-option').forEach(btn => btn.addEventListener('click', (e) => { e.target.closest('.option-row').remove(); syncBuilderToSurvey(); }));
-                card.querySelectorAll('.option-label').forEach(inp => inp.addEventListener('input', syncBuilderToSurvey));
-                card.querySelectorAll('.goto-select').forEach(sel => sel.addEventListener('change', function() { this.dataset.currentValue = this.value; syncBuilderToSurvey(); }));
-
-                const otherToggle = card.querySelector('.other-toggle input');
-                if (otherToggle) {
-                    otherToggle.addEventListener('change', function() {
-                        const placeholder = card.querySelector('.other-placeholder');
-                        if (this.checked) {
-                            if (!placeholder) {
-                                const div = document.createElement('div');
-                                div.className = 'other-placeholder';
-                                div.textContent = 'Other: [manual text entry]';
-                                card.querySelector('.options-list').after(div);
-                            }
-                        } else { const el = card.querySelector('.other-placeholder'); if (el) el.remove(); }
-                        syncBuilderToSurvey();
-                    });
-                }
-
-                const displayToggle = card.querySelector('.display-type-toggle input');
-                if (displayToggle) displayToggle.addEventListener('change', syncBuilderToSurvey);
-
-                const pointsInput = card.querySelector('.scale-points-input');
-                if (pointsInput) {
-                    pointsInput.addEventListener('input', () => {
-                        const val = parseInt(pointsInput.value) || 5;
-                        const preview = card.querySelector('#scalePreview');
-                        if (preview) preview.innerHTML = generateScalePoints(val);
-                        const editor = card.querySelector('.scale-labels-editor');
-                        const currentLabels = Array.from(editor.querySelectorAll('input')).map(inp => inp.value);
-                        editor.innerHTML = '';
-                        for (let i = 0; i < val; i++) {
-                            editor.innerHTML += `<div class="scale-label-item"><div class="point-number">${i+1}</div><input type="text" class="form-control" value="${currentLabels[i] || ''}" placeholder="Point ${i+1} label"></div>`;
-                        }
-                        editor.querySelectorAll('input').forEach(inp => inp.addEventListener('input', syncBuilderToSurvey));
-                        syncBuilderToSurvey();
-                    });
-                    card.querySelectorAll('.scale-labels-editor input').forEach(inp => inp.addEventListener('input', syncBuilderToSurvey));
-                }
-
-                // Likert statements
-                const addStatementBtn = card.querySelector('.add-statement-btn');
-                if (addStatementBtn) {
-                    addStatementBtn.addEventListener('click', () => {
-                        const list = card.querySelector('.likert-statements-list');
-                        const newRow = document.createElement('div');
-                        newRow.className = 'likert-statement-row';
-                        newRow.dataset.statementId = generateStatementId();
-                        newRow.innerHTML = `
-                            <input type="text" class="form-control statement-text-input" placeholder="Enter statement">
-                            <button class="remove-statement-btn" title="Remove statement">&times;</button>
-                        `;
-                        list.appendChild(newRow);
-                        newRow.querySelector('.remove-statement-btn').addEventListener('click', () => {
-                            newRow.remove();
-                            syncBuilderToSurvey();
-                        });
-                        newRow.querySelector('.statement-text-input').addEventListener('input', syncBuilderToSurvey);
-                        syncBuilderToSurvey();
-                    });
-                }
-
-                card.querySelectorAll('.remove-statement-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        btn.closest('.likert-statement-row').remove();
-                        syncBuilderToSurvey();
-                    });
-                });
-
-                card.querySelectorAll('.statement-text-input').forEach(inp => {
-                    inp.addEventListener('input', syncBuilderToSurvey);
-                });
-            }
-
-            function buildCardElement(questionData) {
-                const temp = document.createElement('div');
-                temp.innerHTML = '<div class="question-card-builder"></div>';
-                const card = temp.firstChild;
-                const q = questionData;
-                card.className = `question-card-builder ${q.type === 'section_header' ? 'section-header' : ''}`;
-                card.dataset.questionId = q.id;
-                card.draggable = true;
-                card.innerHTML = `
-                    <div class="card-drag-handle" title="Drag to reorder">&#x2630;</div>
-                    <div class="card-question-row">
-                        <input type="text" class="form-control question-text-input" value="${q.question_text || ''}" placeholder="Question text">
+                                    <div class="section-body">
+                                        ${section.questions.length === 0 ? '<p style="color: var(--gray-400); text-align: center; padding: 1.5rem;">No questions yet.</p>' : `
+                                            <div class="questions-list">
+                                                ${section.questions.map((q, qi) => `
+                                                    <div class="question-item">
+                                                        <i class="fa-solid fa-grip-vertical question-drag"></i>
+                                                        <div class="question-number" style="background:${phase.color};">${qi + 1}</div>
+                                                        <div class="question-content">
+                                                            <p class="question-label-text">${q.label}</p>
+                                                            <div class="question-meta">
+                                                                <span class="question-type-badge"><i class="fa-solid ${typeIcons[q.type] || 'fa-question'}"></i> ${typeLabels[q.type] || q.type}</span>
+                                                                ${q.required ? '<span class="required-badge">Required</span>' : ''}
+                                                                ${q.options ? `<span style="font-size:0.6875rem;color:var(--gray-400);">${q.options.length} options</span>` : ''}
+                                                            </div>
+                                                        </div>
+                                                        <div class="question-actions">
+                                                            <button onclick="openQuestionModal(${phase.id}, '${section.id}', ${JSON.stringify(q).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                                            <button class="delete-question" onclick="deleteQuestion(${phase.id}, '${section.id}', '${q.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        `}
+                                        <button class="add-question-btn" onclick="openQuestionModal(${phase.id}, '${section.id}', null)">
+                                            <i class="fa-solid fa-plus"></i> Add Question
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
-                    <div class="card-subtitle-row">
-                        <input type="text" class="form-control subtitle-input" value="${q.subtitle || ''}" placeholder="Subtitle (optional)">
-                    </div>
-                    <div class="card-toolbar">
-                        <span class="question-number">?</span>
-                        <select class="form-control type-select">
-                            <option value="text" ${q.type==='text'?'selected':''}>Text</option>
-                            <option value="choice" ${q.type==='choice'?'selected':''}>Choice</option>
-                            <option value="checkbox" ${q.type==='checkbox'?'selected':''}>Checkbox</option>
-                            <option value="likert" ${q.type==='likert'?'selected':''}>Likert Scale</option>
-                            <option value="section_header" ${q.type==='section_header'?'selected':''}>Section Header</option>
-                        </select>
-                        <label class="required-toggle"><input type="checkbox" ${q.required?'checked':''}> Required</label>
-                        <div class="card-actions">
-                            <button class="btn-icon duplicate" title="Duplicate question">&#x2398;</button>
-                            <button class="btn-icon delete" title="Delete question">&#x2715;</button>
+                `}
+            `;
+        }
+
+        function toggleSection(sectionId) {
+            if (expandedSections.has(sectionId)) {
+                expandedSections.delete(sectionId);
+            } else {
+                expandedSections.add(sectionId);
+            }
+            renderBuilder();
+        }
+
+        function deletePhase(id) {
+            if (!confirm('Delete this phase and all its content?')) return;
+            phases = phases.filter(p => p.id !== id);
+            if (selectedPhaseId === id) selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+            renderBuilder();
+        }
+
+        function deleteSection(phaseId, secId) {
+            if (!confirm('Delete this section?')) return;
+            phases = phases.map(p => p.id === phaseId ? { ...p, sections: p.sections.filter(s => s.id !== secId) } : p);
+            expandedSections.delete(secId);
+            renderBuilder();
+        }
+
+        function deleteQuestion(phaseId, secId, qId) {
+            if (!confirm('Delete this question?')) return;
+            phases = phases.map(p => p.id === phaseId ? {
+                ...p,
+                sections: p.sections.map(s => s.id === secId ? { ...s, questions: s.questions.filter(q => q.id !== qId) } : s)
+            } : p);
+            renderBuilder();
+        }
+
+        // ═══════════════════════════════════════
+        // QUESTION MODAL
+        // ═══════════════════════════════════════
+
+        function openQuestionModal(phaseId, secId, question) {
+            currentEditQuestion = { phaseId, secId, question };
+            tempOptions = question && question.options ? [...question.options] : [];
+            
+            document.getElementById('questionModalTitle').textContent = question ? 'Edit Question' : 'Add New Question';
+            document.getElementById('qLabel').value = question ? question.label : '';
+            document.getElementById('qType').value = question ? question.type : 'text';
+            document.getElementById('qPlaceholder').value = question && question.placeholder ? question.placeholder : '';
+            document.getElementById('qRequired').checked = question ? !!question.required : true;
+            
+            handleTypeChange();
+            renderOptionsList();
+            
+            document.getElementById('questionModal').classList.add('active');
+        }
+
+        function closeQuestionModal() {
+            document.getElementById('questionModal').classList.remove('active');
+            currentEditQuestion = null;
+            tempOptions = [];
+        }
+
+        function handleTypeChange() {
+            const type = document.getElementById('qType').value;
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(type);
+            const needsPlaceholder = ['text', 'email', 'tel', 'textarea'].includes(type);
+            
+            document.getElementById('optionsGroup').style.display = needsOptions ? 'block' : 'none';
+            document.getElementById('placeholderGroup').style.display = needsPlaceholder ? 'block' : 'none';
+            document.getElementById('typeHelp').textContent = typeHelpText[type] || '';
+            
+            if (!needsOptions) tempOptions = [];
+        }
+
+        function renderOptionsList() {
+            const container = document.getElementById('optionsList');
+            container.innerHTML = tempOptions.map((opt, i) => `
+                <div class="option-item">
+                    <i class="fa-solid fa-grip-vertical" style="color:var(--gray-300);"></i>
+                    <span>${opt}</span>
+                    <button onclick="removeOption(${i})" style="color:var(--danger);"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function addOption() {
+            const input = document.getElementById('newOption');
+            const val = input.value.trim();
+            if (val) {
+                tempOptions.push(val);
+                input.value = '';
+                renderOptionsList();
+            }
+        }
+
+        function handleOptionKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addOption();
+            }
+        }
+
+        function removeOption(index) {
+            tempOptions.splice(index, 1);
+            renderOptionsList();
+        }
+
+        function saveQuestion() {
+            const label = document.getElementById('qLabel').value.trim();
+            if (!label) return;
+            
+            const type = document.getElementById('qType').value;
+            const needsOptions = ['radio', 'checkbox', 'select'].includes(type);
+            const needsPlaceholder = ['text', 'email', 'tel', 'textarea'].includes(type);
+            
+            const qData = {
+                id: currentEditQuestion.question ? currentEditQuestion.question.id : 'q-' + Date.now(),
+                label,
+                type,
+                options: needsOptions && tempOptions.length > 0 ? [...tempOptions] : undefined,
+                placeholder: needsPlaceholder ? document.getElementById('qPlaceholder').value.trim() || undefined : undefined,
+                required: document.getElementById('qRequired').checked
+            };
+
+            const { phaseId, secId, question } = currentEditQuestion;
+            
+            phases = phases.map(p => p.id === phaseId ? {
+                ...p,
+                sections: p.sections.map(s => s.id === secId ? {
+                    ...s,
+                    questions: question
+                        ? s.questions.map(q => q.id === question.id ? qData : q)
+                        : [...s.questions, qData]
+                } : s)
+            } : p);
+
+            closeQuestionModal();
+            renderBuilder();
+        }
+
+        // ═══════════════════════════════════════
+        // PHASE MODAL
+        // ═══════════════════════════════════════
+
+        function openPhaseModal(phaseId) {
+            const phase = phaseId ? phases.find(p => p.id === phaseId) : null;
+            currentEditPhase = phase;
+            selectedIcon = phase ? phase.icon : 'fa-user';
+            selectedColor = phase ? phase.color : '#3b82f6';
+            
+            document.getElementById('phaseModalTitle').textContent = phase ? 'Edit Phase' : 'Add New Phase';
+            document.getElementById('phaseTitle').value = phase ? phase.title : '';
+            document.getElementById('phaseSubtitle').value = phase ? phase.subtitle : '';
+            
+            renderIconGrid();
+            renderColorGrid();
+            
+            document.getElementById('phaseModal').classList.add('active');
+        }
+
+        function closePhaseModal() {
+            document.getElementById('phaseModal').classList.remove('active');
+            currentEditPhase = null;
+        }
+
+        function renderIconGrid() {
+            document.getElementById('iconGrid').innerHTML = icons.map(ic => `
+                <button onclick="selectIcon('${ic.key}')" class="icon-option ${selectedIcon === ic.key ? 'selected' : ''}">
+                    <i class="fa-solid ${ic.key}" style="color:${selectedIcon === ic.key ? '#32418C' : '#6b7280'};"></i>
+                    <span>${ic.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectIcon(key) {
+            selectedIcon = key;
+            renderIconGrid();
+        }
+
+        function renderColorGrid() {
+            document.getElementById('colorGrid').innerHTML = colors.map(c => `
+                <button onclick="selectedColor = '${c}'; renderColorGrid();" class="color-option ${selectedColor === c ? 'selected' : ''}" style="background:${c};"></button>
+            `).join('');
+        }
+
+        function savePhase() {
+            const title = document.getElementById('phaseTitle').value.trim();
+            if (!title) return;
+            
+            const data = {
+                title,
+                subtitle: document.getElementById('phaseSubtitle').value.trim(),
+                icon: selectedIcon,
+                color: selectedColor
+            };
+
+            if (currentEditPhase) {
+                phases = phases.map(p => p.id === currentEditPhase.id ? { ...p, ...data } : p);
+            } else {
+                const newId = Math.max(0, ...phases.map(p => p.id)) + 1;
+                phases.push({ id: newId, ...data, sections: [] });
+                selectedPhaseId = newId;
+            }
+
+            closePhaseModal();
+            renderBuilder();
+        }
+
+        // ═══════════════════════════════════════
+        // SECTION MODAL
+        // ═══════════════════════════════════════
+
+        function openSectionModal(sectionId, phaseId) {
+            const section = sectionId ? phases.find(p => p.id === phaseId)?.sections.find(s => s.id === sectionId) : null;
+            currentEditSection = { section, phaseId };
+            
+            document.getElementById('sectionModalTitle').textContent = section ? 'Edit Section' : 'Add New Section';
+            document.getElementById('sectionTitle').value = section ? section.title : '';
+            document.getElementById('sectionDesc').value = section ? section.description || '' : '';
+            
+            document.getElementById('sectionModal').classList.add('active');
+        }
+
+        function closeSectionModal() {
+            document.getElementById('sectionModal').classList.remove('active');
+            currentEditSection = null;
+        }
+
+        function saveSection() {
+            const title = document.getElementById('sectionTitle').value.trim();
+            if (!title) return;
+            
+            const data = {
+                title,
+                description: document.getElementById('sectionDesc').value.trim()
+            };
+
+            const { section, phaseId } = currentEditSection;
+
+            phases = phases.map(p => p.id === phaseId ? {
+                ...p,
+                sections: section
+                    ? p.sections.map(s => s.id === section.id ? { ...s, ...data } : s)
+                    : [...p.sections, { id: phaseId + '-' + Date.now(), ...data, questions: [] }]
+            } : p);
+
+            closeSectionModal();
+            renderBuilder();
+        }
+
+        // ═══════════════════════════════════════
+        // RESPONSES TABLE
+        // ═══════════════════════════════════════
+
+        function renderResponsesTable(filteredData) {
+            const data = filteredData || MOCK_RESPONSES;
+            const tbody = document.getElementById('responsesTableBody');
+            tbody.innerHTML = data.map(r => `
+                <tr>
+                    <td style="color:var(--gray-400);font-size:0.8125rem;">${r.id}</td>
+                    <td>
+                        <div class="alumni-info">
+                            <div class="alumni-avatar">${r.name.split(' ').map(n => n[0]).join('')}</div>
+                            <span class="alumni-name">${r.name}</span>
                         </div>
-                    </div>
-                    <div class="card-body"></div>
-                `;
-                const body = card.querySelector('.card-body');
-                loadTypeBody(body, q);
-                attachCardEvents(card);
-                return card;
-            }
-
-            function updateQuestionNumbers() {
-                document.querySelectorAll('.question-card-builder').forEach((card, idx) => {
-                    const numSpan = card.querySelector('.question-number');
-                    if (numSpan) numSpan.textContent = '#' + (idx + 1);
-                });
-            }
-
-            function addBetweenButtons() {
-                document.querySelectorAll('.add-between').forEach(el => el.remove());
-                const cards = [...document.querySelectorAll('.question-card-builder')];
-                cards.forEach((card, index) => {
-                    if (index < cards.length - 1) {
-                        const betweenDiv = document.createElement('div');
-                        betweenDiv.className = 'add-between';
-                        betweenDiv.innerHTML = '<button>+ Insert Between</button>';
-                        betweenDiv.querySelector('button').addEventListener('click', () => {
-                            const newQuestion = createEmptyQuestion('text');
-                            const newCard = buildCardElement(newQuestion);
-                            card.after(newCard);
-                            updateQuestionNumbers();
-                            addBetweenButtons();
-                            syncBuilderToSurvey();
-                            enableDragDrop();
-                            refreshAllGoToDropdowns();
-                        });
-                        card.after(betweenDiv);
-                    }
-                });
-            }
-
-            function enableDragDrop() {
-                const cards = document.querySelectorAll('.question-card-builder');
-                cards.forEach(card => {
-                    card.removeEventListener('dragstart', handleDragStart);
-                    card.removeEventListener('dragover', handleDragOver);
-                    card.removeEventListener('dragleave', handleDragLeave);
-                    card.removeEventListener('drop', handleDrop);
-                    card.removeEventListener('dragend', handleDragEnd);
-                    card.addEventListener('dragstart', handleDragStart);
-                    card.addEventListener('dragover', handleDragOver);
-                    card.addEventListener('dragleave', handleDragLeave);
-                    card.addEventListener('drop', handleDrop);
-                    card.addEventListener('dragend', handleDragEnd);
-                });
-            }
-
-            let draggedItem = null;
-            function handleDragStart(e) { draggedItem = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
-            function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); }
-            function handleDragLeave() { this.classList.remove('drag-over'); }
-            function handleDrop(e) {
-                e.stopPropagation();
-                this.classList.remove('drag-over');
-                if (draggedItem !== this && draggedItem) {
-                    const parent = this.parentNode;
-                    const ref = this.nextSibling === draggedItem ? this : this;
-                    parent.insertBefore(draggedItem, ref);
-                    addBetweenButtons();
-                    updateQuestionNumbers();
-                    syncBuilderToSurvey();
-                    enableDragDrop();
-                    refreshAllGoToDropdowns();
-                }
-            }
-            function handleDragEnd() { this.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); draggedItem = null; }
-
-            function renderSidebar() {
-                surveyListContainer.innerHTML = '';
-                
-                if (surveys.length === 0) {
-                    surveyListContainer.innerHTML = '<div class="empty-state">No surveys yet. Click "+ Add New Alumni Tracer" to create one.</div>';
-                    return;
-                }
-                
-                surveys.forEach(survey => {
-                    const item = document.createElement('div');
-                    item.className = `survey-item${currentSurveyId === survey.id ? ' active' : ''}`;
-                    item.dataset.surveyId = survey.id;
-                    item.innerHTML = `
-                        <div class="survey-item-icon ${survey.title.includes('SHS') ? 'warning' : ''}">NU</div>
-                        <div class="survey-item-details">
-                            <h4>${survey.title || 'Untitled Survey'}</h4>
-                            <span>${survey.displayStatus || survey.status}</span>
+                    </td>
+                    <td>${r.program}</td>
+                    <td>${r.year}</td>
+                    <td>
+                        <div class="progress-bar-wrapper">
+                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.completion}%; background:${r.completion === 100 ? '#10b981' : '#f59e0b'};"></div></div>
+                            <span class="progress-text" style="color:${r.completion === 100 ? '#10b981' : '#f59e0b'};">${r.completion}%</span>
                         </div>
-                    `;
-                    item.addEventListener('click', () => selectSurvey(survey.id));
-                    surveyListContainer.appendChild(item);
+                    </td>
+                    <td>${r.date}</td>
+                    <td><span class="status-badge ${r.status}">${r.status === 'complete' ? 'Complete' : 'In Progress'}</span></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon" title="View"><i class="fa-solid fa-eye"></i></button>
+                            <button class="btn-icon delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('responsesCount').textContent = `${data.length} result${data.length !== 1 ? 's' : ''}`;
+        }
+
+        // Responses search & filter
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('responsesSearch');
+            const filterSelect = document.getElementById('responsesFilter');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterResponses);
+            }
+            if (filterSelect) {
+                filterSelect.addEventListener('change', filterResponses);
+            }
+
+            function filterResponses() {
+                const query = (searchInput?.value || '').toLowerCase();
+                const status = filterSelect?.value || 'all';
+                
+                const filtered = MOCK_RESPONSES.filter(r => {
+                    const matchesSearch = r.name.toLowerCase().includes(query) || r.program.toLowerCase().includes(query);
+                    const matchesStatus = status === 'all' || r.status === status;
+                    return matchesSearch && matchesStatus;
                 });
-            }
-
-            function selectSurvey(id) {
-                if (!id || currentSurveyId === id) return;
                 
-                syncBuilderToSurvey();
-                currentSurveyId = id;
-                
-                document.querySelectorAll('.survey-item').forEach(item => {
-                    item.classList.toggle('active', parseInt(item.dataset.surveyId) === id);
-                });
-                
-                const survey = getCurrentSurvey();
-                if (survey) {
-                    surveyTitleInput.value = survey.title || '';
-                    surveyTitleDisplay.textContent = survey.title || 'Untitled Survey';
-                    surveyStatusDisplay.textContent = survey.displayStatus || survey.status;
-                    surveyLogoText.innerText = survey.logo || 'NU';
-                    headerPhotoImg.src = survey.headerPhoto || '/assets/logos/nu_banner.png';
-                }
-                
-                buildFormFromSurvey();
-                addBetweenButtons();
-                enableDragDrop();
-                refreshAllGoToDropdowns();
+                renderResponsesTable(filtered);
             }
 
-            function renderManageTable() {
-                manageTableBody.innerHTML = '';
-                if (!surveys.length) {
-                    manageTableBody.innerHTML = '<tr><td colspan="3" style="padding: 14px; color: #6b7280;">No active surveys yet.</td></tr>';
-                    return;
+            // Initial render
+            renderResponsesTable();
+            renderBuilder();
+        });
+
+        // ═══════════════════════════════════════
+        // MODAL CLOSE ON OVERLAY CLICK
+        // ═══════════════════════════════════════
+
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('active');
                 }
+            });
+        });
 
-                surveys.forEach(survey => {
-                    const row = document.createElement('tr');
-                    row.style.borderBottom = '1px solid #e5e7eb';
-                    const isActive = survey.statusCode === 1;
-                    row.innerHTML = `
-                        <td style="padding: 12px; font-weight: 500;">${survey.title || 'Untitled'}</td>
-                        <td style="padding: 12px;">
-                            <label class="toggle-switch">
-                                <input type="checkbox" class="status-toggle" data-survey-id="${survey.id}" ${isActive ? 'checked' : ''}>
-                                <span class="toggle-slider"></span>
-                            </label>
-                            <span style="margin-left: 8px; font-size:13px;">${survey.displayStatus || survey.status}</span>
-                        </td>
-                        <td style="padding: 12px;">
-                            <button class="edit-btn" data-survey-id="${survey.id}" style="background: #32418c; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-right: 5px; cursor: pointer;">Edit</button>
-                            <button class="delete-btn" data-survey-id="${survey.id}" style="background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Delete</button>
-                        </td>
-                    `;
-                    manageTableBody.appendChild(row);
-                });
-
-                document.querySelectorAll('.status-toggle').forEach(toggle => {
-                    toggle.addEventListener('change', async function() {
-                        const id = parseInt(this.dataset.surveyId);
-                        const survey = surveys.find(s => s.id === id);
-                        if (survey) {
-                            try {
-                                const newStatus = this.checked ? 1 : 3; // Active or Closed
-                                const response = await fetch(`${tracerUpdateBaseUrl}/${id}/toggle-status`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Accept': 'application/json',
-                                        'X-CSRF-TOKEN': csrfToken,
-                                    },
-                                    body: JSON.stringify({ status: newStatus }),
-                                });
-                                
-                                if (response.ok) {
-                                    survey.statusCode = newStatus;
-                                    survey.status = newStatus === 1 ? 'Active' : 'Closed';
-                                    survey.displayStatus = newStatus === 1 ? 'Accepting Responses' : 'Closed';
-                                    renderManageTable();
-                                    renderSidebar();
-                                    if (id === currentSurveyId) {
-                                        surveyStatusDisplay.textContent = survey.displayStatus;
-                                    }
-                                } else {
-                                    this.checked = !this.checked; // Revert on error
-                                    showAlert('Failed to update status');
-                                }
-                            } catch (error) {
-                                this.checked = !this.checked; // Revert on error
-                                showAlert('Failed to update status');
-                            }
-                        }
-                    });
-                });
-
-                document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                    const id = parseInt(e.target.getAttribute('data-survey-id'));
-                    selectSurvey(id);
-                    switchToEditor();
-                }));
-
-                document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                    const id = parseInt(e.target.getAttribute('data-survey-id'));
-                    deleteSurvey(id);
-                }));
+        // ESC to close modals
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
             }
-
-            function renderDeletedTable() {
-                deletedTableBody.innerHTML = '';
-                if (!deletedSurveys.length) {
-                    deletedTableBody.innerHTML = '<tr><td colspan="3" style="padding: 14px; color: #6b7280;">No recently deleted surveys.</td></tr>';
-                    return;
-                }
-
-                deletedSurveys.forEach(survey => {
-                    const row = document.createElement('tr');
-                    row.style.borderBottom = '1px solid #e5e7eb';
-                    const deletedAt = survey.deletedAt ? new Date(survey.deletedAt).toLocaleString() : 'Recently deleted';
-                    row.innerHTML = `
-                        <td style="padding: 12px; font-weight: 500;">${survey.title || 'Untitled'}</td>
-                        <td style="padding: 12px; color: #6b7280; font-size: 13px;">${deletedAt}</td>
-                        <td style="padding: 12px;">
-                            <button class="restore-btn" data-survey-id="${survey.id}" style="background: #047857; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Restore</button>
-                        </td>
-                    `;
-                    deletedTableBody.appendChild(row);
-                });
-
-                document.querySelectorAll('.restore-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                    const id = parseInt(e.target.getAttribute('data-survey-id'));
-                    restoreSurvey(id);
-                }));
-            }
-
-            function switchToEditor() {
-                editorView.style.display = 'block';
-                manageView.style.display = 'none';
-                tabAddNew.classList.add('active');
-                tabManage.classList.remove('active');
-            }
-
-            function switchToManage() {
-                syncBuilderToSurvey();
-                editorView.style.display = 'none';
-                manageView.style.display = 'block';
-                tabAddNew.classList.remove('active');
-                tabManage.classList.add('active');
-                renderManageTable();
-                renderDeletedTable();
-            }
-
-            function resetForm() {
-                surveyTitleInput.value = '';
-                surveyTitleDisplay.textContent = 'New Survey';
-                surveyStatusDisplay.textContent = 'Draft';
-                formBuilder.innerHTML = '';
-                currentSurveyId = null;
-                document.querySelectorAll('.survey-item').forEach(item => item.classList.remove('active'));
-                addBetweenButtons();
-            }
-
-            async function deleteSurvey(id) {
-                const confirmed = await showConfirm(
-                    'Are you sure you want to delete this survey? This will move it to "Recently Deleted".',
-                    'Delete Survey',
-                    'warning'
-                );
-                
-                if (!confirmed) return;
-                
-                const survey = surveys.find(s => s.id === id);
-
-                try {
-                    if (survey && survey.persisted) {
-                        const response = await fetch(`${tracerUpdateBaseUrl}/${id}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                            },
-                        });
-
-                        const result = await response.json();
-
-                        if (!response.ok) {
-                            throw new Error(result.error || result.message || 'Failed to delete tracer form.');
-                        }
-
-                        const deletedForm = result.form ? normalizeServerSurvey(result.form) : { ...survey, deletedAt: new Date().toISOString() };
-                        deletedSurveys.unshift(deletedForm);
-                    } else if (survey) {
-                        deletedSurveys.unshift({ ...survey, deletedAt: new Date().toISOString() });
-                    }
-
-                    const idx = surveys.findIndex(s => s.id === id);
-                    if (idx > -1) surveys.splice(idx, 1);
-
-                    if (currentSurveyId === id) {
-                        currentSurveyId = surveys.length ? surveys[0].id : null;
-                        if (currentSurveyId) selectSurvey(currentSurveyId);
-                        else resetForm();
-                    }
-
-                    renderSidebar();
-                    renderManageTable();
-                    renderDeletedTable();
-                    showAlert('Survey moved to Recently Deleted.', 'Deleted', 'success');
-                } catch (error) {
-                    showAlert(error.message || 'Failed to delete tracer form.', 'Error', 'error');
-                }
-            }
-
-            async function restoreSurvey(id) {
-                try {
-                    const response = await fetch(`${tracerUpdateBaseUrl}/${id}/restore`, {
-                        method: 'PUT',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                        },
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.error || result.message || 'Failed to restore tracer form.');
-                    }
-
-                    const restoredSurvey = normalizeServerSurvey(result.form);
-                    const deletedIndex = deletedSurveys.findIndex(s => s.id === id);
-                    if (deletedIndex > -1) deletedSurveys.splice(deletedIndex, 1);
-
-                    const activeIndex = surveys.findIndex(s => s.id === restoredSurvey.id);
-                    if (activeIndex > -1) {
-                        surveys.splice(activeIndex, 1, restoredSurvey);
-                    } else {
-                        surveys.unshift(restoredSurvey);
-                    }
-
-                    renderSidebar();
-                    renderManageTable();
-                    renderDeletedTable();
-                    selectSurvey(restoredSurvey.id);
-                } catch (error) {
-                    showAlert(error.message || 'Failed to restore tracer form.');
-                }
-            }
-
-            // Preview modal (updated for Likert matrix)
-            function openPreview() {
-                syncBuilderToSurvey();
-                const survey = getCurrentSurvey();
-                if (!survey) {
-                    previewContent.innerHTML = '<p style="text-align:center; color:#6b7280;">No survey loaded to preview.</p>';
-                    previewModal.style.display = 'flex';
-                    return;
-                }
-                
-                let html = '';
-                if (survey.headerPhoto) {
-                    html += `<img src="${survey.headerPhoto}" class="preview-header-img" alt="Header">`;
-                }
-                html += `<h2>${survey.title || 'Untitled Survey'}</h2>`;
-                
-                if (!survey.questions || survey.questions.length === 0) {
-                    html += '<p style="color:#6b7280; font-style:italic;">No questions added yet.</p>';
-                } else {
-                    survey.questions.forEach(q => {
-                        html += '<div class="preview-question">';
-                        html += `<h3>${q.question_text || 'Untitled Question'}</h3>`;
-                        if (q.subtitle) html += `<div class="preview-subtitle">${q.subtitle}</div>`;
-
-                        if (q.type === 'text') {
-                            html += '<textarea class="form-control" placeholder="Your answer" disabled style="resize: vertical;"></textarea>';
-                        } else if (q.type === 'choice' || q.type === 'checkbox') {
-                            const isDropdown = q.display_type === 'dropdown';
-                            if (isDropdown) {
-                                html += '<select class="form-control" disabled>';
-                                html += '<option value="">Select an option</option>';
-                                (q.options || []).forEach(opt => {
-                                    html += `<option value="${opt.label}">${opt.label || 'Option'}</option>`;
-                                });
-                                if (q.other_enabled) html += '<option value="other">Other</option>';
-                                html += '</select>';
-                            } else {
-                                html += '<div class="preview-options">';
-                                (q.options || []).forEach(opt => {
-                                    html += `<label><input type="${q.type === 'choice' ? 'radio' : 'checkbox'}" disabled> ${opt.label || 'Option'}</label>`;
-                                });
-                                if (q.other_enabled) html += '<label><input type="checkbox" disabled> Other</label>';
-                                html += '</div>';
-                            }
-                        } else if (q.type === 'likert') {
-                            const points = q.scale_points || 5;
-                            const labels = q.scale_labels || [];
-                            const statements = q.statements || [];
-
-                            html += '<div class="preview-likert-table">';
-                            html += '<table style="width:100%; border-collapse: collapse;">';
-                            html += '<thead><tr><th style="text-align:left; padding: 6px;"></th>';
-                            for (let i = 0; i < points; i++) {
-                                const label = labels[i] || (i+1).toString();
-                                html += `<th style="text-align:center; padding: 6px; font-size:12px;">${label}</th>`;
-                            }
-                            html += '</tr></thead><tbody>';
-                            statements.forEach(stmt => {
-                                html += '<tr>';
-                                html += `<td style="padding: 8px 6px; font-size:14px;">${stmt.text || 'Statement'}</td>`;
-                                for (let i = 0; i < points; i++) {
-                                    html += `<td style="text-align:center; padding: 6px;"><input type="radio" name="likert_${q.id}_${stmt.id}" disabled></td>`;
-                                }
-                                html += '</tr>';
-                            });
-                            html += '</tbody></table>';
-                            html += '</div>';
-                        } else if (q.type === 'section_header') {
-                            html += '<hr style="margin: 20px 0 10px;">';
-                        }
-                        html += '</div>';
-                    });
-                }
-                previewContent.innerHTML = html;
-                previewModal.style.display = 'flex';
-            }
-
-            // ========== ALERT MODAL EVENT LISTENERS ==========
-            document.getElementById('closeAlertModal').addEventListener('click', () => {
-                document.getElementById('alertModal').style.display = 'none';
-            });
-
-            document.getElementById('alertModalConfirm').addEventListener('click', () => {
-                document.getElementById('alertModal').style.display = 'none';
-            });
-
-            document.getElementById('closeConfirmModal').addEventListener('click', () => {
-                document.getElementById('confirmModal').style.display = 'none';
-            });
-
-            document.getElementById('confirmModalCancel').addEventListener('click', () => {
-                document.getElementById('confirmModal').style.display = 'none';
-            });
-
-            // Close modals when clicking outside (single consolidated listener)
-            window.addEventListener('click', (e) => {
-                if (e.target === document.getElementById('alertModal')) {
-                    document.getElementById('alertModal').style.display = 'none';
-                }
-                if (e.target === document.getElementById('confirmModal')) {
-                    document.getElementById('confirmModal').style.display = 'none';
-                }
-                if (e.target === document.getElementById('previewModal')) {
-                    document.getElementById('previewModal').style.display = 'none';
-                }
-            });
-
-            // Close modals on Escape key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    document.getElementById('alertModal').style.display = 'none';
-                    document.getElementById('confirmModal').style.display = 'none';
-                    document.getElementById('previewModal').style.display = 'none';
-                }
-            });
-
-            previewBtn.addEventListener('click', openPreview);
-            closePreview.addEventListener('click', () => { previewModal.style.display = 'none'; });
-
-            // Branding uploads
-            changeLogoBtn.addEventListener('click', () => logoFileInput.click());
-            logoFileInput.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        surveyLogoText.innerHTML = `<img src="${event.target.result}" alt="Logo" style="width:100%;height:100%;object-fit:cover;">`;
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-
-            changePhotoBtn.addEventListener('click', () => photoFileInput.click());
-            photoFileInput.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        headerPhotoImg.src = event.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-
-            // Footer add question
-            document.getElementById('addQuestionBtn').addEventListener('click', () => {
-                const newQ = createEmptyQuestion('text');
-                const card = buildCardElement(newQ);
-                formBuilder.appendChild(card);
-                updateQuestionNumbers();
-                addBetweenButtons();
-                syncBuilderToSurvey();
-                enableDragDrop();
-                refreshAllGoToDropdowns();
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            });
-
-            document.getElementById('addNewTracerBtn').addEventListener('click', () => { switchToEditor(); resetForm(); });
-            tabAddNew.addEventListener('click', () => { switchToEditor(); resetForm(); });
-            tabManage.addEventListener('click', switchToManage);
-
-            surveyTitleInput.addEventListener('input', () => {
-                surveyTitleDisplay.textContent = surveyTitleInput.value || 'Untitled Survey';
-                const survey = getCurrentSurvey();
-                if (survey) survey.title = surveyTitleInput.value;
-            });
-
-            document.getElementById('saveBtn').addEventListener('click', async () => {
-                syncBuilderToSurvey();
-                const formData = collectSurveyFromBuilder();
-
-                if (!formData.title.trim()) {
-                    showAlert('Please enter a survey title before saving.', 'Validation Error', 'error');
-                    return;
-                }
-
-                let headerData = formData.headerPhoto;
-                if (headerData && headerData.startsWith('data:image')) {
-                    headerData = headerData;
-                }
-
-                const payload = {
-                    form_title: formData.title.trim(),
-                    form_description: null,
-                    form_header: headerData,
-                    status: formData.status,
-                    questions: formData.questions,
-                };
-
-                const currentSurvey = getCurrentSurvey();
-                const shouldUpdate = !!(currentSurvey && currentSurvey.persisted && currentSurvey.id);
-                const endpoint = shouldUpdate ? `${tracerUpdateBaseUrl}/${currentSurvey.id}` : tracerStoreUrl;
-                const method = shouldUpdate ? 'PUT' : 'POST';
-
-                try {
-                    const response = await fetch(endpoint, {
-                        method,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                        },
-                        body: JSON.stringify(payload),
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.error || result.message || 'Failed to save tracer form.');
-                    }
-
-                    const savedSurvey = normalizeServerSurvey(result.form);
-                    const currentIndex = currentSurvey ? surveys.findIndex(s => s.id === currentSurvey.id) : -1;
-
-                    if (currentIndex >= 0) {
-                        surveys.splice(currentIndex, 1, savedSurvey);
-                    } else {
-                        surveys.unshift(savedSurvey);
-                    }
-
-                    currentSurveyId = savedSurvey.id;
-                    renderSidebar();
-                    selectSurvey(savedSurvey.id);
-                    showAlert(result.message || 'Survey saved successfully.', 'Success', 'success');
-                } catch (error) {
-                    console.error('Save error:', error);
-                    showAlert(error.message || 'Failed to save tracer form.', 'Error', 'error');
-                }
-            });
-
-            // Initialize: Load data from backend ONLY
-            loadTracerData().then(() => {
-                renderSidebar();
-                if (surveys.length > 0) {
-                    if (!currentSurveyId) {
-                        currentSurveyId = surveys[0].id;
-                    }
-                    selectSurvey(currentSurveyId);
-                } else {
-                    // Start fresh with empty form
-                    resetForm();
-                }
-                addBetweenButtons();
-                enableDragDrop();
-                refreshAllGoToDropdowns();
-            }).catch(error => {
-                console.error('Initialization error:', error);
-                surveys = [];
-                deletedSurveys = [];
-                resetForm();
-                renderSidebar();
-            });
-        })();
+        });
     </script>
+
 </body>
 </html>
+
+    
