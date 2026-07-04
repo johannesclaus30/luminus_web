@@ -151,9 +151,9 @@
                             <i class="fa-solid fa-users"></i>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value" id="statTotalAlumni">0</span>
+                            <span class="stat-value">247</span>
                             <span class="stat-label">Total Alumni</span>
-                            <span class="stat-sub">--</span>
+                            <span class="stat-sub">+12 this month</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -161,9 +161,9 @@
                             <i class="fa-solid fa-check-circle"></i>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value" id="statCompleted">0</span>
+                            <span class="stat-value">156</span>
                             <span class="stat-label">Completed</span>
-                            <span class="stat-sub">--</span>
+                            <span class="stat-sub">63.2% completion rate</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -171,9 +171,9 @@
                             <i class="fa-solid fa-hourglass-half"></i>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value" id="statInProgress">0</span>
+                            <span class="stat-value">91</span>
                             <span class="stat-label">In Progress</span>
-                            <span class="stat-sub">--</span>
+                            <span class="stat-sub">36.8% still answering</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -181,58 +181,152 @@
                             <i class="fa-solid fa-circle-question"></i>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value" id="statTotalQuestions">0</span>
+                            <span class="stat-value">49</span>
                             <span class="stat-label">Total Questions</span>
-                            <span class="stat-sub">0 phases · 0 sections</span>
+                            <span class="stat-sub">5 phases · 10 sections</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Replace the dashboard-grid-2col section -->
                 <div class="dashboard-grid-2col">
-                <div class="chart-card">
-                    <h3><i class="fa-solid fa-clock-rotate-left" style="color:#3b82f6;"></i> Recent Activity</h3>
-                    <div class="activity-list" id="activityList">
-                        <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No recent activity yet.</p>
+                    <div class="chart-card">
+                        <h3><i class="fa-solid fa-clock-rotate-left" style="color:#3b82f6;"></i> Recent Activity</h3>
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <div class="activity-icon green"><i class="fa-solid fa-check"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text"><strong>Maria Santos</strong> completed the tracer survey.</p>
+                                    <span class="activity-time">2 hours ago</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon blue"><i class="fa-solid fa-pen"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text"><strong>Jose Reyes</strong> updated employment status.</p>
+                                    <span class="activity-time">5 hours ago</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon amber"><i class="fa-solid fa-plus"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text">New phase <strong>"Professional Development"</strong> added.</p>
+                                    <span class="activity-time">1 day ago</span>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon purple"><i class="fa-solid fa-download"></i></div>
+                                <div class="activity-content">
+                                    <p class="activity-text">Analytics report exported by <strong>Admin</strong>.</p>
+                                    <span class="activity-time">2 days ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <h3><i class="fa-solid fa-bullseye" style="color:#ef4444;"></i> Survey Completion Funnel</h3>
+                        <div class="funnel-chart">
+                            <div class="funnel-item" style="width: 100%;">
+                                <span class="funnel-label">Invited</span>
+                                <span class="funnel-value">247</span>
+                            </div>
+                            <div class="funnel-item" style="width: 82%;">
+                                <span class="funnel-label">Opened</span>
+                                <span class="funnel-value">203</span>
+                            </div>
+                            <div class="funnel-item" style="width: 63%;">
+                                <span class="funnel-label">Completed</span>
+                                <span class="funnel-value">156</span>
+                            </div>
+                            <div class="funnel-item" style="width: 48%;">
+                                <span class="funnel-label">Verified</span>
+                                <span class="funnel-value">118</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="chart-card">
-                    <h3><i class="fa-solid fa-bullseye" style="color:#ef4444;"></i> Survey Completion Funnel</h3>
-                    <div class="funnel-chart" id="funnelChart">
-                        <div class="funnel-item" style="width: 100%;">
-                            <span class="funnel-label">Invited</span>
-                            <span class="funnel-value">0</span>
-                        </div>
-                        <div class="funnel-item" style="width: 0%;">
-                            <span class="funnel-label">Opened</span>
-                            <span class="funnel-value">0</span>
-                        </div>
-                        <div class="funnel-item" style="width: 0%;">
-                            <span class="funnel-label">Completed</span>
-                            <span class="funnel-value">0</span>
-                        </div>
-                        <div class="funnel-item" style="width: 0%;">
-                            <span class="funnel-label">Verified</span>
-                            <span class="funnel-value">0</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
                 <!-- Charts Row -->
                 <div class="charts-grid">
+                    <!-- Phase Completion Chart -->
                     <div class="chart-card">
                         <h3>Phase Completion Rate</h3>
-                        <div class="bar-chart" id="phaseCompletionChart">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No phases created yet.</p>
+                        <div class="bar-chart">
+                            <div class="bar-chart-item">
+                                <span class="bar-value">87%</span>
+                                <div class="bar-fill" style="height: 122px; background: #3b82f6;"></div>
+                                <span class="bar-label">Personal</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">72%</span>
+                                <div class="bar-fill" style="height: 101px; background: #10b981;"></div>
+                                <span class="bar-label">Education</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">65%</span>
+                                <div class="bar-fill" style="height: 91px; background: #f59e0b;"></div>
+                                <span class="bar-label">Employment</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">48%</span>
+                                <div class="bar-fill" style="height: 67px; background: #8b5cf6;"></div>
+                                <span class="bar-label">Dev't</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">41%</span>
+                                <div class="bar-fill" style="height: 57px; background: #ef4444;"></div>
+                                <span class="bar-label">Assessment</span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Employment Status -->
                     <div class="chart-card">
                         <h3>Employment Status</h3>
-                        <div class="employment-list" id="employmentStatusList">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No employment data yet.</p>
+                        <div class="employment-list">
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#10b981;"></span> Employed (Full-time)</span>
+                                    <span class="employment-count">124</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:50%; background:#10b981;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#3b82f6;"></span> Employed (Part-time)</span>
+                                    <span class="employment-count">28</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:11%; background:#3b82f6;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#f59e0b;"></span> Self-employed</span>
+                                    <span class="employment-count">18</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:7%; background:#f59e0b;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#8b5cf6;"></span> Continuing Education</span>
+                                    <span class="employment-count">35</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:14%; background:#8b5cf6;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#ef4444;"></span> Unemployed</span>
+                                    <span class="employment-count">20</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:8%; background:#ef4444;"></div></div>
+                            </div>
+                            <div class="employment-item">
+                                <div class="employment-header">
+                                    <span class="employment-label"><span class="employment-dot" style="background:#06b6d4;"></span> OFW</span>
+                                    <span class="employment-count">22</span>
+                                </div>
+                                <div class="employment-bar"><div class="employment-fill" style="width:9%; background:#06b6d4;"></div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -263,11 +357,114 @@
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody id="recentSubmissionsBody">
+                            <tbody>
                                 <tr>
-                                    <td colspan="6" style="text-align: center; color: var(--gray-400); padding: 2rem;">
-                                        No submissions yet.
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">MS</div>
+                                            <span class="alumni-name">Maria Santos</span>
+                                        </div>
                                     </td>
+                                    <td>BS IT</td>
+                                    <td>2023</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-14</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">JR</div>
+                                            <span class="alumni-name">Jose Reyes</span>
+                                        </div>
+                                    </td>
+                                    <td>BS ME</td>
+                                    <td>2022</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:60%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">60%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-13</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">AC</div>
+                                            <span class="alumni-name">Ana Cruz</span>
+                                        </div>
+                                    </td>
+                                    <td>BS Accountancy</td>
+                                    <td>2023</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:40%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">40%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-12</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">CM</div>
+                                            <span class="alumni-name">Carlo Mendoza</span>
+                                        </div>
+                                    </td>
+                                    <td>BS CS</td>
+                                    <td>2024</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-11</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">LB</div>
+                                            <span class="alumni-name">Liza Bautista</span>
+                                        </div>
+                                    </td>
+                                    <td>BS Tourism</td>
+                                    <td>2022</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:20%; background:#f59e0b;"></div></div>
+                                            <span class="progress-text" style="color:#f59e0b;">20%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-10</td>
+                                    <td><span class="status-badge in-progress">In Progress</span></td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="alumni-info">
+                                            <div class="alumni-avatar">RV</div>
+                                            <span class="alumni-name">Ryan Villanueva</span>
+                                        </div>
+                                    </td>
+                                    <td>BS CE</td>
+                                    <td>2021</td>
+                                    <td>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:100%; background:#10b981;"></div></div>
+                                            <span class="progress-text" style="color:#10b981;">100%</span>
+                                        </div>
+                                    </td>
+                                    <td>2025-06-09</td>
+                                    <td><span class="status-badge complete">Complete</span></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -369,57 +566,185 @@
                 <div class="analytics-kpi-grid">
                     <div class="kpi-card">
                         <div class="kpi-icon green"><i class="fa-solid fa-percent"></i></div>
-                        <div class="kpi-value" style="color:#10b981;" id="kpiResponseRate">--</div>
+                        <div class="kpi-value" style="color:#10b981;">87.2%</div>
                         <div class="kpi-label">Response Rate</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 5.2% from last month</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon blue"><i class="fa-solid fa-chart-simple"></i></div>
-                        <div class="kpi-value" style="color:#3b82f6;" id="kpiAvgCompletion">--</div>
+                        <div class="kpi-value" style="color:#3b82f6;">63%</div>
                         <div class="kpi-label">Avg. Completion</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 2.1% from last month</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon amber"><i class="fa-solid fa-star"></i></div>
-                        <div class="kpi-value" style="color:#f59e0b;" id="kpiAvgRating">--</div>
+                        <div class="kpi-value" style="color:#f59e0b;">4.1 / 5</div>
                         <div class="kpi-label">Avg. Rating (Overall)</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend down"><i class="fa-solid fa-arrow-down"></i> 0.2 from last month</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon purple"><i class="fa-solid fa-briefcase"></i></div>
-                        <div class="kpi-value" style="color:#8b5cf6;" id="kpiJobRelevance">--</div>
+                        <div class="kpi-value" style="color:#8b5cf6;">68.4%</div>
                         <div class="kpi-label">Job Relevance</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend up"><i class="fa-solid fa-arrow-up"></i> 1.5% from last month</div>
                     </div>
                 </div>
 
                 <!-- Analytics Charts Grid -->
                 <div class="analytics-grid">
+                    <!-- Monthly Submissions -->
                     <div class="analytics-card">
                         <h3>Monthly Submissions</h3>
-                        <div class="bar-chart" id="monthlySubmissionsChart">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No data available yet.</p>
+                        <div class="bar-chart">
+                            <div class="bar-chart-item">
+                                <span class="bar-value">12</span>
+                                <div class="bar-fill" style="height: 43px; background: #32418C;"></div>
+                                <span class="bar-label">Jan</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">18</span>
+                                <div class="bar-fill" style="height: 64px; background: #32418C;"></div>
+                                <span class="bar-label">Feb</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">25</span>
+                                <div class="bar-fill" style="height: 89px; background: #32418C;"></div>
+                                <span class="bar-label">Mar</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">31</span>
+                                <div class="bar-fill" style="height: 111px; background: #32418C;"></div>
+                                <span class="bar-label">Apr</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">28</span>
+                                <div class="bar-fill" style="height: 100px; background: #32418C;"></div>
+                                <span class="bar-label">May</span>
+                            </div>
+                            <div class="bar-chart-item">
+                                <span class="bar-value">42</span>
+                                <div class="bar-fill" style="height: 150px; background: #32418C;"></div>
+                                <span class="bar-label">Jun</span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Salary Distribution -->
                     <div class="analytics-card">
                         <h3>Monthly Salary Distribution</h3>
-                        <div class="h-bar-list" id="salaryDistribution">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No salary data yet.</p>
+                        <div class="h-bar-list">
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> Below ₱15k</span>
+                                    <span class="h-bar-percent">18%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:18%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱15–25k</span>
+                                    <span class="h-bar-percent">34%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:34%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱25–50k</span>
+                                    <span class="h-bar-percent">29%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:29%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> ₱50–100k</span>
+                                    <span class="h-bar-percent">14%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:14%; background:#FBD117;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#FBD117;"></span> Above ₱100k</span>
+                                    <span class="h-bar-percent">5%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:5%; background:#FBD117;"></div></div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Average Ratings -->
                     <div class="analytics-card">
                         <h3>Average Ratings by Criterion</h3>
-                        <div class="rating-list" id="ratingsByCriterion">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No rating data yet.</p>
+                        <div class="rating-list">
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Overall Education Quality</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 4.1 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:82%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Curriculum Relevance</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.8 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:76%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Teaching Effectiveness</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 4.3 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:86%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Facilities & Resources</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.5 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:70%;"></div></div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-header">
+                                    <span class="rating-label">Career Guidance Services</span>
+                                    <span class="rating-score"><i class="fa-solid fa-star"></i> 3.2 <span>/5</span></span>
+                                </div>
+                                <div class="rating-bar-track"><div class="rating-bar-fill" style="width:64%;"></div></div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Job Relevance -->
                     <div class="analytics-card">
                         <h3>Job Relevance to Degree</h3>
-                        <div class="h-bar-list" id="jobRelevance">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No data available yet.</p>
+                        <div class="h-bar-list">
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#10b981;"></span> Directly related</span>
+                                    <span class="h-bar-percent" style="color:#10b981;">40%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:40%; background:#10b981;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#3b82f6;"></span> Somewhat related</span>
+                                    <span class="h-bar-percent" style="color:#3b82f6;">28%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:28%; background:#3b82f6;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#f59e0b;"></span> Not related</span>
+                                    <span class="h-bar-percent" style="color:#f59e0b;">22%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:22%; background:#f59e0b;"></div></div>
+                            </div>
+                            <div class="h-bar-item">
+                                <div class="h-bar-header">
+                                    <span class="h-bar-label"><span class="h-bar-dot" style="background:#ef4444;"></span> Not yet employed</span>
+                                    <span class="h-bar-percent" style="color:#ef4444;">10%</span>
+                                </div>
+                                <div class="h-bar-track"><div class="h-bar-fill" style="width:10%; background:#ef4444;"></div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -645,11 +970,161 @@
 
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#1f2b67', '#ec4899'];
 
-    let phases = [];
+    let phases = [
+        {
+            id: 1, title: 'Personal Profile', subtitle: 'Basic & contact information',
+            icon: 'fa-user', color: '#3b82f6',
+            sections: [
+                {
+                    id: '1-0', title: 'Basic Information', description: 'Personal details',
+                    questions: [
+                        { id: '1-0-1', label: 'Full Name', type: 'short_answer', placeholder: 'Juan dela Cruz', required: true },
+                        { id: '1-0-2', label: 'Date of Birth', type: 'short_answer', placeholder: 'MM/DD/YYYY', required: true },
+                        { id: '1-0-3', label: 'Civil Status', type: 'multiple_choice', options: ['Single','Married','Widowed','Separated'], required: true },
+                        { id: '1-0-4', label: 'Gender', type: 'multiple_choice', options: ['Male','Female','Prefer not to say'], required: true },
+                        { id: '1-0-5', label: 'Region of Residence', type: 'dropdown', options: ['Region III – Central Luzon','Region IV-A – CALABARZON','NCR – Metro Manila','Others'], required: true }
+                    ]
+                },
+                {
+                    id: '1-1', title: 'Contact Details', description: 'How to reach you',
+                    questions: [
+                        { id: '1-1-1', label: 'Mobile Number', type: 'short_answer', placeholder: '09XX-XXX-XXXX', required: true },
+                        { id: '1-1-2', label: 'Email Address', type: 'short_answer', placeholder: 'juandelacruz@email.com', required: true },
+                        { id: '1-1-3', label: 'Present Address', type: 'paragraph', placeholder: 'Street, Barangay, City/Municipality', required: true },
+                        { id: '1-1-4', label: 'Upload your Resume/CV', type: 'file_upload', fileTypes: ['pdf', 'doc'], maxSize: 10, required: false }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 2, title: 'Educational Background', subtitle: 'Academic history at NU Lipa',
+            icon: 'fa-book', color: '#10b981',
+            sections: [
+                {
+                    id: '2-0', title: 'Academic History', description: 'Your credentials',
+                    questions: [
+                        { id: '2-0-1', label: 'College / Department', type: 'dropdown', options: ['College of Engineering','College of Business & Accountancy','College of Computing and IT','College of Arts and Sciences','Others'], required: true },
+                        { id: '2-0-2', label: 'Degree Program', type: 'short_answer', placeholder: 'e.g. BS Computer Science', required: true },
+                        { id: '2-0-3', label: 'Year Graduated', type: 'dropdown', options: ['2024','2023','2022','2021','2020','2019','2018','2017','2016 or earlier'], required: true },
+                        { id: '2-0-4', label: 'Academic Honors Received', type: 'multiple_choice', options: ['Summa Cum Laude','Magna Cum Laude','Cum Laude','With Honors','None'], required: true },
+                        { id: '2-0-5', label: 'Did you graduate on time?', type: 'multiple_choice', options: ['Yes, on schedule','Extended by 1 semester','Extended by 1 year or more'], required: true }
+                    ]
+                },
+                {
+                    id: '2-1', title: 'Further Studies', description: 'Post-graduate education',
+                    questions: [
+                        { id: '2-1-1', label: 'Are you pursuing graduate studies?', type: 'multiple_choice', options: ['Yes, currently enrolled','Planning to enroll','Already finished','Not interested'], required: true },
+                        { id: '2-1-2', label: 'Graduate Program (if applicable)', type: 'short_answer', placeholder: 'e.g. Master in IT' },
+                        { id: '2-1-3', label: 'Licensure Exams Passed', type: 'checkboxes', options: ['Board Exam (PRC)','Civil Service Exam','CPA Board Exam','Engineering Board Exam','None / Not Applicable'] }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 3, title: 'Employment Profile', subtitle: 'Career and work details',
+            icon: 'fa-briefcase', color: '#f59e0b',
+            sections: [
+                {
+                    id: '3-0', title: 'Current Employment', description: 'Present work situation',
+                    questions: [
+                        { id: '3-0-1', label: 'Employment Status', type: 'multiple_choice', options: ['Employed (full-time)','Employed (part-time)','Self-employed / Freelance','Unemployed – seeking work','Continuing Education','OFW'], required: true },
+                        { id: '3-0-2', label: 'Job Title / Position', type: 'short_answer', placeholder: 'e.g. Software Developer' },
+                        { id: '3-0-3', label: 'Company / Employer', type: 'short_answer', placeholder: 'Company or organization name' },
+                        { id: '3-0-4', label: 'Industry / Type of Work', type: 'dropdown', options: ['Information Technology','Business / Finance','Engineering','Healthcare','Education / Academe','Government','Tourism / Hospitality','Others'] },
+                        { id: '3-0-5', label: 'Monthly Salary Range', type: 'multiple_choice', options: ['Below ₱15,000','₱15,000 – ₱25,000','₱25,001 – ₱50,000','₱50,001 – ₱100,000','Above ₱100,000','Prefer not to disclose'] }
+                    ]
+                },
+                {
+                    id: '3-1', title: 'First Job Details', description: 'Journey to first employment',
+                    questions: [
+                        { id: '3-1-1', label: 'How long to find your first job?', type: 'multiple_choice', options: ['Before graduation','Within 1 month','1–6 months','6 months–1 year','More than 1 year','Still looking'], required: true },
+                        { id: '3-1-2', label: 'How did you find your first job?', type: 'multiple_choice', options: ['Online job portal','School placement / OJT','Referral from family or friends','Walk-in / direct application','Self-employed'], required: true },
+                        { id: '3-1-3', label: 'Is your job related to your degree?', type: 'multiple_choice', options: ['Yes, directly related','Somewhat related','Not related at all','Not yet employed'], required: true }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 4, title: 'Professional Development', subtitle: 'Skills, training & growth',
+            icon: 'fa-bolt', color: '#8b5cf6',
+            sections: [
+                {
+                    id: '4-0', title: 'Skills & Competencies', description: 'What you learned and applied',
+                    questions: [
+                        { id: '4-0-1', label: 'Technical skills you use most', type: 'checkboxes', options: ['Programming / Coding','Data Analysis','Design / Drawing','Engineering Calculation','Accounting / Bookkeeping','Project Management','Research / Writing'] },
+                        { 
+                            id: '4-0-2', 
+                            label: 'Rate the following competencies you gained from NU Lipa:', 
+                            type: 'likert_scale', 
+                            required: true,
+                            gridRows: [
+                                'Critical Thinking',
+                                'Communication Skills', 
+                                'Problem Solving',
+                                'Teamwork & Collaboration',
+                                'Technical/Professional Skills'
+                            ],
+                            gridColumns: DEFAULT_LIKERT_COLUMNS
+                        }
+                    ]
+                },
+                {
+                    id: '4-1', title: 'Trainings & Certifications', description: 'Professional development',
+                    questions: [
+                        { id: '4-1-1', label: 'Attended professional trainings / seminars?', type: 'multiple_choice', options: ['Yes, many times','Yes, once or twice','Not yet, but planning to','No'], required: true },
+                        { id: '4-1-2', label: 'Types of development activities', type: 'checkboxes', options: ['Technical / skills training','Leadership / management','Industry certification','Online courses','Government-sponsored (TESDA)','None'] },
+                        { id: '4-1-3', label: 'Remarks about your professional growth', type: 'paragraph', placeholder: 'Share your career development journey...' }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 5, title: 'Program Assessment', subtitle: 'Evaluate your NU Lipa education',
+            icon: 'fa-clipboard-check', color: '#ef4444',
+            sections: [
+                {
+                    id: '5-0', title: 'Curriculum Evaluation', description: 'Help us improve our programs',
+                    questions: [
+                        { 
+                            id: '5-0-1', 
+                            label: 'Rate the following aspects of your NU Lipa education:', 
+                            type: 'likert_scale', 
+                            required: true,
+                            gridRows: [
+                                'Overall quality of education',
+                                'Relevance of curriculum to your career',
+                                'Effectiveness of your instructors',
+                                'Adequacy of facilities and resources',
+                                'Quality of career guidance services'
+                            ],
+                            gridColumns: DEFAULT_LIKERT_COLUMNS
+                        }
+                    ]
+                },
+                {
+                    id: '5-1', title: 'Suggestions & Recommendations', description: 'Your feedback shapes our future',
+                    questions: [
+                        { id: '5-1-1', label: 'Aspects of the curriculum to improve', type: 'checkboxes', options: ['More industry-relevant subjects','More practical/OJT exposure','Updated course materials','Better lab equipment','Stronger industry linkages','Better career counseling'] },
+                        { id: '5-1-2', label: 'Would you recommend NU Lipa?', type: 'multiple_choice', options: ['Definitely yes','Probably yes','Probably not','Definitely not'], required: true },
+                        { id: '5-1-3', label: 'Other suggestions or comments', type: 'paragraph', placeholder: 'Share your thoughts and recommendations...' }
+                    ]
+                }
+            ]
+        }
+    ];
 
-    const MOCK_RESPONSES = [];
+    const MOCK_RESPONSES = [
+        { id: 1, name: 'Maria Santos', program: 'BS IT', year: 2023, completion: 100, date: '2025-06-14', status: 'complete' },
+        { id: 2, name: 'Jose Reyes', program: 'BS ME', year: 2022, completion: 60, date: '2025-06-13', status: 'in-progress' },
+        { id: 3, name: 'Ana Cruz', program: 'BS Accountancy', year: 2023, completion: 40, date: '2025-06-12', status: 'in-progress' },
+        { id: 4, name: 'Carlo Mendoza', program: 'BS CS', year: 2024, completion: 100, date: '2025-06-11', status: 'complete' },
+        { id: 5, name: 'Liza Bautista', program: 'BS Tourism', year: 2022, completion: 20, date: '2025-06-10', status: 'in-progress' },
+        { id: 6, name: 'Ryan Villanueva', program: 'BS CE', year: 2021, completion: 100, date: '2025-06-09', status: 'complete' },
+        { id: 7, name: 'Grace Domingo', program: 'BS BA', year: 2023, completion: 80, date: '2025-06-08', status: 'in-progress' },
+        { id: 8, name: 'Ken Flores', program: 'BS EE', year: 2022, completion: 100, date: '2025-06-07', status: 'complete' }
+    ];
 
-    let selectedPhaseId = null;
+    let selectedPhaseId = phases.length > 0 ? phases[0].id : null;
     let expandedSections = new Set();
     let currentEditQuestion = null;
     let currentEditPhase = null;
@@ -1203,7 +1678,7 @@
         if (currentEditPhase) {
             phases = phases.map(p => p.id === currentEditPhase.id ? { ...p, ...data } : p);
         } else {
-            const newId = phases.length > 0 ? Math.max(0, ...phases.map(p => p.id)) + 1 : 1;
+            const newId = Math.max(0, ...phases.map(p => p.id)) + 1;
             phases.push({ id: newId, ...data, sections: [] });
             selectedPhaseId = newId;
         }
@@ -1261,45 +1736,33 @@
     function renderResponsesTable(filteredData) {
         const data = filteredData || MOCK_RESPONSES;
         const tbody = document.getElementById('responsesTableBody');
-        
-        if (data.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" style="text-align: center; color: var(--gray-400); padding: 3rem;">
-                        <i class="fa-solid fa-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.75rem;"></i>
-                        No responses found.
-                    </td>
-                </tr>
-            `;
-        } else {
-            tbody.innerHTML = data.map(r => `
-                <tr>
-                    <td style="color:var(--gray-400);font-size:0.8125rem;">${r.id}</td>
-                    <td>
-                        <div class="alumni-info">
-                            <div class="alumni-avatar">${r.name.split(' ').map(n => n[0]).join('')}</div>
-                            <span class="alumni-name">${r.name}</span>
-                        </div>
-                    </td>
-                    <td>${r.program}</td>
-                    <td>${r.year}</td>
-                    <td>
-                        <div class="progress-bar-wrapper">
-                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.completion}%; background:${r.completion === 100 ? '#10b981' : '#f59e0b'};"></div></div>
-                            <span class="progress-text" style="color:${r.completion === 100 ? '#10b981' : '#f59e0b'};">${r.completion}%</span>
-                        </div>
-                    </td>
-                    <td>${r.date}</td>
-                    <td><span class="status-badge ${r.status}">${r.status === 'complete' ? 'Complete' : 'In Progress'}</span></td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-icon" title="View"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-icon delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td style="color:var(--gray-400);font-size:0.8125rem;">${r.id}</td>
+                <td>
+                    <div class="alumni-info">
+                        <div class="alumni-avatar">${r.name.split(' ').map(n => n[0]).join('')}</div>
+                        <span class="alumni-name">${r.name}</span>
+                    </div>
+                </td>
+                <td>${r.program}</td>
+                <td>${r.year}</td>
+                <td>
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.completion}%; background:${r.completion === 100 ? '#10b981' : '#f59e0b'};"></div></div>
+                        <span class="progress-text" style="color:${r.completion === 100 ? '#10b981' : '#f59e0b'};">${r.completion}%</span>
+                    </div>
+                </td>
+                <td>${r.date}</td>
+                <td><span class="status-badge ${r.status}">${r.status === 'complete' ? 'Complete' : 'In Progress'}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-icon" title="View"><i class="fa-solid fa-eye"></i></button>
+                        <button class="btn-icon delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
         
         document.getElementById('responsesCount').textContent = `${data.length} result${data.length !== 1 ? 's' : ''}`;
     }

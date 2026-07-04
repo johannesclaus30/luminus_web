@@ -177,7 +177,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/alumni_tracer/{id}/restore', [TracerFormController::class, 'restore'])
             ->name('admin.alumni_tracer.restore');
 
-        Route::post('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
+        Route::patch('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
             ->name('admin.alumni_tracer.toggle-status');
 
         // View Alumni Profile

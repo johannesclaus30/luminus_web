@@ -14,7 +14,6 @@ class TracerForm extends Model
         'admin_id',
         'form_title',
         'form_description',
-        'form_header',
         'status',
     ];
 
@@ -30,14 +29,18 @@ class TracerForm extends Model
     public const STATUS_DRAFT = 2;
     public const STATUS_CLOSED = 3;
 
+    // ═══════════════════════════════════════
+    // RELATIONSHIPS
+    // ═══════════════════════════════════════
+
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
     }
 
-    public function questions(): HasMany
+    public function phases(): HasMany
     {
-        return $this->hasMany(TracerQuestion::class, 'form_id');
+        return $this->hasMany(TracerPhase::class, 'form_id')->orderBy('order_priority');
     }
 
     public function responses(): HasMany
@@ -45,7 +48,10 @@ class TracerForm extends Model
         return $this->hasMany(TracerResponse::class, 'form_id');
     }
 
-    // Scopes
+    // ═══════════════════════════════════════
+    // SCOPES
+    // ═══════════════════════════════════════
+
     public function scopeActive($query)
     {
         return $query->where('status', self::STATUS_ACTIVE);
@@ -61,7 +67,10 @@ class TracerForm extends Model
         return $query->where('status', self::STATUS_DELETED);
     }
 
-    // Helper methods
+    // ═══════════════════════════════════════
+    // HELPER METHODS
+    // ═══════════════════════════════════════
+
     public function isDeleted(): bool
     {
         return $this->status === self::STATUS_DELETED;
@@ -70,6 +79,16 @@ class TracerForm extends Model
     public function isActiveStatus(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->status === self::STATUS_CLOSED;
     }
 
     public function markAsDeleted()
@@ -84,6 +103,12 @@ class TracerForm extends Model
         $this->save();
     }
 
+    public function markAsDraft()
+    {
+        $this->status = self::STATUS_DRAFT;
+        $this->save();
+    }
+
     public function markAsClosed()
     {
         $this->status = self::STATUS_CLOSED;
@@ -94,5 +119,37 @@ class TracerForm extends Model
     {
         $this->status = self::STATUS_ACTIVE;
         $this->save();
+    }
+
+    /**
+     * Get a flat collection of all questions in this form.
+     */
+    public function allQuestions()
+    {
+        return TracerQuestion::whereIn('section_id', function ($query) {
+            $query->select('id')
+                ->from('tracer_sections')
+                ->whereIn('phase_id', function ($subQuery) {
+                    $subQuery->select('id')
+                        ->from('tracer_phases')
+                        ->where('form_id', $this->id);
+                });
+        })->orderBy('order_priority')->get();
+    }
+
+    /**
+     * Count total questions in this form.
+     */
+    public function totalQuestionsCount(): int
+    {
+        return TracerQuestion::whereIn('section_id', function ($query) {
+            $query->select('id')
+                ->from('tracer_sections')
+                ->whereIn('phase_id', function ($subQuery) {
+                    $subQuery->select('id')
+                        ->from('tracer_phases')
+                        ->where('form_id', $this->id);
+                });
+        })->count();
     }
 }

@@ -6,37 +6,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class TracerResponse extends Model
+class TracerPhase extends Model
 {
-    protected $table = 'tracer_responses';
+    protected $table = 'tracer_phases';
 
     protected $fillable = [
-        'alumni_id',
         'form_id',
-        'status',
-        'submitted_at',
-    ];
-
-    protected $casts = [
-        'submitted_at' => 'datetime',
+        'title',
+        'subtitle',
+        'icon',
+        'color',
+        'order_priority',
     ];
 
     // ═══════════════════════════════════════
     // RELATIONSHIPS
     // ═══════════════════════════════════════
 
-    public function alumni(): BelongsTo
-    {
-        return $this->belongsTo(Alumni::class, 'alumni_id');
-    }
-
     public function form(): BelongsTo
     {
         return $this->belongsTo(TracerForm::class, 'form_id');
     }
 
-    public function answers(): HasMany
+    public function sections(): HasMany
     {
-        return $this->hasMany(TracerAnswer::class, 'tracer_response_id');
+        return $this->hasMany(TracerSection::class, 'phase_id')->orderBy('order_priority');
     }
 }

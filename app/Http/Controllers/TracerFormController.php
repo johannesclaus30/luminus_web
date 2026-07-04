@@ -1,34 +1,32 @@
 <?php
 
-namespace App\Http\Controllers; // 👈 Updated from App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\TracerForm;
+use App\Models\TracerPhase;
+use App\Models\TracerSection;
+use App\Models\TracerQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class TracerFormController extends Controller
 {
-    protected $supabaseDisk;
-
-    public function __construct()
-    {
-        // Initialize Supabase storage disk
-        $this->supabaseDisk = Storage::disk('supabase_admin');
-    }
-
+    /**
+     * Show the tracer admin page.
+     */
     public function index()
     {
         return view('admin_alumni_tracer');
     }
 
+    /**
+     * Get all forms with full nested structure.
+     */
     public function list()
     {
         try {
-            // Get all non-deleted forms (status != 0)
-            $forms = TracerForm::with(['questions.options'])
+            $forms = TracerForm::with($this->nestedEagerLoad())
                 ->where('status', '!=', TracerForm::STATUS_DELETED)
                 ->orderByDesc('created_at')
                 ->get();
@@ -43,11 +41,13 @@ class TracerFormController extends Controller
         }
     }
 
+    /**
+     * Get deleted forms only.
+     */
     public function deleted()
     {
         try {
-            // Get only deleted forms (status = 0)
-            $forms = TracerForm::with(['questions.options'])
+            $forms = TracerForm::with($this->nestedEagerLoad())
                 ->where('status', TracerForm::STATUS_DELETED)
                 ->orderByDesc('updated_at')
                 ->get();
@@ -62,10 +62,13 @@ class TracerFormController extends Controller
         }
     }
 
+    /**
+     * Get a single form with full nested structure.
+     */
     public function show($id)
     {
         try {
-            $form = TracerForm::with(['questions.options'])
+            $form = TracerForm::with($this->nestedEagerLoad())
                 ->where('status', '!=', TracerForm::STATUS_DELETED)
                 ->findOrFail($id);
 
@@ -78,109 +81,127 @@ class TracerFormController extends Controller
         }
     }
 
+    /**
+     * Create a new tracer form with phases, sections, and questions.
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'form_title' => 'required|string|max:255',
+            'form_title'       => 'required|string|max:255',
             'form_description' => 'nullable|string',
-            'form_header' => 'nullable|string',
-            'status' => 'integer|in:1,2,3', // 1=active, 2=draft, 3=closed
-            'questions' => 'nullable|array',
+            'status'           => 'integer|in:0,1,2,3',
+            'phases'           => 'nullable|array',
+            'phases.*.title'    => 'required|string|max:255',
+            'phases.*.subtitle' => 'nullable|string|max:255',
+            'phases.*.icon'     => 'nullable|string|max:100',
+            'phases.*.color'    => 'nullable|string|max:20',
+            'phases.*.sections' => 'nullable|array',
+            'phases.*.sections.*.title'       => 'required|string|max:255',
+            'phases.*.sections.*.description' => 'nullable|string',
+            'phases.*.sections.*.questions'   => 'nullable|array',
+            'phases.*.sections.*.questions.*.question_text' => 'required|string',
+            'phases.*.sections.*.questions.*.type' => 'required|string|in:short_answer,paragraph,multiple_choice,checkboxes,dropdown,file_upload,likert_scale,multiple_choice_grid',
+            'phases.*.sections.*.questions.*.description'  => 'nullable|string',
+            'phases.*.sections.*.questions.*.placeholder'  => 'nullable|string|max:255',
+            'phases.*.sections.*.questions.*.is_required'  => 'boolean',
+            'phases.*.sections.*.questions.*.file_types'   => 'nullable|array',
+            'phases.*.sections.*.questions.*.max_file_size' => 'nullable|integer',
+            'phases.*.sections.*.questions.*.options'      => 'nullable|array',
+            'phases.*.sections.*.questions.*.options.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_rows'    => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_rows.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_columns' => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_columns.*.label' => 'required|string',
         ]);
 
         DB::beginTransaction();
 
         try {
-            // Process form header image if present
-            $formHeaderPath = null;
-            if (!empty($validated['form_header'])) {
-                $formHeaderPath = $this->uploadFormHeader($validated['form_header'], null);
-            }
-
             $form = TracerForm::create([
-                'admin_id' => auth()->id() ?? 1,
-                'form_title' => $validated['form_title'],
+                'admin_id'         => auth()->guard('admin')->id() ?? 1,
+                'form_title'       => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
-                'form_header' => $formHeaderPath,
-                'status' => $validated['status'] ?? TracerForm::STATUS_ACTIVE,
+                'status'           => $validated['status'] ?? TracerForm::STATUS_DRAFT,
             ]);
 
-            if (!empty($validated['questions'])) {
-                $this->saveQuestions($form, $validated['questions']);
+            if (!empty($validated['phases'])) {
+                $this->savePhases($form, $validated['phases']);
             }
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Tracer form saved successfully.',
-                'form' => $form->load('questions.options')
+                'message' => 'Tracer form created successfully.',
+                'form'    => $form->load($this->nestedEagerLoad())
             ], 201);
         } catch (\Throwable $e) {
             DB::rollBack();
-            \Log::error('Failed to save tracer form: ' . $e->getMessage());
+            \Log::error('Failed to create tracer form: ' . $e->getMessage());
 
             return response()->json([
-                'message' => 'Failed to save tracer form.',
-                'error' => $e->getMessage(),
+                'message' => 'Failed to create tracer form.',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * Update an existing form (replace all phases/sections/questions).
+     */
     public function update(Request $request, $id)
     {
         $form = TracerForm::findOrFail($id);
 
         $validated = $request->validate([
-            'form_title' => 'required|string|max:255',
+            'form_title'       => 'required|string|max:255',
             'form_description' => 'nullable|string',
-            'form_header' => 'nullable|string',
-            'status' => 'integer|in:1,2,3',
-            'questions' => 'nullable|array',
+            'status'           => 'integer|in:0,1,2,3',
+            'phases'           => 'nullable|array',
+            'phases.*.title'    => 'required|string|max:255',
+            'phases.*.subtitle' => 'nullable|string|max:255',
+            'phases.*.icon'     => 'nullable|string|max:100',
+            'phases.*.color'    => 'nullable|string|max:20',
+            'phases.*.sections' => 'nullable|array',
+            'phases.*.sections.*.title'       => 'required|string|max:255',
+            'phases.*.sections.*.description' => 'nullable|string',
+            'phases.*.sections.*.questions'   => 'nullable|array',
+            'phases.*.sections.*.questions.*.question_text' => 'required|string',
+            'phases.*.sections.*.questions.*.type' => 'required|string|in:short_answer,paragraph,multiple_choice,checkboxes,dropdown,file_upload,likert_scale,multiple_choice_grid',
+            'phases.*.sections.*.questions.*.description'  => 'nullable|string',
+            'phases.*.sections.*.questions.*.placeholder'  => 'nullable|string|max:255',
+            'phases.*.sections.*.questions.*.is_required'  => 'boolean',
+            'phases.*.sections.*.questions.*.file_types'   => 'nullable|array',
+            'phases.*.sections.*.questions.*.max_file_size' => 'nullable|integer',
+            'phases.*.sections.*.questions.*.options'      => 'nullable|array',
+            'phases.*.sections.*.questions.*.options.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_rows'    => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_rows.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_columns' => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_columns.*.label' => 'required|string',
         ]);
 
         DB::beginTransaction();
 
         try {
-            // Process form header image if present
-            $formHeaderPath = $form->form_header;
-            if (!empty($validated['form_header'])) {
-                // Check if it's base64 data (new upload) or existing URL
-                if (Str::startsWith($validated['form_header'], 'data:image')) {
-                    $formHeaderPath = $this->uploadFormHeader($validated['form_header'], $form->id);
-                    
-                    // Delete old image if exists
-                    if ($form->form_header) {
-                        $this->deleteFormHeader($form->form_header);
-                    }
-                } else {
-                    // It's already a URL/path, keep it
-                    $formHeaderPath = $validated['form_header'];
-                }
-            }
-
             $form->update([
-                'form_title' => $validated['form_title'],
+                'form_title'       => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
-                'form_header' => $formHeaderPath,
-                'status' => $validated['status'] ?? $form->status,
+                'status'           => $validated['status'] ?? $form->status,
             ]);
 
-            // Delete existing questions and options
-            foreach ($form->questions as $question) {
-                $question->options()->delete();
-            }
-            $form->questions()->delete();
+            // Delete old structure (ON DELETE CASCADE handles nested)
+            $form->phases()->delete();
 
-            // Save new questions
-            if (!empty($validated['questions'])) {
-                $this->saveQuestions($form, $validated['questions']);
+            // Save new structure
+            if (!empty($validated['phases'])) {
+                $this->savePhases($form, $validated['phases']);
             }
 
             DB::commit();
 
             return response()->json([
                 'message' => 'Tracer form updated successfully.',
-                'form' => $form->load('questions.options')
+                'form'    => $form->load($this->nestedEagerLoad())
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -188,169 +209,223 @@ class TracerFormController extends Controller
 
             return response()->json([
                 'message' => 'Failed to update tracer form.',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * Soft delete a form.
+     */
     public function destroy($id)
     {
         try {
             $form = TracerForm::findOrFail($id);
-            
-            // Delete form header image if exists
-            if ($form->form_header) {
+
+            // Delete form header image if exists (for backward compatibility)
+            if ($form->form_header ?? null) {
                 $this->deleteFormHeader($form->form_header);
             }
-            
-            // Set status to deleted (0)
+
             $form->update(['status' => TracerForm::STATUS_DELETED]);
 
             return response()->json([
                 'message' => 'Tracer form deleted successfully.',
-                'form' => $form->load('questions.options'),
             ]);
         } catch (\Throwable $e) {
             \Log::error('Failed to delete tracer form: ' . $e->getMessage());
-            
             return response()->json([
                 'message' => 'Failed to delete tracer form.',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * Restore a deleted form.
+     */
     public function restore($id)
     {
         try {
             $form = TracerForm::findOrFail($id);
-            
-            // Only restore if actually deleted
+
             if ($form->status !== TracerForm::STATUS_DELETED) {
-                return response()->json([
-                    'message' => 'Form is not deleted.',
-                    'form' => $form->load('questions.options'),
-                ], 400);
+                return response()->json(['message' => 'Form is not deleted.'], 400);
             }
-            
-            // Restore by setting status back to active (1)
+
             $form->update(['status' => TracerForm::STATUS_ACTIVE]);
 
             return response()->json([
                 'message' => 'Tracer form restored successfully.',
-                'form' => $form->load('questions.options'),
             ]);
         } catch (\Throwable $e) {
             \Log::error('Failed to restore tracer form: ' . $e->getMessage());
-            
             return response()->json([
                 'message' => 'Failed to restore tracer form.',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * Toggle form status.
+     */
     public function toggleStatus(Request $request, $id)
     {
         try {
             $form = TracerForm::findOrFail($id);
             $newStatus = $request->integer('status');
-            
-            // Validate status
-            if (!in_array($newStatus, [TracerForm::STATUS_ACTIVE, TracerForm::STATUS_CLOSED, TracerForm::STATUS_DRAFT])) {
+
+            if (!in_array($newStatus, [
+                TracerForm::STATUS_DELETED,
+                TracerForm::STATUS_ACTIVE,
+                TracerForm::STATUS_DRAFT,
+                TracerForm::STATUS_CLOSED
+            ])) {
                 return response()->json(['message' => 'Invalid status.'], 400);
             }
-            
+
             $form->update(['status' => $newStatus]);
 
             return response()->json(['message' => 'Status updated successfully.']);
         } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'Failed to update status.',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
-    private function uploadFormHeader(string $base64Image, ?int $formId)
+    // ═══════════════════════════════════════
+    // PRIVATE HELPERS
+    // ═══════════════════════════════════════
+
+    /**
+     * Eager load array for nested relationships.
+     */
+    private function nestedEagerLoad(): array
     {
-        try {
-            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
-                $base64Image = substr($base64Image, strpos($base64Image, ',') + 1);
-                $type = strtolower($type[1]);
-                
-                $base64Image = str_replace(' ', '+', $base64Image);
-                $imageData = base64_decode($base64Image);
-                
-                if ($imageData === false) {
-                    throw new \Exception('Failed to decode base64 image');
-                }
-                
-                $filename = 'header_' . time() . '_' . Str::random(10) . '.' . $type;
-                
-                $folderPath = $formId 
-                    ? "tracer_images/{$formId}/" 
-                    : "tracer_images/temp_" . Str::random(10) . "/";
-                
-                $fullPath = $folderPath . $filename;
-                
-                $this->supabaseDisk->put($fullPath, $imageData, [
-                    'visibility' => 'public',
-                    'Content-Type' => 'image/' . $type
-                ]);
-                
-                return $this->supabaseDisk->url($fullPath);
+        return [
+            'phases' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+            'phases.sections' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+            'phases.sections.questions' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+            'phases.sections.questions.options' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+            'phases.sections.questions.gridRows' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+            'phases.sections.questions.gridColumns' => function ($q) {
+                $q->orderBy('order_priority');
+            },
+        ];
+    }
+
+    /**
+     * Save phases from request data.
+     */
+    private function savePhases(TracerForm $form, array $phases)
+    {
+        foreach ($phases as $phaseIdx => $phaseData) {
+            $phase = $form->phases()->create([
+                'title'          => $phaseData['title'],
+                'subtitle'       => $phaseData['subtitle'] ?? null,
+                'icon'           => $phaseData['icon'] ?? 'fa-user',
+                'color'          => $phaseData['color'] ?? '#3b82f6',
+                'order_priority' => $phaseIdx,
+            ]);
+
+            if (!empty($phaseData['sections'])) {
+                $this->saveSections($phase, $phaseData['sections']);
             }
-            
-            throw new \Exception('Invalid image format');
-            
-        } catch (\Exception $e) {
-            \Log::error('Failed to upload form header: ' . $e->getMessage());
-            throw $e;
         }
     }
 
+    /**
+     * Save sections from request data.
+     */
+    private function saveSections(TracerPhase $phase, array $sections)
+    {
+        foreach ($sections as $sectionIdx => $sectionData) {
+            $section = $phase->sections()->create([
+                'title'          => $sectionData['title'],
+                'description'    => $sectionData['description'] ?? null,
+                'order_priority' => $sectionIdx,
+            ]);
+
+            if (!empty($sectionData['questions'])) {
+                $this->saveQuestions($section, $sectionData['questions']);
+            }
+        }
+    }
+
+    /**
+     * Save questions from request data.
+     */
+    private function saveQuestions(TracerSection $section, array $questions)
+    {
+        foreach ($questions as $qIdx => $qData) {
+            $question = $section->questions()->create([
+                'type'           => $qData['type'],
+                'question_text'  => $qData['question_text'],
+                'description'    => $qData['description'] ?? null,
+                'placeholder'    => $qData['placeholder'] ?? null,
+                'is_required'    => $qData['is_required'] ?? true,
+                'order_priority' => $qIdx,
+                'file_types'     => $qData['file_types'] ?? null,
+                'max_file_size'  => $qData['max_file_size'] ?? null,
+            ]);
+
+            // Save simple options (multiple_choice, checkboxes, dropdown)
+            if (!empty($qData['options'])) {
+                foreach ($qData['options'] as $optIdx => $optionData) {
+                    $question->options()->create([
+                        'option_label'   => is_array($optionData) ? ($optionData['label'] ?? '') : $optionData,
+                        'order_priority' => $optIdx,
+                    ]);
+                }
+            }
+
+            // Save grid rows (likert_scale, multiple_choice_grid)
+            if (!empty($qData['grid_rows'])) {
+                foreach ($qData['grid_rows'] as $rowIdx => $rowData) {
+                    $question->gridRows()->create([
+                        'row_label'      => is_array($rowData) ? ($rowData['label'] ?? '') : $rowData,
+                        'order_priority' => $rowIdx,
+                    ]);
+                }
+            }
+
+            // Save grid columns (likert_scale, multiple_choice_grid)
+            if (!empty($qData['grid_columns'])) {
+                foreach ($qData['grid_columns'] as $colIdx => $colData) {
+                    $question->gridColumns()->create([
+                        'column_label'   => is_array($colData) ? ($colData['label'] ?? '') : $colData,
+                        'order_priority' => $colIdx,
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete form header image from storage.
+     */
     private function deleteFormHeader(string $imageUrl)
     {
         try {
             $path = parse_url($imageUrl, PHP_URL_PATH);
-            
             if (preg_match('/luminus_assets\/(.+)$/', $path, $matches)) {
-                $filePath = $matches[1];
-                $this->supabaseDisk->delete($filePath);
+                \Storage::disk('supabase_admin')->delete($matches[1]);
             }
         } catch (\Exception $e) {
             \Log::error('Failed to delete form header: ' . $e->getMessage());
-        }
-    }
-
-    private function saveQuestions(TracerForm $form, array $questions)
-    {
-        foreach ($questions as $index => $questionData) {
-            $question = $form->questions()->create([
-                'type' => $questionData['type'] ?? 'text',
-                'question_text' => $questionData['question_text'] ?? '',
-                'description' => $questionData['subtitle'] ?? null,
-                'is_required' => $questionData['required'] ?? false,
-                'order_priority' => $index,
-                'settings' => [
-                    'scale_points' => $questionData['scale_points'] ?? null,
-                    'scale_labels' => $questionData['scale_labels'] ?? null,
-                    'other_enabled' => $questionData['other_enabled'] ?? false,
-                    'display_type' => $questionData['display_type'] ?? 'list',
-                    'statements' => $questionData['statements'] ?? [],
-                ],
-            ]);
-
-            if (!empty($questionData['options']) && is_array($questionData['options'])) {
-                foreach ($questionData['options'] as $optIndex => $optionData) {
-                    $question->options()->create([
-                        'option_label' => $optionData['label'] ?? '',
-                        'option_value' => $optionData['label'] ?? '',
-                        'order_priority' => $optIndex,
-                    ]);
-                }
-            }
         }
     }
 }
