@@ -96,11 +96,11 @@ class TracerFormController extends Controller
             'phases.*.icon'     => 'nullable|string|max:100',
             'phases.*.color'    => 'nullable|string|max:20',
             'phases.*.sections' => 'nullable|array',
-            'phases.*.sections.*.title'       => 'required|string|max:255',
+            'phases.*.sections.*.title'       => 'required_with:phases.*.sections|string|max:255',
             'phases.*.sections.*.description' => 'nullable|string',
             'phases.*.sections.*.questions'   => 'nullable|array',
-            'phases.*.sections.*.questions.*.question_text' => 'required|string',
-            'phases.*.sections.*.questions.*.type' => 'required|string|in:short_answer,paragraph,multiple_choice,checkboxes,dropdown,file_upload,likert_scale,multiple_choice_grid',
+            'phases.*.sections.*.questions.*.question_text' => 'required_with:phases.*.sections.*.questions|string',
+            'phases.*.sections.*.questions.*.type' => 'required_with:phases.*.sections.*.questions|string|in:short_answer,paragraph,multiple_choice,checkboxes,dropdown,file_upload,likert_scale,multiple_choice_grid',
             'phases.*.sections.*.questions.*.description'  => 'nullable|string',
             'phases.*.sections.*.questions.*.placeholder'  => 'nullable|string|max:255',
             'phases.*.sections.*.questions.*.is_required'  => 'boolean',
@@ -118,7 +118,7 @@ class TracerFormController extends Controller
 
         try {
             $form = TracerForm::create([
-                'admin_id'         => auth()->guard('admin')->id() ?? 1,
+                'admin_id'         => session('admin_id') ?? 1,  // ✅ FIXED
                 'form_title'       => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
                 'status'           => $validated['status'] ?? TracerForm::STATUS_DRAFT,

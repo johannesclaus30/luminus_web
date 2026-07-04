@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/alumni_tracer_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body>
     
@@ -346,7 +347,7 @@
                     </table>
                 </div>
                 <div class="table-footer">
-                    <span id="responsesCount">8 results</span>
+                    <span id="responsesCount">0 results</span>
                 </div>
             </div>
 
@@ -357,71 +358,59 @@
                 <!-- Analytics Header -->
                 <div class="analytics-header">
                     <div>
-                        <h2 class="analytics-title">Tracer Analytics Overview</h2>
-                        <p class="analytics-subtitle">Insights from alumni employment and feedback data</p>
+                        <h2 class="analytics-title">Tracer Analytics</h2>
+                        <p class="analytics-subtitle">Visualize and analyze alumni responses</p>
                     </div>
-                    <button class="btn-export">
-                        <i class="fa-solid fa-file-export"></i> Export Full Report
-                    </button>
+                    <div class="analytics-header-actions">
+                        <button class="btn-add-chart" onclick="openChartBuilderModal()">
+                            <i class="fa-solid fa-plus"></i> Add Chart
+                        </button>
+                        <button class="btn-export" onclick="exportAnalyticsReport()">
+                            <i class="fa-solid fa-file-export"></i> Export Report
+                        </button>
+                    </div>
                 </div>
 
-                <!-- KPI Cards with Trends -->
-                <div class="analytics-kpi-grid">
+                <!-- KPI Summary Cards (auto-populated from data) -->
+                <div class="analytics-kpi-grid" id="analyticsKpiGrid">
                     <div class="kpi-card">
                         <div class="kpi-icon green"><i class="fa-solid fa-percent"></i></div>
                         <div class="kpi-value" style="color:#10b981;" id="kpiResponseRate">--</div>
                         <div class="kpi-label">Response Rate</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend" id="kpiResponseRateTrend">--</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-icon blue"><i class="fa-solid fa-chart-simple"></i></div>
                         <div class="kpi-value" style="color:#3b82f6;" id="kpiAvgCompletion">--</div>
                         <div class="kpi-label">Avg. Completion</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-trend" id="kpiAvgCompletionTrend">--</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-icon amber"><i class="fa-solid fa-star"></i></div>
-                        <div class="kpi-value" style="color:#f59e0b;" id="kpiAvgRating">--</div>
-                        <div class="kpi-label">Avg. Rating (Overall)</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-icon amber"><i class="fa-solid fa-users"></i></div>
+                        <div class="kpi-value" style="color:#f59e0b;" id="kpiTotalResponses">--</div>
+                        <div class="kpi-label">Total Responses</div>
+                        <div class="kpi-trend" id="kpiTotalResponsesTrend">--</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-icon purple"><i class="fa-solid fa-briefcase"></i></div>
-                        <div class="kpi-value" style="color:#8b5cf6;" id="kpiJobRelevance">--</div>
-                        <div class="kpi-label">Job Relevance</div>
-                        <div class="kpi-trend">--</div>
+                        <div class="kpi-icon purple"><i class="fa-solid fa-clock"></i></div>
+                        <div class="kpi-value" style="color:#8b5cf6;" id="kpiAvgTime">--</div>
+                        <div class="kpi-label">Avg. Time to Complete</div>
+                        <div class="kpi-trend" id="kpiAvgTimeTrend">--</div>
                     </div>
                 </div>
 
-                <!-- Analytics Charts Grid -->
-                <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <h3>Monthly Submissions</h3>
-                        <div class="bar-chart" id="monthlySubmissionsChart">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No data available yet.</p>
-                        </div>
+                <!-- Customizable Charts Grid -->
+                <div class="analytics-grid" id="analyticsChartsGrid">
+                    <!-- Empty state when no charts configured -->
+                    <div class="analytics-empty-state" id="analyticsEmptyState">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <h3>No charts configured yet</h3>
+                        <p>Click "Add Chart" to select questions and visualize response data.</p>
+                        <button class="btn btn-primary" onclick="openChartBuilderModal()">
+                            Add Your First Chart
+                        </button>
                     </div>
-
-                    <div class="analytics-card">
-                        <h3>Monthly Salary Distribution</h3>
-                        <div class="h-bar-list" id="salaryDistribution">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No salary data yet.</p>
-                        </div>
-                    </div>
-
-                    <div class="analytics-card">
-                        <h3>Average Ratings by Criterion</h3>
-                        <div class="rating-list" id="ratingsByCriterion">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No rating data yet.</p>
-                        </div>
-                    </div>
-
-                    <div class="analytics-card">
-                        <h3>Job Relevance to Degree</h3>
-                        <div class="h-bar-list" id="jobRelevance">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No data available yet.</p>
-                        </div>
-                    </div>
+                    <!-- Charts will be rendered here dynamically -->
                 </div>
             </div>
         </main>
@@ -586,6 +575,89 @@
         </div>
     </div>
 
+        <!-- ============================================ -->
+    <!-- CHART BUILDER MODAL -->
+    <!-- ============================================ -->
+    <div class="modal-overlay" id="chartBuilderModal">
+        <div class="modal-dialog" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3 id="chartBuilderModalTitle">Add Analytics Chart</h3>
+                <button class="modal-close" onclick="closeChartBuilderModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Chart Title <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="chartTitle" placeholder="e.g. Employment Status Distribution">
+                </div>
+
+                <div class="form-group">
+                    <label>Chart Type</label>
+                    <select class="form-control" id="chartType" onchange="handleChartTypeChange()">
+                        <option value="bar">Bar Chart</option>
+                        <option value="pie">Pie Chart</option>
+                        <option value="horizontal_bar">Horizontal Bar Chart</option>
+                        <option value="doughnut">Doughnut Chart</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Select Question to Visualize <span class="required">*</span></label>
+                    <select class="form-control" id="chartQuestion" onchange="handleChartQuestionChange()">
+                        <option value="">-- Select a question --</option>
+                        <!-- Populated dynamically from tracer questions -->
+                    </select>
+                    <p class="help-text" id="chartQuestionHelp">Choose a multiple choice, checkbox, dropdown, or grid question.</p>
+                </div>
+
+                <div class="form-group" id="chartPhaseFilterGroup">
+                    <label>Filter by Phase (optional)</label>
+                    <select class="form-control" id="chartPhaseFilter">
+                        <option value="">All Phases</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="form-group" id="chartColorGroup">
+                    <label>Color Scheme</label>
+                    <div class="color-scheme-grid" id="colorSchemeGrid">
+                        <button class="color-scheme-option selected" data-scheme="default" onclick="selectColorScheme('default', this)">
+                            <span style="background:#3b82f6;"></span>
+                            <span style="background:#10b981;"></span>
+                            <span style="background:#f59e0b;"></span>
+                            <span style="background:#8b5cf6;"></span>
+                            <span style="background:#ef4444;"></span>
+                        </button>
+                        <button class="color-scheme-option" data-scheme="ocean" onclick="selectColorScheme('ocean', this)">
+                            <span style="background:#06b6d4;"></span>
+                            <span style="background:#0ea5e9;"></span>
+                            <span style="background:#3b82f6;"></span>
+                            <span style="background:#6366f1;"></span>
+                            <span style="background:#8b5cf6;"></span>
+                        </button>
+                        <button class="color-scheme-option" data-scheme="forest" onclick="selectColorScheme('forest', this)">
+                            <span style="background:#22c55e;"></span>
+                            <span style="background:#10b981;"></span>
+                            <span style="background:#059669;"></span>
+                            <span style="background:#047857;"></span>
+                            <span style="background:#065f46;"></span>
+                        </button>
+                        <button class="color-scheme-option" data-scheme="sunset" onclick="selectColorScheme('sunset', this)">
+                            <span style="background:#f97316;"></span>
+                            <span style="background:#ef4444;"></span>
+                            <span style="background:#ec4899;"></span>
+                            <span style="background:#a855f7;"></span>
+                            <span style="background:#6366f1;"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeChartBuilderModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveChart()">Add Chart</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     // ═══════════════════════════════════════
     // GLOBAL STATE
@@ -660,6 +732,218 @@
     let selectedIcon = 'fa-user';
     let selectedColor = '#3b82f6';
 
+    let analyticsCharts = []; // Configured charts by admin
+
+        function getDefaultCharts() {
+        // Returns default charts based on questions found in phases
+        const charts = [];
+        
+        for (const phase of phases) {
+            for (const section of phase.sections) {
+                for (const q of section.questions) {
+                    if (q.type === 'multiple_choice' || q.type === 'dropdown') {
+                        charts.push({
+                            title: q.label,
+                            type: 'pie',
+                            questionId: q.id,
+                            phaseFilter: null,
+                            colorScheme: 'default',
+                        });
+                    } else if (q.type === 'likert_scale' || q.type === 'multiple_choice_grid') {
+                        charts.push({
+                            title: q.label,
+                            type: 'horizontal_bar',
+                            questionId: q.id,
+                            phaseFilter: null,
+                            colorScheme: 'default',
+                        });
+                    } else if (q.type === 'checkboxes') {
+                        charts.push({
+                            title: q.label,
+                            type: 'bar',
+                            questionId: q.id,
+                            phaseFilter: null,
+                            colorScheme: 'default',
+                        });
+                    } else if (q.type === 'short_answer' || q.type === 'paragraph') {
+                        charts.push({
+                            title: q.label,
+                            type: 'bar',
+                            questionId: q.id,
+                            phaseFilter: null,
+                            colorScheme: 'ocean',
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Limit to first 6 charts to avoid overwhelming the dashboard
+        return charts.slice(0, 6);
+    }
+
+    let currentEditingChart = null;
+    let selectedColorScheme = 'default';
+
+    const colorSchemes = {
+        default: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'],
+        ocean: ['#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316'],
+        forest: ['#22c55e', '#10b981', '#059669', '#047857', '#065f46', '#84cc16', '#a3e635', '#65a30d', '#4d7c0f', '#3f6212'],
+        sunset: ['#f97316', '#ef4444', '#ec4899', '#a855f7', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#10b981', '#84cc16']
+    };
+
+        // ═══════════════════════════════════════
+    // API HELPERS
+    // ═══════════════════════════════════════
+
+    const API_BASE = '/admin/alumni_tracer';
+
+    async function apiFetch(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                ...options,
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: 'Request failed' }));
+                throw new Error(error.message || `HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    async function loadForms() {
+        const forms = await apiFetch(`${API_BASE}/list`);
+        if (forms.length > 0) {
+            const form = await apiFetch(`${API_BASE}/${forms[0].id}`);
+            phases = mapFormToPhases(form);
+            selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+            // Auto-generate default charts
+            analyticsCharts = getDefaultCharts();
+        } else {
+            phases = [];
+            selectedPhaseId = null;
+            analyticsCharts = [];
+        }
+        renderBuilder();
+    }
+
+    async function saveFormToBackend() {
+        const payload = mapPhasesToPayload();
+        const existingForms = await apiFetch(`${API_BASE}/list`);
+        
+        if (existingForms.length > 0) {
+            const formId = existingForms[0].id;
+            await apiFetch(`${API_BASE}/${formId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        } else {
+            await apiFetch(API_BASE, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+        }
+    }
+
+    function mapFormToPhases(form) {
+        if (!form.phases) return [];
+        return form.phases.map(phase => ({
+            id: phase.id,
+            title: phase.title,
+            subtitle: phase.subtitle || '',
+            icon: phase.icon || 'fa-user',
+            color: phase.color || '#3b82f6',
+            sections: (phase.sections || []).map(section => ({
+                id: section.id,  // ✅ Use database ID, not generated
+                title: section.title,
+                description: section.description || '',
+                questions: (section.questions || []).map(q => {
+                    const question = {
+                        id: q.id,  // ✅ Use database ID
+                        label: q.question_text,
+                        type: q.type,
+                        placeholder: q.placeholder || '',
+                        required: q.is_required,
+                    };
+                    
+                    if (q.options && q.options.length > 0) {
+                        question.options = q.options.map(o => o.option_label);
+                    }
+                    
+                    if (q.file_types) {
+                        question.fileTypes = q.file_types;
+                    }
+                    if (q.max_file_size) {
+                        question.maxSize = q.max_file_size;
+                    }
+                    
+                    if (q.grid_rows && q.grid_rows.length > 0) {
+                        question.gridRows = q.grid_rows.map(r => r.row_label);
+                    }
+                    if (q.grid_columns && q.grid_columns.length > 0) {
+                        question.gridColumns = q.grid_columns.map(c => c.column_label);
+                    }
+                    
+                    return question;
+                })
+            }))
+        }));
+    }
+
+    function mapPhasesToPayload() {
+        return {
+            form_title: 'Alumni Tracer',
+            form_description: 'Alumni tracer survey form',
+            status: 2, // draft
+            phases: phases.map(phase => ({
+                title: phase.title,
+                subtitle: phase.subtitle || '',
+                icon: phase.icon || 'fa-user',
+                color: phase.color || '#3b82f6',
+                sections: (phase.sections || []).map(section => ({
+                    title: section.title,
+                    description: section.description || '',
+                    questions: (section.questions || []).map(q => {
+                        const question = {
+                            question_text: q.label,
+                            type: q.type,
+                            is_required: q.required,
+                            placeholder: q.placeholder || null,
+                        };
+                        
+                        if (q.options && q.options.length > 0) {
+                            question.options = q.options.map(opt => ({ label: opt }));
+                        }
+                        
+                        if (q.type === 'file_upload') {
+                            question.file_types = q.fileTypes || [];
+                            question.max_file_size = q.maxSize || 10;
+                        }
+                        
+                        if (q.gridRows && q.gridRows.length > 0) {
+                            question.grid_rows = q.gridRows.map(row => ({ label: row }));
+                        }
+                        if (q.gridColumns && q.gridColumns.length > 0) {
+                            question.grid_columns = q.gridColumns.map(col => ({ label: col }));
+                        }
+                        
+                        return question;
+                    })
+                }))
+            }))
+        };
+    }
+
     // ═══════════════════════════════════════
     // MOBILE MENU
     // ═══════════════════════════════════════
@@ -699,6 +983,7 @@
 
             if (this.dataset.tab === 'builder') renderBuilder();
             if (this.dataset.tab === 'responses') renderResponsesTable();
+            if (this.dataset.tab === 'analytics') renderAnalytics();
         });
     });
 
@@ -708,6 +993,17 @@
 
     function renderPhasesList() {
         const container = document.getElementById('phasesList');
+        
+        if (!phases || phases.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 1.5rem; text-align: center; color: var(--gray-400); font-size: 0.8125rem;">
+                    <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem;"></i>
+                    No phases yet. Click "Add" to create one.
+                </div>
+            `;
+            return;
+        }
+        
         container.innerHTML = phases.map(phase => {
             const isSel = selectedPhaseId === phase.id;
             const totalQ = phase.sections.reduce((s, sec) => s + sec.questions.length, 0);
@@ -827,10 +1123,12 @@
     }
 
     function toggleSection(sectionId) {
-        if (expandedSections.has(sectionId)) {
-            expandedSections.delete(sectionId);
+        // Convert to number for consistent Set operations (database IDs are integers)
+        const id = Number(sectionId);
+        if (expandedSections.has(id)) {
+            expandedSections.delete(id);
         } else {
-            expandedSections.add(sectionId);
+            expandedSections.add(id);
         }
         renderBuilder();
     }
@@ -840,22 +1138,34 @@
         phases = phases.filter(p => p.id !== id);
         if (selectedPhaseId === id) selectedPhaseId = phases.length > 0 ? phases[0].id : null;
         renderBuilder();
+        saveFormToBackend(); // Auto-save
     }
 
     function deleteSection(phaseId, secId) {
         if (!confirm('Delete this section?')) return;
-        phases = phases.map(p => p.id === phaseId ? { ...p, sections: p.sections.filter(s => s.id !== secId) } : p);
-        expandedSections.delete(secId);
+        phases = phases.map(p => {
+            if (Number(p.id) !== Number(phaseId)) return p;
+            return { ...p, sections: p.sections.filter(s => Number(s.id) !== Number(secId)) };
+        });
+        expandedSections.delete(Number(secId));
         renderBuilder();
+        saveFormToBackend();
     }
 
     function deleteQuestion(phaseId, secId, qId) {
         if (!confirm('Delete this question?')) return;
-        phases = phases.map(p => p.id === phaseId ? {
-            ...p,
-            sections: p.sections.map(s => s.id === secId ? { ...s, questions: s.questions.filter(q => q.id !== qId) } : s)
-        } : p);
+        phases = phases.map(p => {
+            if (Number(p.id) !== Number(phaseId)) return p;
+            return {
+                ...p,
+                sections: p.sections.map(s => {
+                    if (Number(s.id) !== Number(secId)) return s;
+                    return { ...s, questions: s.questions.filter(q => Number(q.id) !== Number(qId)) };
+                })
+            };
+        });
         renderBuilder();
+        saveFormToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -1075,13 +1385,11 @@
         const isFileType = type === 'file_upload';
         const isGridType = ['likert_scale', 'multiple_choice_grid'].includes(type);
         
-        // Validate options for choice types
         if (isChoiceType && tempOptions.length < 2) {
             alert('Please add at least 2 options for this question type.');
             return;
         }
         
-        // Validate grid data
         if (isGridType) {
             if (tempGridRows.length === 0) {
                 alert('Please add at least 1 statement (row) for the grid.');
@@ -1093,7 +1401,6 @@
             }
         }
         
-        // Get file upload settings
         let fileTypes = [];
         let maxSize = 10;
         if (isFileType) {
@@ -1108,21 +1415,15 @@
             required: document.getElementById('qRequired').checked
         };
 
-        // Add type-specific data
-        if (isChoiceType) {
-            qData.options = [...tempOptions];
-        }
-        
+        if (isChoiceType) qData.options = [...tempOptions];
         if (isTextType) {
             const placeholder = document.getElementById('qPlaceholder').value.trim();
             if (placeholder) qData.placeholder = placeholder;
         }
-        
         if (isFileType) {
             qData.fileTypes = fileTypes;
             qData.maxSize = maxSize;
         }
-        
         if (isGridType) {
             qData.gridRows = [...tempGridRows];
             qData.gridColumns = [...tempGridColumns];
@@ -1130,18 +1431,25 @@
 
         const { phaseId, secId, question } = currentEditQuestion;
         
-        phases = phases.map(p => p.id === phaseId ? {
-            ...p,
-            sections: p.sections.map(s => s.id === secId ? {
-                ...s,
-                questions: question
-                    ? s.questions.map(q => q.id === question.id ? qData : q)
-                    : [...s.questions, qData]
-            } : s)
-        } : p);
+        phases = phases.map(p => {
+            if (Number(p.id) !== Number(phaseId)) return p;
+            return {
+                ...p,
+                sections: p.sections.map(s => {
+                    if (Number(s.id) !== Number(secId)) return s;
+                    return {
+                        ...s,
+                        questions: question
+                            ? s.questions.map(q => Number(q.id) === Number(question.id) ? qData : q)
+                            : [...s.questions, qData]
+                    };
+                })
+            };
+        });
 
         closeQuestionModal();
         renderBuilder();
+        saveFormToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -1210,6 +1518,7 @@
 
         closePhaseModal();
         renderBuilder();
+        saveFormToBackend(); // Auto-save
     }
 
     // ═══════════════════════════════════════
@@ -1217,12 +1526,16 @@
     // ═══════════════════════════════════════
 
     function openSectionModal(sectionId, phaseId) {
-        const section = sectionId ? phases.find(p => p.id === phaseId)?.sections.find(s => s.id === sectionId) : null;
-        currentEditSection = { section, phaseId };
+        // Convert both to numbers for reliable comparison
+        const secId = sectionId ? Number(sectionId) : null;
+        const phId = Number(phaseId);
+        
+        const section = secId ? phases.find(p => p.id === phId)?.sections.find(s => Number(s.id) === secId) : null;
+        currentEditSection = { section, phaseId: phId };
         
         document.getElementById('sectionModalTitle').textContent = section ? 'Edit Section' : 'Add New Section';
         document.getElementById('sectionTitle').value = section ? section.title : '';
-        document.getElementById('sectionDesc').value = section ? section.description || '' : '';
+        document.getElementById('sectionDesc').value = section ? (section.description || '') : '';
         
         document.getElementById('sectionModal').classList.add('active');
     }
@@ -1243,15 +1556,19 @@
 
         const { section, phaseId } = currentEditSection;
 
-        phases = phases.map(p => p.id === phaseId ? {
-            ...p,
-            sections: section
-                ? p.sections.map(s => s.id === section.id ? { ...s, ...data } : s)
-                : [...p.sections, { id: phaseId + '-' + Date.now(), ...data, questions: [] }]
-        } : p);
+        phases = phases.map(p => {
+            if (Number(p.id) !== Number(phaseId)) return p;
+            return {
+                ...p,
+                sections: section
+                    ? p.sections.map(s => Number(s.id) === Number(section.id) ? { ...s, ...data } : s)
+                    : [...p.sections, { id: phaseId + '-' + Date.now(), ...data, questions: [] }]
+            };
+        });
 
         closeSectionModal();
         renderBuilder();
+        saveFormToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -1329,9 +1646,64 @@
             renderResponsesTable(filtered);
         }
 
-        // Initial render
-        renderResponsesTable();
-        renderBuilder();
+        // Show loading state in phases sidebar
+                // Show loading state in phases sidebar
+        const phasesList = document.getElementById('phasesList');
+        phasesList.innerHTML = `
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Show loading in the center of the builder content area
+        const emptyState = document.getElementById('emptyBuilderState');
+        const detailContent = document.getElementById('phaseDetailContent');
+        const builderContent = document.getElementById('builderContent');
+        
+        // Make builder-content fill its parent
+        builderContent.style.cssText = 'display: flex; flex-direction: column; flex: 1; height: 100%; position: relative;';
+        
+        emptyState.innerHTML = `
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                <div class="loading-spinner" style="margin: 0 auto 0.75rem auto;"></div>
+                <p class="loading-text">Loading tracer form...</p>
+            </div>
+        `;
+        emptyState.style.cssText = 'position: relative; flex: 1; width: 100%;';
+        detailContent.style.display = 'none';
+
+        // Load tracer form from backend
+        loadForms().then(() => {
+            renderResponsesTable();
+        }).catch(err => {
+            console.error('Failed to load tracer form:', err);
+            renderBuilder();
+            renderResponsesTable();
+        });
     });
 
     // ═══════════════════════════════════════
@@ -1352,6 +1724,356 @@
             document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
         }
     });
+
+        // ═══════════════════════════════════════
+    // ANALYTICS RENDERING
+    // ═══════════════════════════════════════
+
+    /**
+     * Render the analytics tab - called when switching to analytics tab or when charts change.
+     */
+    function renderAnalytics() {
+        renderAnalyticsKPIs();
+        renderAnalyticsChartsGrid();
+        updateChartQuestionDropdown();
+    }
+
+    /**
+     * Populate KPI cards from actual data.
+     */
+    function renderAnalyticsKPIs() {
+        const totalAlumni = 0; // TODO: Fetch from backend
+        const totalResponses = MOCK_RESPONSES.length;
+        const completedResponses = MOCK_RESPONSES.filter(r => r.status === 'complete').length;
+        const responseRate = totalAlumni > 0 ? Math.round((totalResponses / totalAlumni) * 100) : 0;
+        const avgCompletion = totalResponses > 0 
+            ? Math.round(MOCK_RESPONSES.reduce((sum, r) => sum + r.completion, 0) / totalResponses) 
+            : 0;
+
+        document.getElementById('kpiResponseRate').textContent = totalAlumni > 0 ? responseRate + '%' : '--';
+        document.getElementById('kpiAvgCompletion').textContent = totalResponses > 0 ? avgCompletion + '%' : '--';
+        document.getElementById('kpiTotalResponses').textContent = totalResponses || '--';
+        document.getElementById('kpiAvgTime').textContent = '--'; // TODO: calculate from submitted_at timestamps
+        document.getElementById('kpiResponseRateTrend').textContent = '--';
+        document.getElementById('kpiAvgCompletionTrend').textContent = '--';
+        document.getElementById('kpiTotalResponsesTrend').textContent = '--';
+        document.getElementById('kpiAvgTimeTrend').textContent = '--';
+    }
+
+    /**
+     * Render the charts grid with all configured charts.
+     */
+    function renderAnalyticsChartsGrid() {
+        const grid = document.getElementById('analyticsChartsGrid');
+        const emptyState = document.getElementById('analyticsEmptyState');
+
+        if (analyticsCharts.length === 0) {
+            emptyState.style.display = 'flex';
+            // Remove any existing chart cards except empty state
+            grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        // Remove existing chart cards
+        grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
+
+        // Render each configured chart
+        analyticsCharts.forEach((chart, index) => {
+            const card = document.createElement('div');
+            card.className = 'analytics-card';
+            card.innerHTML = `
+                <div class="analytics-card-header">
+                    <h3>${chart.title}</h3>
+                    <div class="analytics-card-actions">
+                        <button class="btn-icon" onclick="editChart(${index})" title="Edit Chart">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn-icon delete" onclick="deleteChart(${index})" title="Remove Chart">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container" id="chartContainer${index}">
+                    ${generateChartHTML(chart, index)}
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    /**
+     * Generate chart HTML based on chart type and question data.
+     */
+    function generateChartHTML(chart, index) {
+        const question = findQuestionById(chart.questionId);
+        if (!question) {
+            return `<p style="color: var(--gray-400); text-align: center; padding: 2rem;">Question not found. It may have been deleted.</p>`;
+        }
+
+        let labels = [];
+        let values = [];
+
+        if (question.options && question.options.length > 0) {
+            // Multiple choice, checkboxes, dropdown
+            labels = question.options;
+            values = labels.map(() => Math.floor(Math.random() * 50) + 5);
+        } else if (question.gridRows && question.gridColumns) {
+            // Likert scale or multiple choice grid
+            labels = question.gridRows;
+            values = labels.map(() => Math.floor(Math.random() * 40) + 10);
+        } else {
+            // short_answer, paragraph — show placeholder data
+            labels = ['Responses'];
+            values = [Math.floor(Math.random() * 30) + 5];
+        }
+
+        const colors = colorSchemes[chart.colorScheme] || colorSchemes.default;
+        const maxValue = Math.max(...values, 1);
+
+        if (chart.type === 'bar' || chart.type === 'horizontal_bar') {
+            const isHorizontal = chart.type === 'horizontal_bar';
+            return `
+                <div class="${isHorizontal ? 'h-bar-list' : 'bar-chart'}">
+                    ${labels.map((label, i) => {
+                        const pct = Math.round((values[i] / maxValue) * 100);
+                        if (isHorizontal) {
+                            return `
+                                <div class="h-bar-item">
+                                    <div class="h-bar-header">
+                                        <span class="h-bar-label">
+                                            <span class="h-bar-dot" style="background:${colors[i % colors.length]};"></span> ${label}
+                                        </span>
+                                        <span class="h-bar-percent">${values[i]}</span>
+                                    </div>
+                                    <div class="h-bar-track">
+                                        <div class="h-bar-fill" style="width:${pct}%; background:${colors[i % colors.length]};"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        return `
+                            <div class="bar-chart-item">
+                                <span class="bar-value">${values[i]}</span>
+                                <div class="bar-fill" style="height: ${Math.max(pct * 1.5, 10)}px; background: ${colors[i % colors.length]};"></div>
+                                <span class="bar-label">${label.length > 10 ? label.substring(0, 10) + '...' : label}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        if (chart.type === 'pie' || chart.type === 'doughnut') {
+            const total = values.reduce((a, b) => a + b, 0);
+            return `
+                <div class="simple-pie-chart">
+                    <div class="pie-legend">
+                        ${labels.map((label, i) => {
+                            const pct = total > 0 ? Math.round((values[i] / total) * 100) : 0;
+                            return `
+                                <div class="pie-legend-item">
+                                    <span class="pie-legend-dot" style="background:${colors[i % colors.length]};"></span>
+                                    <span class="pie-legend-label">${label}</span>
+                                    <span class="pie-legend-value">${values[i]} (${pct}%)</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="pie-visual" style="
+                        background: conic-gradient(
+                            ${labels.map((label, i) => {
+                                const pct = total > 0 ? (values[i] / total) * 100 : 0;
+                                const prevPct = values.slice(0, i).reduce((a, b) => a + b, 0);
+                                const prevAngle = total > 0 ? (prevPct / total) * 100 : 0;
+                                return `${colors[i % colors.length]} ${prevAngle}% ${prevAngle + pct}%`;
+                            }).join(', ')}
+                        );
+                        ${chart.type === 'doughnut' ? 'mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
+                        ${chart.type === 'doughnut' ? '-webkit-mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
+                    "></div>
+                </div>
+            `;
+        }
+
+        return `<p style="color: var(--gray-400); text-align: center;">Unknown chart type.</p>`;
+    }
+
+    /**
+     * Find a question by ID across all phases/sections.
+     */
+    function findQuestionById(questionId) {
+        for (const phase of phases) {
+            for (const section of phase.sections) {
+                const q = section.questions.find(q => q.id === questionId);
+                if (q) return q;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update the question dropdown in the chart builder modal.
+     */
+    function updateChartQuestionDropdown() {
+        const select = document.getElementById('chartQuestion');
+        const currentValue = select.value;
+        
+        let options = '<option value="">-- Select a question --</option>';
+        
+        for (const phase of phases) {
+            for (const section of phase.sections) {
+                for (const q of section.questions) {
+                    // Allow ALL question types except file_upload
+                    if (q.type !== 'file_upload') {
+                        const label = q.label.length > 60 ? q.label.substring(0, 57) + '...' : q.label;
+                        options += `<option value="${q.id}">[${typeLabels[q.type]}] ${label}</option>`;
+                    }
+                }
+            }
+        }
+
+        select.innerHTML = options;
+        if (currentValue && [...select.options].some(o => o.value === currentValue)) {
+            select.value = currentValue;
+        }
+    }
+
+    // ═══════════════════════════════════════
+    // CHART BUILDER MODAL
+    // ═══════════════════════════════════════
+
+    function openChartBuilderModal(chartIndex = null) {
+        updateChartQuestionDropdown();
+        updatePhaseFilterDropdown();
+        
+        if (chartIndex !== null && chartIndex !== undefined) {
+            // Editing existing chart
+            const chart = analyticsCharts[chartIndex];
+            currentEditingChart = chartIndex;
+            document.getElementById('chartBuilderModalTitle').textContent = 'Edit Chart';
+            document.getElementById('chartTitle').value = chart.title;
+            document.getElementById('chartType').value = chart.type;
+            document.getElementById('chartQuestion').value = chart.questionId;
+            document.getElementById('chartPhaseFilter').value = chart.phaseFilter || '';
+            selectedColorScheme = chart.colorScheme || 'default';
+        } else {
+            // Adding new chart
+            currentEditingChart = null;
+            document.getElementById('chartBuilderModalTitle').textContent = 'Add Analytics Chart';
+            document.getElementById('chartTitle').value = '';
+            document.getElementById('chartType').value = 'bar';
+            document.getElementById('chartQuestion').value = '';
+            document.getElementById('chartPhaseFilter').value = '';
+            selectedColorScheme = 'default';
+        }
+
+        handleChartTypeChange();
+        handleChartQuestionChange();
+        renderColorSchemeOptions();
+        
+        document.getElementById('chartBuilderModal').classList.add('active');
+    }
+
+    function closeChartBuilderModal() {
+        document.getElementById('chartBuilderModal').classList.remove('active');
+        currentEditingChart = null;
+    }
+
+    function handleChartTypeChange() {
+        const type = document.getElementById('chartType').value;
+        document.getElementById('chartColorGroup').style.display = 
+            ['pie', 'doughnut', 'bar', 'horizontal_bar'].includes(type) ? 'block' : 'block';
+    }
+
+    function handleChartQuestionChange() {
+        const questionId = document.getElementById('chartQuestion').value;
+        const question = questionId ? findQuestionById(questionId) : null;
+        const helpEl = document.getElementById('chartQuestionHelp');
+        
+        if (question) {
+            if (question.type === 'multiple_choice' || question.type === 'dropdown') {
+                helpEl.textContent = `Type: ${typeLabels[question.type]} · ${question.options?.length || 0} options · Best visualized as Pie or Bar chart.`;
+            } else if (question.type === 'checkboxes') {
+                helpEl.textContent = `Type: ${typeLabels[question.type]} · ${question.options?.length || 0} options · Each option counted independently.`;
+            } else if (question.type === 'likert_scale' || question.type === 'multiple_choice_grid') {
+                helpEl.textContent = `Type: ${typeLabels[question.type]} · ${question.gridRows?.length || 0} rows × ${question.gridColumns?.length || 0} columns · Best visualized as Horizontal Bar chart.`;
+            } else if (question.type === 'short_answer' || question.type === 'paragraph') {
+                helpEl.textContent = `Type: ${typeLabels[question.type]} · Shows response count · Best visualized as Bar chart.`;
+            }
+        } else {
+            helpEl.textContent = 'Choose a question to visualize its response data.';
+        }
+    }
+
+    function updatePhaseFilterDropdown() {
+        const select = document.getElementById('chartPhaseFilter');
+        select.innerHTML = '<option value="">All Phases</option>' +
+            phases.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+    }
+
+    function selectColorScheme(scheme, button) {
+        selectedColorScheme = scheme;
+        document.querySelectorAll('.color-scheme-option').forEach(b => b.classList.remove('selected'));
+        button.classList.add('selected');
+    }
+
+    function renderColorSchemeOptions() {
+        document.querySelectorAll('.color-scheme-option').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.scheme === selectedColorScheme);
+        });
+    }
+
+    function saveChart() {
+        const title = document.getElementById('chartTitle').value.trim();
+        const type = document.getElementById('chartType').value;
+        const questionId = document.getElementById('chartQuestion').value;
+        const phaseFilter = document.getElementById('chartPhaseFilter').value;
+
+        if (!title) {
+            alert('Please enter a chart title.');
+            return;
+        }
+        if (!questionId) {
+            alert('Please select a question to visualize.');
+            return;
+        }
+
+        const chartData = {
+            title,
+            type,
+            questionId,
+            phaseFilter: phaseFilter || null,
+            colorScheme: selectedColorScheme,
+        };
+
+        if (currentEditingChart !== null) {
+            analyticsCharts[currentEditingChart] = chartData;
+        } else {
+            analyticsCharts.push(chartData);
+        }
+
+        closeChartBuilderModal();
+        renderAnalyticsChartsGrid();
+    }
+
+    function editChart(index) {
+        openChartBuilderModal(index);
+    }
+
+    function deleteChart(index) {
+        if (!confirm('Remove this chart from the analytics dashboard?')) return;
+        analyticsCharts.splice(index, 1);
+        renderAnalyticsChartsGrid();
+    }
+
+    function exportAnalyticsReport() {
+        // TODO: Implement CSV/PDF export
+        alert('Analytics export will be available when response data is connected.');
+    }
+
+
 </script>
 
 </body>
