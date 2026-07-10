@@ -428,4 +428,392 @@ class TracerFormController extends Controller
             \Log::error('Failed to delete form header: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Get dashboard statistics for a form.
+     */
+    public function dashboardStats($formId)
+    {
+        try {
+            $form = TracerForm::withCount(['responses', 'responses as completed_count' => function ($q) {
+                $q->where('status', 'completed');
+            }])->findOrFail($formId);
+
+            $totalAlumni = \App\Models\Alumni::count();
+            $totalResponses = $form->responses_count;
+            $completedResponses = $form->completed_count;
+            $inProgressResponses = $totalResponses - $completedResponses;
+
+            // Count total questions
+            $totalQuestions = TracerQuestion::whereHas('section.phase.form', function ($q) use ($formId) {
+                $q->where('id', $formId);
+            })->count();
+
+            // Get phase count
+            $phaseCount = $form->phases()->count();
+            $sectionCount = TracerSection::whereHas('phase.form', function ($q) use ($formId) {
+                $q->where('id', $formId);
+            })->count();
+
+            return response()->json([
+                'totalAlumni' => $totalAlumni,
+                'completedResponses' => $completedResponses,
+                'inProgressResponses' => $inProgressResponses,
+                'totalQuestions' => $totalQuestions,
+                'phaseCount' => $phaseCount,
+                'sectionCount' => $sectionCount,
+                'responseRate' => $totalAlumni > 0 ? round(($totalResponses / $totalAlumni) * 100, 1) : 0,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get recent submissions for dashboard.
+     */
+    public function recentSubmissions($formId)
+    {
+        try {
+            $submissions = \App\Models\TracerResponse::with(['alumni:id,first_name,last_name,program,year_graduated'])
+                ->where('form_id', $formId)
+                ->orderByDesc('updated_at')
+                ->limit(10)
+                ->get()
+                ->map(function ($response) {
+                    // Calculate completion percentage
+                    $totalQuestions = TracerQuestion::whereHas('section.phase.form', function ($q) use ($response) {
+                        $q->where('id', $response->form_id);
+                    })->count();
+                    
+                    $answeredQuestions = $response->answers()->count();
+                    $completion = $totalQuestions > 0 ? round(($answeredQuestions / $totalQuestions) * 100) : 0;
+
+                    return [
+                        'id' => $response->id,
+                        'alumni_name' => $response->alumni->first_name . ' ' . $response->alumni->last_name,
+                        'program' => $response->alumni->program ?? 'N/A',
+                        'year_graduated' => $response->alumni->year_graduated ? date('Y', strtotime($response->alumni->year_graduated)) : 'N/A',
+                        'completion' => $completion,
+                        'status' => $response->status,
+                        'submitted_at' => $response->submitted_at ? $response->submitted_at->format('M d, Y') : $response->created_at->format('M d, Y'),
+                    ];
+                });
+
+            return response()->json($submissions);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get analytics data for a specific question.
+     */
+    public function questionAnalytics($questionId)
+    {
+        try {
+            $question = TracerQuestion::with(['options', 'gridRows', 'gridColumns'])->findOrFail($questionId);
+            
+            $data = [
+                'question' => $question,
+                'type' => $question->type,
+            ];
+
+            if (in_array($question->type, ['multiple_choice', 'dropdown'])) {
+                // Get answer counts per option
+                $optionCounts = [];
+                foreach ($question->options as $option) {
+                    $count = \App\Models\TracerAnswerSelection::whereHas('answer', function ($q) use ($questionId) {
+                        $q->where('question_id', $questionId);
+                    })->where('option_id', $option->id)->count();
+                    
+                    $optionCounts[] = [
+                        'label' => $option->option_label,
+                        'count' => $count,
+                    ];
+                }
+                $data['options'] = $optionCounts;
+                
+            } elseif ($question->type === 'checkboxes') {
+                // Count each selected option
+                $optionCounts = [];
+                foreach ($question->options as $option) {
+                    $count = \App\Models\TracerAnswerSelection::whereHas('answer', function ($q) use ($questionId) {
+                        $q->where('question_id', $questionId);
+                    })->where('option_id', $option->id)->count();
+                    
+                    $optionCounts[] = [
+                        'label' => $option->option_label,
+                        'count' => $count,
+                    ];
+                }
+                $data['options'] = $optionCounts;
+                
+            } elseif (in_array($question->type, ['likert_scale', 'multiple_choice_grid'])) {
+                // Get row and column data
+                $rowData = [];
+                foreach ($question->gridRows as $row) {
+                    $columnCounts = [];
+                    foreach ($question->gridColumns as $column) {
+                        $count = \App\Models\TracerAnswerSelection::whereHas('answer', function ($q) use ($questionId, $row) {
+                            $q->where('question_id', $questionId)
+                            ->where('grid_row_id', $row->id);
+                        })->where('grid_column_id', $column->id)->count();
+                        
+                        $columnCounts[] = [
+                            'column_label' => $column->column_label,
+                            'count' => $count,
+                        ];
+                    }
+                    $rowData[] = [
+                        'row_label' => $row->row_label,
+                        'columns' => $columnCounts,
+                    ];
+                }
+                $data['gridData'] = $rowData;
+                
+            } elseif (in_array($question->type, ['short_answer', 'paragraph'])) {
+                // Get response count
+                $responseCount = \App\Models\TracerAnswer::where('question_id', $questionId)
+                    ->whereNotNull('answer_value')
+                    ->count();
+                $data['responseCount'] = $responseCount;
+            }
+
+            return response()->json($data);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get analytics KPIs.
+     */
+    public function analyticsKPIs($formId)
+    {
+        try {
+            $form = TracerForm::findOrFail($formId);
+            $totalAlumni = \App\Models\Alumni::count();
+            $totalResponses = $form->responses()->count();
+            $completedResponses = $form->responses()->where('status', 'completed')->count();
+            
+            $responseRate = $totalAlumni > 0 ? round(($totalResponses / $totalAlumni) * 100, 1) : 0;
+            
+            // Calculate average completion
+            $avgCompletion = 0;
+            if ($totalResponses > 0) {
+                $totalQuestions = TracerQuestion::whereHas('section.phase.form', function ($q) use ($formId) {
+                    $q->where('id', $formId);
+                })->count();
+                
+                if ($totalQuestions > 0) {
+                    $responses = $form->responses()->withCount('answers')->get();
+                    $avgCompletion = round($responses->avg(function ($r) use ($totalQuestions) {
+                        return ($r->answers_count / $totalQuestions) * 100;
+                    }), 1);
+                }
+            }
+            
+            // Average time to complete (in minutes)
+            $avgTime = null;
+            if ($completedResponses > 0) {
+                $avgTime = $form->responses()
+                    ->where('status', 'completed')
+                    ->whereNotNull('submitted_at')
+                    ->get()
+                    ->avg(function ($r) {
+                        return $r->created_at->diffInMinutes($r->submitted_at);
+                    });
+                $avgTime = round($avgTime, 1);
+            }
+
+            return response()->json([
+                'responseRate' => $responseRate,
+                'avgCompletion' => $avgCompletion,
+                'totalResponses' => $totalResponses,
+                'avgTimeToComplete' => $avgTime,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+ * Get alumni who haven't completed the tracer form.
+ */
+public function getIncompleteAlumni($formId)
+{
+    try {
+        $form = TracerForm::findOrFail($formId);
+        
+        // Get all alumni IDs who have completed responses
+        $completedAlumniIds = $form->responses()
+            ->where('status', 'completed')
+            ->pluck('alumni_id');
+        
+        // Get alumni who haven't completed (or haven't started) the tracer
+        // Note: Your table is 'alumnis' (with 's') - make sure your model reflects this
+        $incompleteAlumni = \App\Models\Alumni::whereNotIn('id', $completedAlumniIds)
+            ->select('id', 'first_name', 'last_name', 'email', 'program', 'year_graduated')
+            ->orderBy('last_name')
+            ->get()
+            ->map(function ($alumni) use ($form) {
+                // Check if they have an in-progress response
+                $response = $form->responses()
+                    ->where('alumni_id', $alumni->id)
+                    ->where('status', 'in_progress')
+                    ->first();
+                
+                // Calculate completion if response exists
+                $completion = 0;
+                $lastActivity = null;
+                
+                if ($response) {
+                    $totalQuestions = TracerQuestion::whereHas('section.phase.form', function ($q) use ($form) {
+                        $q->where('id', $form->id);
+                    })->count();
+                    
+                    $answeredQuestions = $response->answers()->count();
+                    $completion = $totalQuestions > 0 ? round(($answeredQuestions / $totalQuestions) * 100) : 0;
+                    $lastActivity = $response->updated_at ? $response->updated_at->diffForHumans() : null;
+                }
+                
+                return [
+                    'id' => $alumni->id,
+                    'name' => $alumni->first_name . ' ' . $alumni->last_name,
+                    'email' => $alumni->email,
+                    'program' => $alumni->program ?? 'N/A',
+                    'year_graduated' => $alumni->year_graduated ? date('Y', strtotime($alumni->year_graduated)) : 'N/A',
+                    'has_started' => !is_null($response),
+                    'completion' => $completion,
+                    'last_activity' => $lastActivity,
+                ];
+            });
+        
+        // Get total stats
+        $totalAlumni = \App\Models\Alumni::count();
+        $completedCount = $form->responses()->where('status', 'completed')->count();
+        $inProgressCount = $form->responses()->where('status', 'in_progress')->count();
+        $notStartedCount = $totalAlumni - $completedCount - $inProgressCount;
+        
+        return response()->json([
+            'alumni' => $incompleteAlumni,
+            'stats' => [
+                'total_alumni' => $totalAlumni,
+                'completed' => $completedCount,
+                'in_progress' => $inProgressCount,
+                'not_started' => $notStartedCount,
+            ],
+            'form_title' => $form->form_title,
+        ]);
+        
+    } catch (\Throwable $e) {
+        \Log::error('Failed to get incomplete alumni: ' . $e->getMessage());
+        return response()->json([
+            'error' => 'Failed to load alumni data',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Send reminder email to specific alumni.
+ */
+public function sendReminder(Request $request, $formId, $alumniId)
+{
+    try {
+        $form = TracerForm::findOrFail($formId);
+        $alumni = \App\Models\Alumni::findOrFail($alumniId);
+        
+        // Check if alumni has already completed
+        $existingResponse = $form->responses()
+            ->where('alumni_id', $alumniId)
+            ->where('status', 'completed')
+            ->first();
+            
+        if ($existingResponse) {
+            return response()->json([
+                'error' => 'This alumni has already completed the tracer.'
+            ], 400);
+        }
+        
+        // Send email using Laravel's mail system
+        \Mail::to($alumni->email)->send(new \App\Mail\TracerReminderMail($alumni, $form));
+        
+        return response()->json([
+            'message' => 'Reminder sent successfully to ' . $alumni->first_name . ' ' . $alumni->last_name,
+        ]);
+        
+    } catch (\Throwable $e) {
+        \Log::error('Failed to send reminder: ' . $e->getMessage());
+        return response()->json([
+            'error' => 'Failed to send reminder',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Send reminder emails to all incomplete alumni.
+ */
+public function sendReminderToAll(Request $request, $formId)
+{
+    $request->validate([
+        'alumni_ids' => 'required|array',
+        'alumni_ids.*' => 'integer',
+    ]);
+    
+    try {
+        $form = TracerForm::findOrFail($formId);
+        $sentCount = 0;
+        $failedEmails = [];
+        
+        foreach ($request->alumni_ids as $alumniId) {
+            try {
+                $alumni = \App\Models\Alumni::findOrFail($alumniId);
+                
+                // Check if completed
+                $existingResponse = $form->responses()
+                    ->where('alumni_id', $alumniId)
+                    ->where('status', 'completed')
+                    ->first();
+                    
+                if ($existingResponse) {
+                    continue;
+                }
+                
+                // Send email
+                \Mail::to($alumni->email)->send(new \App\Mail\TracerReminderMail($alumni, $form));
+                
+                $sentCount++;
+                
+            } catch (\Exception $e) {
+                $alumniName = isset($alumni) ? ($alumni->first_name . ' ' . $alumni->last_name) : "Alumni ID: $alumniId";
+                $failedEmails[] = $alumniName;
+                \Log::error("Failed to send reminder to alumni $alumniId: " . $e->getMessage());
+            }
+        }
+        
+        $message = "Successfully sent {$sentCount} reminders.";
+        if (count($failedEmails) > 0) {
+            $message .= " Failed: " . implode(', ', $failedEmails);
+        }
+        
+        return response()->json([
+            'message' => $message,
+            'sent_count' => $sentCount,
+            'failed_count' => count($failedEmails),
+        ]);
+        
+    } catch (\Throwable $e) {
+        \Log::error('Failed to send bulk reminders: ' . $e->getMessage());
+        return response()->json([
+            'error' => 'Failed to send reminders',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
 }

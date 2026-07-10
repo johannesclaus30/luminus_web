@@ -658,6 +658,78 @@
         </div>
     </div>
 
+        <!-- ============================================ -->
+    <!-- SEND REMINDERS MODAL -->
+    <!-- ============================================ -->
+    <div class="modal-overlay" id="reminderModal">
+        <div class="modal-dialog" style="max-width: 850px;">
+            <div class="modal-header" style="border-bottom: 2px solid #F3F4F6;">
+                <div>
+                    <h3 id="reminderModalTitle" style="display: flex; align-items: center; gap: 0.625rem;">
+                        <i class="fa-solid fa-paper-plane" style="color: #3b82f6; font-size: 1.25rem;"></i>
+                        Send Tracer Reminders
+                    </h3>
+                    <p style="font-size: 0.8125rem; color: var(--gray-500); margin-top: 0.25rem;" id="reminderStats">
+                        Loading alumni data...
+                    </p>
+                </div>
+                <button class="modal-close" onclick="closeReminderModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <!-- Stats Summary Bar -->
+                <div class="reminder-stats-bar" id="reminderStatsBar">
+                    <div class="reminder-stat-item">
+                        <span class="reminder-stat-value" id="statTotal">0</span>
+                        <span class="reminder-stat-label">Total Alumni</span>
+                    </div>
+                    <div class="reminder-stat-item completed">
+                        <span class="reminder-stat-value" id="statDone">0</span>
+                        <span class="reminder-stat-label">Completed</span>
+                    </div>
+                    <div class="reminder-stat-item in-progress">
+                        <span class="reminder-stat-value" id="statProgress">0</span>
+                        <span class="reminder-stat-label">In Progress</span>
+                    </div>
+                    <div class="reminder-stat-item pending">
+                        <span class="reminder-stat-value" id="statNotStarted">0</span>
+                        <span class="reminder-stat-label">Not Started</span>
+                    </div>
+                </div>
+                
+                <!-- Toolbar -->
+                <div class="reminder-toolbar">
+                    <div class="reminder-search">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="reminderSearch" placeholder="Search alumni by name, email, or program..." oninput="filterReminderAlumni()">
+                    </div>
+                    <div class="reminder-toolbar-actions">
+                        <label class="reminder-checkbox-select-all">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                            <span>Select All</span>
+                        </label>
+                        <button class="btn btn-primary btn-send-selected" id="btnSendSelected" onclick="sendBulkReminders()" disabled>
+                            <i class="fa-solid fa-paper-plane"></i> Send to Selected (<span id="selectedCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Alumni List -->
+                <div class="reminder-alumni-list" id="reminderAlumniList">
+                    <!-- Loading skeleton -->
+                    <div class="reminder-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading alumni list...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
     // ═══════════════════════════════════════
     // GLOBAL STATE
@@ -718,9 +790,7 @@
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#1f2b67', '#ec4899'];
 
     let phases = [];
-
-    const MOCK_RESPONSES = [];
-
+    let currentFormId = null;
     let selectedPhaseId = null;
     let expandedSections = new Set();
     let currentEditQuestion = null;
@@ -732,10 +802,171 @@
     let selectedIcon = 'fa-user';
     let selectedColor = '#3b82f6';
 
-    let analyticsCharts = []; // Configured charts by admin
+    let analyticsCharts = [];
+    let currentEditingChart = null;
+    let selectedColorScheme = 'default';
 
-        function getDefaultCharts() {
-        // Returns default charts based on questions found in phases
+    const colorSchemes = {
+        default: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'],
+        ocean: ['#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316'],
+        forest: ['#22c55e', '#10b981', '#059669', '#047857', '#065f46', '#84cc16', '#a3e635', '#65a30d', '#4d7c0f', '#3f6212'],
+        sunset: ['#f97316', '#ef4444', '#ec4899', '#a855f7', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#10b981', '#84cc16']
+    };
+
+    // ═══════════════════════════════════════
+    // API HELPERS
+    // ═══════════════════════════════════════
+
+    const API_BASE = '/admin/alumni_tracer';
+
+    async function apiFetch(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                ...options,
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: 'Request failed' }));
+                throw new Error(error.message || `HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    async function loadForms() {
+        const forms = await apiFetch(`${API_BASE}/list`);
+        if (forms.length > 0) {
+            currentFormId = forms[0].id;
+            const form = await apiFetch(`${API_BASE}/${currentFormId}`);
+            phases = mapFormToPhases(form);
+            selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+            analyticsCharts = getDefaultCharts();
+        } else {
+            currentFormId = null;
+            phases = [];
+            selectedPhaseId = null;
+            analyticsCharts = [];
+        }
+        renderBuilder();
+    }
+
+    async function saveFormToBackend() {
+        const payload = mapPhasesToPayload();
+        const existingForms = await apiFetch(`${API_BASE}/list`);
+        
+        if (existingForms.length > 0) {
+            const formId = existingForms[0].id;
+            await apiFetch(`${API_BASE}/${formId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        } else {
+            await apiFetch(API_BASE, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+        }
+    }
+
+    function mapFormToPhases(form) {
+        if (!form.phases) return [];
+        return form.phases.map(phase => ({
+            id: phase.id,
+            title: phase.title,
+            subtitle: phase.subtitle || '',
+            icon: phase.icon || 'fa-user',
+            color: phase.color || '#3b82f6',
+            sections: (phase.sections || []).map(section => ({
+                id: section.id,
+                title: section.title,
+                description: section.description || '',
+                questions: (section.questions || []).map(q => {
+                    const question = {
+                        id: q.id,
+                        label: q.question_text,
+                        type: q.type,
+                        placeholder: q.placeholder || '',
+                        required: q.is_required,
+                    };
+                    
+                    if (q.options && q.options.length > 0) {
+                        question.options = q.options.map(o => o.option_label);
+                    }
+                    
+                    if (q.file_types) {
+                        question.fileTypes = q.file_types;
+                    }
+                    if (q.max_file_size) {
+                        question.maxSize = q.max_file_size;
+                    }
+                    
+                    if (q.grid_rows && q.grid_rows.length > 0) {
+                        question.gridRows = q.grid_rows.map(r => r.row_label);
+                    }
+                    if (q.grid_columns && q.grid_columns.length > 0) {
+                        question.gridColumns = q.grid_columns.map(c => c.column_label);
+                    }
+                    
+                    return question;
+                })
+            }))
+        }));
+    }
+
+    function mapPhasesToPayload() {
+        return {
+            form_title: 'Alumni Tracer',
+            form_description: 'Alumni tracer survey form',
+            status: 2,
+            phases: phases.map(phase => ({
+                title: phase.title,
+                subtitle: phase.subtitle || '',
+                icon: phase.icon || 'fa-user',
+                color: phase.color || '#3b82f6',
+                sections: (phase.sections || []).map(section => ({
+                    title: section.title,
+                    description: section.description || '',
+                    questions: (section.questions || []).map(q => {
+                        const question = {
+                            question_text: q.label,
+                            type: q.type,
+                            is_required: q.required,
+                            placeholder: q.placeholder || null,
+                        };
+                        
+                        if (q.options && q.options.length > 0) {
+                            question.options = q.options.map(opt => ({ label: opt }));
+                        }
+                        
+                        if (q.type === 'file_upload') {
+                            question.file_types = q.fileTypes || [];
+                            question.max_file_size = q.maxSize || 10;
+                        }
+                        
+                        if (q.gridRows && q.gridRows.length > 0) {
+                            question.grid_rows = q.gridRows.map(row => ({ label: row }));
+                        }
+                        if (q.gridColumns && q.gridColumns.length > 0) {
+                            question.grid_columns = q.gridColumns.map(col => ({ label: col }));
+                        }
+                        
+                        return question;
+                    })
+                }))
+            }))
+        };
+    }
+
+    function getDefaultCharts() {
         const charts = [];
         
         for (const phase of phases) {
@@ -778,170 +1009,7 @@
             }
         }
         
-        // Limit to first 6 charts to avoid overwhelming the dashboard
         return charts.slice(0, 6);
-    }
-
-    let currentEditingChart = null;
-    let selectedColorScheme = 'default';
-
-    const colorSchemes = {
-        default: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'],
-        ocean: ['#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316'],
-        forest: ['#22c55e', '#10b981', '#059669', '#047857', '#065f46', '#84cc16', '#a3e635', '#65a30d', '#4d7c0f', '#3f6212'],
-        sunset: ['#f97316', '#ef4444', '#ec4899', '#a855f7', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#10b981', '#84cc16']
-    };
-
-        // ═══════════════════════════════════════
-    // API HELPERS
-    // ═══════════════════════════════════════
-
-    const API_BASE = '/admin/alumni_tracer';
-
-    async function apiFetch(url, options = {}) {
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                },
-                ...options,
-            });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ message: 'Request failed' }));
-                throw new Error(error.message || `HTTP ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    }
-
-    async function loadForms() {
-        const forms = await apiFetch(`${API_BASE}/list`);
-        if (forms.length > 0) {
-            const form = await apiFetch(`${API_BASE}/${forms[0].id}`);
-            phases = mapFormToPhases(form);
-            selectedPhaseId = phases.length > 0 ? phases[0].id : null;
-            // Auto-generate default charts
-            analyticsCharts = getDefaultCharts();
-        } else {
-            phases = [];
-            selectedPhaseId = null;
-            analyticsCharts = [];
-        }
-        renderBuilder();
-    }
-
-    async function saveFormToBackend() {
-        const payload = mapPhasesToPayload();
-        const existingForms = await apiFetch(`${API_BASE}/list`);
-        
-        if (existingForms.length > 0) {
-            const formId = existingForms[0].id;
-            await apiFetch(`${API_BASE}/${formId}`, {
-                method: 'PUT',
-                body: JSON.stringify(payload),
-            });
-        } else {
-            await apiFetch(API_BASE, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
-        }
-    }
-
-    function mapFormToPhases(form) {
-        if (!form.phases) return [];
-        return form.phases.map(phase => ({
-            id: phase.id,
-            title: phase.title,
-            subtitle: phase.subtitle || '',
-            icon: phase.icon || 'fa-user',
-            color: phase.color || '#3b82f6',
-            sections: (phase.sections || []).map(section => ({
-                id: section.id,  // ✅ Use database ID, not generated
-                title: section.title,
-                description: section.description || '',
-                questions: (section.questions || []).map(q => {
-                    const question = {
-                        id: q.id,  // ✅ Use database ID
-                        label: q.question_text,
-                        type: q.type,
-                        placeholder: q.placeholder || '',
-                        required: q.is_required,
-                    };
-                    
-                    if (q.options && q.options.length > 0) {
-                        question.options = q.options.map(o => o.option_label);
-                    }
-                    
-                    if (q.file_types) {
-                        question.fileTypes = q.file_types;
-                    }
-                    if (q.max_file_size) {
-                        question.maxSize = q.max_file_size;
-                    }
-                    
-                    if (q.grid_rows && q.grid_rows.length > 0) {
-                        question.gridRows = q.grid_rows.map(r => r.row_label);
-                    }
-                    if (q.grid_columns && q.grid_columns.length > 0) {
-                        question.gridColumns = q.grid_columns.map(c => c.column_label);
-                    }
-                    
-                    return question;
-                })
-            }))
-        }));
-    }
-
-    function mapPhasesToPayload() {
-        return {
-            form_title: 'Alumni Tracer',
-            form_description: 'Alumni tracer survey form',
-            status: 2, // draft
-            phases: phases.map(phase => ({
-                title: phase.title,
-                subtitle: phase.subtitle || '',
-                icon: phase.icon || 'fa-user',
-                color: phase.color || '#3b82f6',
-                sections: (phase.sections || []).map(section => ({
-                    title: section.title,
-                    description: section.description || '',
-                    questions: (section.questions || []).map(q => {
-                        const question = {
-                            question_text: q.label,
-                            type: q.type,
-                            is_required: q.required,
-                            placeholder: q.placeholder || null,
-                        };
-                        
-                        if (q.options && q.options.length > 0) {
-                            question.options = q.options.map(opt => ({ label: opt }));
-                        }
-                        
-                        if (q.type === 'file_upload') {
-                            question.file_types = q.fileTypes || [];
-                            question.max_file_size = q.maxSize || 10;
-                        }
-                        
-                        if (q.gridRows && q.gridRows.length > 0) {
-                            question.grid_rows = q.gridRows.map(row => ({ label: row }));
-                        }
-                        if (q.gridColumns && q.gridColumns.length > 0) {
-                            question.grid_columns = q.gridColumns.map(col => ({ label: col }));
-                        }
-                        
-                        return question;
-                    })
-                }))
-            }))
-        };
     }
 
     // ═══════════════════════════════════════
@@ -975,17 +1043,416 @@
     // ═══════════════════════════════════════
 
     document.querySelectorAll('.tracer-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
+        tab.addEventListener('click', async function() {
             document.querySelectorAll('.tracer-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tracer-panel').forEach(p => p.classList.remove('active'));
             this.classList.add('active');
             document.getElementById(this.dataset.tab + '-panel').classList.add('active');
 
-            if (this.dataset.tab === 'builder') renderBuilder();
-            if (this.dataset.tab === 'responses') renderResponsesTable();
-            if (this.dataset.tab === 'analytics') renderAnalytics();
+            const tabName = this.dataset.tab;
+            if (tabName === 'builder') renderBuilder();
+            if (tabName === 'responses') await loadResponses();
+            if (tabName === 'dashboard') await loadDashboardData();
+            if (tabName === 'analytics') {
+                await loadAnalyticsKPIs();
+                renderAnalyticsChartsGrid();
+                updateChartQuestionDropdown();
+            }
         });
     });
+
+    // ═══════════════════════════════════════
+    // DASHBOARD DATA LOADING
+    // ═══════════════════════════════════════
+
+    async function loadDashboardData() {
+        if (!currentFormId) {
+            console.log('No form available');
+            return;
+        }
+        
+        try {
+            const stats = await apiFetch(`${API_BASE}/${currentFormId}/dashboard-stats`);
+            updateDashboardStats(stats);
+            
+            const submissions = await apiFetch(`${API_BASE}/${currentFormId}/recent-submissions`);
+            updateRecentSubmissions(submissions);
+            
+            updateFunnelChart(stats);
+            updatePhaseCompletionChart(stats);
+            updateEmploymentStatus(stats);
+            
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            showDashboardError();
+        }
+    }
+
+    function updateDashboardStats(stats) {
+        document.getElementById('statTotalAlumni').textContent = stats.totalAlumni || '0';
+        document.getElementById('statCompleted').textContent = stats.completedResponses || '0';
+        document.getElementById('statInProgress').textContent = stats.inProgressResponses || '0';
+        document.getElementById('statTotalQuestions').textContent = stats.totalQuestions || '0';
+        
+        const statSubs = document.querySelectorAll('.stat-sub');
+        if (statSubs[0]) statSubs[0].textContent = `${stats.responseRate || 0}% response rate`;
+        if (statSubs[1]) statSubs[1].textContent = `${stats.completedResponses || 0} of ${stats.totalAlumni || 0}`;
+        if (statSubs[2]) statSubs[2].textContent = `${stats.inProgressResponses || 0} pending`;
+        if (statSubs[3]) statSubs[3].textContent = `${stats.phaseCount || 0} phases · ${stats.sectionCount || 0} sections`;
+    }
+
+    function updateRecentSubmissions(submissions) {
+        const tbody = document.getElementById('recentSubmissionsBody');
+        
+        if (!submissions || submissions.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--gray-400); padding: 2rem;">
+                        No submissions yet.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = submissions.map(sub => `
+            <tr>
+                <td>${sub.alumni_name || 'Unknown'}</td>
+                <td>${sub.program || 'N/A'}</td>
+                <td>${sub.year_graduated || 'N/A'}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="progress-bar-wrapper" style="flex: 1;">
+                            <div class="progress-bar-track">
+                                <div class="progress-bar-fill" style="width:${sub.completion}%; background:${sub.completion === 100 ? '#10b981' : '#f59e0b'};"></div>
+                            </div>
+                        </div>
+                        <span style="font-size: 0.75rem; color:${sub.completion === 100 ? '#10b981' : '#f59e0b'}; white-space: nowrap;">${sub.completion}%</span>
+                    </div>
+                </td>
+                <td>${sub.submitted_at || 'N/A'}</td>
+                <td><span class="status-badge ${sub.status || 'in_progress'}">${sub.status === 'completed' ? 'Complete' : 'In Progress'}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    function updateFunnelChart(stats) {
+        const total = stats.totalAlumni || 1;
+        const completed = stats.completedResponses || 0;
+        const totalResponses = (stats.completedResponses || 0) + (stats.inProgressResponses || 0);
+        
+        const funnelItems = document.querySelectorAll('#funnelChart .funnel-item');
+        if (funnelItems.length >= 4) {
+            funnelItems[0].style.width = '100%';
+            funnelItems[0].querySelector('.funnel-value').textContent = total;
+            
+            const openedPct = Math.max((totalResponses / total) * 100, 5);
+            funnelItems[1].style.width = openedPct + '%';
+            funnelItems[1].querySelector('.funnel-value').textContent = totalResponses;
+            
+            const completedPct = Math.max((completed / total) * 100, 5);
+            funnelItems[2].style.width = completedPct + '%';
+            funnelItems[2].querySelector('.funnel-value').textContent = completed;
+            
+            funnelItems[3].style.width = Math.max(completedPct * 0.8, 2) + '%';
+            funnelItems[3].querySelector('.funnel-value').textContent = completed;
+        }
+    }
+
+    function updatePhaseCompletionChart(stats) {
+        const container = document.getElementById('phaseCompletionChart');
+        if (!stats.phaseStats || stats.phaseStats.length === 0) {
+            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No phases created yet.</p>';
+            return;
+        }
+        
+        const maxVal = Math.max(...stats.phaseStats.map(p => p.completionRate), 1);
+        container.innerHTML = stats.phaseStats.map(phase => `
+            <div class="h-bar-item">
+                <div class="h-bar-header">
+                    <span class="h-bar-label">${phase.title}</span>
+                    <span class="h-bar-percent">${phase.completionRate}%</span>
+                </div>
+                <div class="h-bar-track">
+                    <div class="h-bar-fill" style="width:${(phase.completionRate / maxVal) * 100}%; background: ${phase.color || '#3b82f6'};"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function updateEmploymentStatus(stats) {
+        const container = document.getElementById('employmentStatusList');
+        if (!stats.employmentStats || stats.employmentStats.length === 0) {
+            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No employment data yet.</p>';
+            return;
+        }
+        
+        container.innerHTML = stats.employmentStats.map(emp => `
+            <div class="employment-item">
+                <span class="employment-label">${emp.status}</span>
+                <span class="employment-count">${emp.count}</span>
+            </div>
+        `).join('');
+    }
+
+    function showDashboardError() {
+        document.getElementById('statTotalAlumni').textContent = 'Error';
+        document.getElementById('statCompleted').textContent = 'Error';
+        document.getElementById('statInProgress').textContent = 'Error';
+        document.getElementById('statTotalQuestions').textContent = 'Error';
+    }
+
+    // ═══════════════════════════════════════
+    // ANALYTICS DATA LOADING
+    // ═══════════════════════════════════════
+
+    async function loadAnalyticsKPIs() {
+        if (!currentFormId) return;
+        
+        try {
+            const kpis = await apiFetch(`${API_BASE}/${currentFormId}/analytics-kpis`);
+            
+            document.getElementById('kpiResponseRate').textContent = kpis.responseRate ? kpis.responseRate + '%' : '--';
+            document.getElementById('kpiAvgCompletion').textContent = kpis.avgCompletion ? kpis.avgCompletion + '%' : '--';
+            document.getElementById('kpiTotalResponses').textContent = kpis.totalResponses || '--';
+            document.getElementById('kpiAvgTime').textContent = kpis.avgTimeToComplete ? kpis.avgTimeToComplete + ' min' : '--';
+            
+            document.getElementById('kpiResponseRateTrend').textContent = 'Current period';
+            document.getElementById('kpiAvgCompletionTrend').textContent = 'All responses';
+            document.getElementById('kpiTotalResponsesTrend').textContent = 'Total count';
+            document.getElementById('kpiAvgTimeTrend').textContent = 'Average time';
+            
+        } catch (error) {
+            console.error('Failed to load analytics KPIs:', error);
+        }
+    }
+
+    async function loadQuestionAnalytics(questionId) {
+        try {
+            return await apiFetch(`${API_BASE}/question/${questionId}/analytics`);
+        } catch (error) {
+            console.error('Failed to load question analytics:', error);
+            return null;
+        }
+    }
+
+    // ═══════════════════════════════════════
+    // ANALYTICS RENDERING
+    // ═══════════════════════════════════════
+
+    async function renderAnalyticsChartsGrid() {
+        const grid = document.getElementById('analyticsChartsGrid');
+        const emptyState = document.getElementById('analyticsEmptyState');
+
+        if (analyticsCharts.length === 0) {
+            emptyState.style.display = 'flex';
+            grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
+
+        for (let index = 0; index < analyticsCharts.length; index++) {
+            const chart = analyticsCharts[index];
+            const analyticsData = await loadQuestionAnalytics(chart.questionId);
+            
+            const card = document.createElement('div');
+            card.className = 'analytics-card';
+            card.innerHTML = `
+                <div class="analytics-card-header">
+                    <h3>${chart.title}</h3>
+                    <div class="analytics-card-actions">
+                        <button class="btn-icon" onclick="editChart(${index})" title="Edit Chart">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn-icon delete" onclick="deleteChart(${index})" title="Remove Chart">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container" id="chartContainer${index}">
+                    ${generateChartHTMLWithData(chart, analyticsData, index)}
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+    }
+
+    function generateChartHTMLWithData(chart, analyticsData, index) {
+        if (!analyticsData || analyticsData.error) {
+            return `<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No data available yet.</p>`;
+        }
+
+        let labels = [];
+        let values = [];
+        
+        const colors = colorSchemes[chart.colorScheme] || colorSchemes.default;
+
+        if (analyticsData.options) {
+            labels = analyticsData.options.map(o => o.label);
+            values = analyticsData.options.map(o => o.count);
+        } else if (analyticsData.gridData) {
+            labels = analyticsData.gridData.map(row => row.row_label);
+            values = labels.map((_, rowIdx) => {
+                return analyticsData.gridData[rowIdx].columns.reduce((sum, col) => sum + col.count, 0);
+            });
+        } else if (analyticsData.responseCount !== undefined) {
+            labels = ['Responses'];
+            values = [analyticsData.responseCount];
+        } else {
+            return `<p style="color: var(--gray-400); text-align: center; padding: 2rem;">Unsupported question type for visualization.</p>`;
+        }
+
+        const maxValue = Math.max(...values, 1);
+
+        if (chart.type === 'bar' || chart.type === 'horizontal_bar') {
+            const isHorizontal = chart.type === 'horizontal_bar';
+            return `
+                <div class="${isHorizontal ? 'h-bar-list' : 'bar-chart'}">
+                    ${labels.map((label, i) => {
+                        const pct = Math.round((values[i] / maxValue) * 100);
+                        if (isHorizontal) {
+                            return `
+                                <div class="h-bar-item">
+                                    <div class="h-bar-header">
+                                        <span class="h-bar-label">
+                                            <span class="h-bar-dot" style="background:${colors[i % colors.length]};"></span> ${label}
+                                        </span>
+                                        <span class="h-bar-percent">${values[i]}</span>
+                                    </div>
+                                    <div class="h-bar-track">
+                                        <div class="h-bar-fill" style="width:${pct}%; background:${colors[i % colors.length]};"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        return `
+                            <div class="bar-chart-item">
+                                <span class="bar-value">${values[i]}</span>
+                                <div class="bar-fill" style="height: ${Math.max(pct * 1.5, 10)}px; background: ${colors[i % colors.length]};"></div>
+                                <span class="bar-label">${label.length > 10 ? label.substring(0, 10) + '...' : label}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        if (chart.type === 'pie' || chart.type === 'doughnut') {
+            const total = values.reduce((a, b) => a + b, 0);
+            if (total === 0) {
+                return `<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No responses yet.</p>`;
+            }
+            return `
+                <div class="simple-pie-chart">
+                    <div class="pie-legend">
+                        ${labels.map((label, i) => {
+                            const pct = total > 0 ? Math.round((values[i] / total) * 100) : 0;
+                            return `
+                                <div class="pie-legend-item">
+                                    <span class="pie-legend-dot" style="background:${colors[i % colors.length]};"></span>
+                                    <span class="pie-legend-label">${label}</span>
+                                    <span class="pie-legend-value">${values[i]} (${pct}%)</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="pie-visual" style="
+                        background: conic-gradient(
+                            ${labels.map((label, i) => {
+                                const pct = total > 0 ? (values[i] / total) * 100 : 0;
+                                const prevPct = values.slice(0, i).reduce((a, b) => a + b, 0);
+                                const prevAngle = total > 0 ? (prevPct / total) * 100 : 0;
+                                return `${colors[i % colors.length]} ${prevAngle}% ${prevAngle + pct}%`;
+                            }).join(', ')}
+                        );
+                        ${chart.type === 'doughnut' ? 'mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
+                        ${chart.type === 'doughnut' ? '-webkit-mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
+                    "></div>
+                </div>
+            `;
+        }
+
+        return `<p style="color: var(--gray-400); text-align: center;">Unknown chart type.</p>`;
+    }
+
+    function findQuestionById(questionId) {
+        for (const phase of phases) {
+            for (const section of phase.sections) {
+                const q = section.questions.find(q => q.id == questionId);
+                if (q) return q;
+            }
+        }
+        return null;
+    }
+
+    // ═══════════════════════════════════════
+    // RESPONSES TABLE
+    // ═══════════════════════════════════════
+
+    async function loadResponses() {
+        if (!currentFormId) {
+            renderResponsesTable([]);
+            return;
+        }
+
+        try {
+            const submissions = await apiFetch(`${API_BASE}/${currentFormId}/recent-submissions`);
+            renderResponsesTable(submissions);
+        } catch (error) {
+            console.error('Failed to load responses:', error);
+            renderResponsesTable([]);
+        }
+    }
+
+    function renderResponsesTable(data) {
+        const tbody = document.getElementById('responsesTableBody');
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--gray-400); padding: 3rem;">
+                        <i class="fa-solid fa-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.75rem;"></i>
+                        No responses found.
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = data.map((r, i) => {
+                const initials = r.alumni_name ? r.alumni_name.split(' ').map(n => n[0]).join('').toUpperCase() : '??';
+                return `
+                    <tr>
+                        <td style="color:var(--gray-400);font-size:0.8125rem;">${r.id || i + 1}</td>
+                        <td>
+                            <div class="alumni-info">
+                                <div class="alumni-avatar">${initials}</div>
+                                <span class="alumni-name">${r.alumni_name || 'Unknown'}</span>
+                            </div>
+                        </td>
+                        <td>${r.program || 'N/A'}</td>
+                        <td>${r.year_graduated || 'N/A'}</td>
+                        <td>
+                            <div class="progress-bar-wrapper">
+                                <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.completion}%; background:${r.completion === 100 ? '#10b981' : '#f59e0b'};"></div></div>
+                                <span class="progress-text" style="color:${r.completion === 100 ? '#10b981' : '#f59e0b'};">${r.completion}%</span>
+                            </div>
+                        </td>
+                        <td>${r.submitted_at || 'N/A'}</td>
+                        <td><span class="status-badge ${r.status || 'in_progress'}">${r.status === 'completed' ? 'Complete' : 'In Progress'}</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-icon" title="View"><i class="fa-solid fa-eye"></i></button>
+                                <button class="btn-icon delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        document.getElementById('responsesCount').textContent = `${data.length} result${data.length !== 1 ? 's' : ''}`;
+    }
 
     // ═══════════════════════════════════════
     // BUILDER RENDERING
@@ -1123,7 +1590,6 @@
     }
 
     function toggleSection(sectionId) {
-        // Convert to number for consistent Set operations (database IDs are integers)
         const id = Number(sectionId);
         if (expandedSections.has(id)) {
             expandedSections.delete(id);
@@ -1138,7 +1604,7 @@
         phases = phases.filter(p => p.id !== id);
         if (selectedPhaseId === id) selectedPhaseId = phases.length > 0 ? phases[0].id : null;
         renderBuilder();
-        saveFormToBackend(); // Auto-save
+        saveFormToBackend();
     }
 
     function deleteSection(phaseId, secId) {
@@ -1169,18 +1635,16 @@
     }
 
     // ═══════════════════════════════════════
-    // QUESTION MODAL (UPDATED)
+    // QUESTION MODAL
     // ═══════════════════════════════════════
 
     function openQuestionModal(phaseId, secId, question) {
         currentEditQuestion = { phaseId, secId, question };
         
-        // Reset temp arrays
         tempOptions = question?.options ? [...question.options] : [];
         tempGridRows = question?.gridRows ? [...question.gridRows] : [];
         tempGridColumns = question?.gridColumns ? [...question.gridColumns] : [];
         
-        // For likert_scale, set default columns if empty
         if (question?.type === 'likert_scale' && tempGridColumns.length === 0) {
             tempGridColumns = [...DEFAULT_LIKERT_COLUMNS];
         }
@@ -1191,7 +1655,6 @@
         document.getElementById('qPlaceholder').value = question?.placeholder || '';
         document.getElementById('qRequired').checked = question ? !!question.required : true;
         
-        // File upload settings
         if (question?.type === 'file_upload') {
             document.querySelectorAll('.file-type-check').forEach(cb => {
                 cb.checked = question.fileTypes ? question.fileTypes.includes(cb.value) : false;
@@ -1225,20 +1688,16 @@
         const isFileType = type === 'file_upload';
         const isGridType = ['likert_scale', 'multiple_choice_grid'].includes(type);
         
-        // Show/hide groups
         document.getElementById('optionsGroup').style.display = isChoiceType ? 'block' : 'none';
         document.getElementById('placeholderGroup').style.display = isTextType ? 'block' : 'none';
         document.getElementById('fileUploadGroup').style.display = isFileType ? 'block' : 'none';
         document.getElementById('gridSettingsGroup').style.display = isGridType ? 'block' : 'none';
         
-        // Update help text
         document.getElementById('typeHelp').textContent = typeHelpText[type] || '';
         
-        // Update grid columns label
         document.getElementById('gridColumnsLabel').textContent = 
             type === 'likert_scale' ? 'Scale Options (Columns)' : 'Choice Options (Columns)';
         
-        // Set defaults for grid types
         if (isGridType) {
             if (tempGridColumns.length === 0) {
                 tempGridColumns = type === 'likert_scale' ? [...DEFAULT_LIKERT_COLUMNS] : ['Option 1'];
@@ -1246,7 +1705,6 @@
             renderGridColumnsList();
         }
         
-        // Clear irrelevant temp data
         if (!isChoiceType && !isGridType) tempOptions = [];
         if (!isGridType) {
             tempGridRows = [];
@@ -1255,7 +1713,7 @@
     }
 
     // ═══════════════════════════════════════
-    // OPTIONS MANAGEMENT (Multiple Choice / Checkboxes / Dropdown)
+    // OPTIONS MANAGEMENT
     // ═══════════════════════════════════════
 
     function renderOptionsList() {
@@ -1293,7 +1751,7 @@
     }
 
     // ═══════════════════════════════════════
-    // GRID ROWS MANAGEMENT (Likert / Multiple Choice Grid)
+    // GRID ROWS MANAGEMENT
     // ═══════════════════════════════════════
 
     function renderGridRowsList() {
@@ -1331,7 +1789,7 @@
     }
 
     // ═══════════════════════════════════════
-    // GRID COLUMNS MANAGEMENT (Likert / Multiple Choice Grid)
+    // GRID COLUMNS MANAGEMENT
     // ═══════════════════════════════════════
 
     function renderGridColumnsList() {
@@ -1369,7 +1827,7 @@
     }
 
     // ═══════════════════════════════════════
-    // SAVE QUESTION (UPDATED)
+    // SAVE QUESTION
     // ═══════════════════════════════════════
 
     function saveQuestion() {
@@ -1518,7 +1976,7 @@
 
         closePhaseModal();
         renderBuilder();
-        saveFormToBackend(); // Auto-save
+        saveFormToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -1526,7 +1984,6 @@
     // ═══════════════════════════════════════
 
     function openSectionModal(sectionId, phaseId) {
-        // Convert both to numbers for reliable comparison
         const secId = sectionId ? Number(sectionId) : null;
         const phId = Number(phaseId);
         
@@ -1572,350 +2029,9 @@
     }
 
     // ═══════════════════════════════════════
-    // RESPONSES TABLE
+    // CHART BUILDER MODAL
     // ═══════════════════════════════════════
 
-    function renderResponsesTable(filteredData) {
-        const data = filteredData || MOCK_RESPONSES;
-        const tbody = document.getElementById('responsesTableBody');
-        
-        if (data.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" style="text-align: center; color: var(--gray-400); padding: 3rem;">
-                        <i class="fa-solid fa-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.75rem;"></i>
-                        No responses found.
-                    </td>
-                </tr>
-            `;
-        } else {
-            tbody.innerHTML = data.map(r => `
-                <tr>
-                    <td style="color:var(--gray-400);font-size:0.8125rem;">${r.id}</td>
-                    <td>
-                        <div class="alumni-info">
-                            <div class="alumni-avatar">${r.name.split(' ').map(n => n[0]).join('')}</div>
-                            <span class="alumni-name">${r.name}</span>
-                        </div>
-                    </td>
-                    <td>${r.program}</td>
-                    <td>${r.year}</td>
-                    <td>
-                        <div class="progress-bar-wrapper">
-                            <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.completion}%; background:${r.completion === 100 ? '#10b981' : '#f59e0b'};"></div></div>
-                            <span class="progress-text" style="color:${r.completion === 100 ? '#10b981' : '#f59e0b'};">${r.completion}%</span>
-                        </div>
-                    </td>
-                    <td>${r.date}</td>
-                    <td><span class="status-badge ${r.status}">${r.status === 'complete' ? 'Complete' : 'In Progress'}</span></td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-icon" title="View"><i class="fa-solid fa-eye"></i></button>
-                            <button class="btn-icon delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        document.getElementById('responsesCount').textContent = `${data.length} result${data.length !== 1 ? 's' : ''}`;
-    }
-
-    // Responses search & filter
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('responsesSearch');
-        const filterSelect = document.getElementById('responsesFilter');
-
-        if (searchInput) {
-            searchInput.addEventListener('input', filterResponses);
-        }
-        if (filterSelect) {
-            filterSelect.addEventListener('change', filterResponses);
-        }
-
-        function filterResponses() {
-            const query = (searchInput?.value || '').toLowerCase();
-            const status = filterSelect?.value || 'all';
-            
-            const filtered = MOCK_RESPONSES.filter(r => {
-                const matchesSearch = r.name.toLowerCase().includes(query) || r.program.toLowerCase().includes(query);
-                const matchesStatus = status === 'all' || r.status === status;
-                return matchesSearch && matchesStatus;
-            });
-            
-            renderResponsesTable(filtered);
-        }
-
-        // Show loading state in phases sidebar
-                // Show loading state in phases sidebar
-        const phasesList = document.getElementById('phasesList');
-        phasesList.innerHTML = `
-            <div class="skeleton-phase">
-                <div class="skeleton-phase-inner">
-                    <div class="skeleton-icon"></div>
-                    <div class="skeleton-lines">
-                        <div class="skeleton-line"></div>
-                        <div class="skeleton-line short"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="skeleton-phase">
-                <div class="skeleton-phase-inner">
-                    <div class="skeleton-icon"></div>
-                    <div class="skeleton-lines">
-                        <div class="skeleton-line"></div>
-                        <div class="skeleton-line short"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="skeleton-phase">
-                <div class="skeleton-phase-inner">
-                    <div class="skeleton-icon"></div>
-                    <div class="skeleton-lines">
-                        <div class="skeleton-line"></div>
-                        <div class="skeleton-line short"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Show loading in the center of the builder content area
-        const emptyState = document.getElementById('emptyBuilderState');
-        const detailContent = document.getElementById('phaseDetailContent');
-        const builderContent = document.getElementById('builderContent');
-        
-        // Make builder-content fill its parent
-        builderContent.style.cssText = 'display: flex; flex-direction: column; flex: 1; height: 100%; position: relative;';
-        
-        emptyState.innerHTML = `
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                <div class="loading-spinner" style="margin: 0 auto 0.75rem auto;"></div>
-                <p class="loading-text">Loading tracer form...</p>
-            </div>
-        `;
-        emptyState.style.cssText = 'position: relative; flex: 1; width: 100%;';
-        detailContent.style.display = 'none';
-
-        // Load tracer form from backend
-        loadForms().then(() => {
-            renderResponsesTable();
-        }).catch(err => {
-            console.error('Failed to load tracer form:', err);
-            renderBuilder();
-            renderResponsesTable();
-        });
-    });
-
-    // ═══════════════════════════════════════
-    // MODAL CLOSE ON OVERLAY CLICK
-    // ═══════════════════════════════════════
-
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.classList.remove('active');
-            }
-        });
-    });
-
-    // ESC to close modals
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
-        }
-    });
-
-        // ═══════════════════════════════════════
-    // ANALYTICS RENDERING
-    // ═══════════════════════════════════════
-
-    /**
-     * Render the analytics tab - called when switching to analytics tab or when charts change.
-     */
-    function renderAnalytics() {
-        renderAnalyticsKPIs();
-        renderAnalyticsChartsGrid();
-        updateChartQuestionDropdown();
-    }
-
-    /**
-     * Populate KPI cards from actual data.
-     */
-    function renderAnalyticsKPIs() {
-        const totalAlumni = 0; // TODO: Fetch from backend
-        const totalResponses = MOCK_RESPONSES.length;
-        const completedResponses = MOCK_RESPONSES.filter(r => r.status === 'complete').length;
-        const responseRate = totalAlumni > 0 ? Math.round((totalResponses / totalAlumni) * 100) : 0;
-        const avgCompletion = totalResponses > 0 
-            ? Math.round(MOCK_RESPONSES.reduce((sum, r) => sum + r.completion, 0) / totalResponses) 
-            : 0;
-
-        document.getElementById('kpiResponseRate').textContent = totalAlumni > 0 ? responseRate + '%' : '--';
-        document.getElementById('kpiAvgCompletion').textContent = totalResponses > 0 ? avgCompletion + '%' : '--';
-        document.getElementById('kpiTotalResponses').textContent = totalResponses || '--';
-        document.getElementById('kpiAvgTime').textContent = '--'; // TODO: calculate from submitted_at timestamps
-        document.getElementById('kpiResponseRateTrend').textContent = '--';
-        document.getElementById('kpiAvgCompletionTrend').textContent = '--';
-        document.getElementById('kpiTotalResponsesTrend').textContent = '--';
-        document.getElementById('kpiAvgTimeTrend').textContent = '--';
-    }
-
-    /**
-     * Render the charts grid with all configured charts.
-     */
-    function renderAnalyticsChartsGrid() {
-        const grid = document.getElementById('analyticsChartsGrid');
-        const emptyState = document.getElementById('analyticsEmptyState');
-
-        if (analyticsCharts.length === 0) {
-            emptyState.style.display = 'flex';
-            // Remove any existing chart cards except empty state
-            grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
-            return;
-        }
-
-        emptyState.style.display = 'none';
-
-        // Remove existing chart cards
-        grid.querySelectorAll('.analytics-card').forEach(c => c.remove());
-
-        // Render each configured chart
-        analyticsCharts.forEach((chart, index) => {
-            const card = document.createElement('div');
-            card.className = 'analytics-card';
-            card.innerHTML = `
-                <div class="analytics-card-header">
-                    <h3>${chart.title}</h3>
-                    <div class="analytics-card-actions">
-                        <button class="btn-icon" onclick="editChart(${index})" title="Edit Chart">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button class="btn-icon delete" onclick="deleteChart(${index})" title="Remove Chart">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="chart-container" id="chartContainer${index}">
-                    ${generateChartHTML(chart, index)}
-                </div>
-            `;
-            grid.appendChild(card);
-        });
-    }
-
-    /**
-     * Generate chart HTML based on chart type and question data.
-     */
-    function generateChartHTML(chart, index) {
-        const question = findQuestionById(chart.questionId);
-        if (!question) {
-            return `<p style="color: var(--gray-400); text-align: center; padding: 2rem;">Question not found. It may have been deleted.</p>`;
-        }
-
-        let labels = [];
-        let values = [];
-
-        if (question.options && question.options.length > 0) {
-            // Multiple choice, checkboxes, dropdown
-            labels = question.options;
-            values = labels.map(() => Math.floor(Math.random() * 50) + 5);
-        } else if (question.gridRows && question.gridColumns) {
-            // Likert scale or multiple choice grid
-            labels = question.gridRows;
-            values = labels.map(() => Math.floor(Math.random() * 40) + 10);
-        } else {
-            // short_answer, paragraph — show placeholder data
-            labels = ['Responses'];
-            values = [Math.floor(Math.random() * 30) + 5];
-        }
-
-        const colors = colorSchemes[chart.colorScheme] || colorSchemes.default;
-        const maxValue = Math.max(...values, 1);
-
-        if (chart.type === 'bar' || chart.type === 'horizontal_bar') {
-            const isHorizontal = chart.type === 'horizontal_bar';
-            return `
-                <div class="${isHorizontal ? 'h-bar-list' : 'bar-chart'}">
-                    ${labels.map((label, i) => {
-                        const pct = Math.round((values[i] / maxValue) * 100);
-                        if (isHorizontal) {
-                            return `
-                                <div class="h-bar-item">
-                                    <div class="h-bar-header">
-                                        <span class="h-bar-label">
-                                            <span class="h-bar-dot" style="background:${colors[i % colors.length]};"></span> ${label}
-                                        </span>
-                                        <span class="h-bar-percent">${values[i]}</span>
-                                    </div>
-                                    <div class="h-bar-track">
-                                        <div class="h-bar-fill" style="width:${pct}%; background:${colors[i % colors.length]};"></div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                        return `
-                            <div class="bar-chart-item">
-                                <span class="bar-value">${values[i]}</span>
-                                <div class="bar-fill" style="height: ${Math.max(pct * 1.5, 10)}px; background: ${colors[i % colors.length]};"></div>
-                                <span class="bar-label">${label.length > 10 ? label.substring(0, 10) + '...' : label}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        }
-
-        if (chart.type === 'pie' || chart.type === 'doughnut') {
-            const total = values.reduce((a, b) => a + b, 0);
-            return `
-                <div class="simple-pie-chart">
-                    <div class="pie-legend">
-                        ${labels.map((label, i) => {
-                            const pct = total > 0 ? Math.round((values[i] / total) * 100) : 0;
-                            return `
-                                <div class="pie-legend-item">
-                                    <span class="pie-legend-dot" style="background:${colors[i % colors.length]};"></span>
-                                    <span class="pie-legend-label">${label}</span>
-                                    <span class="pie-legend-value">${values[i]} (${pct}%)</span>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    <div class="pie-visual" style="
-                        background: conic-gradient(
-                            ${labels.map((label, i) => {
-                                const pct = total > 0 ? (values[i] / total) * 100 : 0;
-                                const prevPct = values.slice(0, i).reduce((a, b) => a + b, 0);
-                                const prevAngle = total > 0 ? (prevPct / total) * 100 : 0;
-                                return `${colors[i % colors.length]} ${prevAngle}% ${prevAngle + pct}%`;
-                            }).join(', ')}
-                        );
-                        ${chart.type === 'doughnut' ? 'mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
-                        ${chart.type === 'doughnut' ? '-webkit-mask: radial-gradient(circle, transparent 40%, black 41%);' : ''}
-                    "></div>
-                </div>
-            `;
-        }
-
-        return `<p style="color: var(--gray-400); text-align: center;">Unknown chart type.</p>`;
-    }
-
-    /**
-     * Find a question by ID across all phases/sections.
-     */
-    function findQuestionById(questionId) {
-        for (const phase of phases) {
-            for (const section of phase.sections) {
-                const q = section.questions.find(q => q.id === questionId);
-                if (q) return q;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Update the question dropdown in the chart builder modal.
-     */
     function updateChartQuestionDropdown() {
         const select = document.getElementById('chartQuestion');
         const currentValue = select.value;
@@ -1925,7 +2041,6 @@
         for (const phase of phases) {
             for (const section of phase.sections) {
                 for (const q of section.questions) {
-                    // Allow ALL question types except file_upload
                     if (q.type !== 'file_upload') {
                         const label = q.label.length > 60 ? q.label.substring(0, 57) + '...' : q.label;
                         options += `<option value="${q.id}">[${typeLabels[q.type]}] ${label}</option>`;
@@ -1940,16 +2055,11 @@
         }
     }
 
-    // ═══════════════════════════════════════
-    // CHART BUILDER MODAL
-    // ═══════════════════════════════════════
-
     function openChartBuilderModal(chartIndex = null) {
         updateChartQuestionDropdown();
         updatePhaseFilterDropdown();
         
         if (chartIndex !== null && chartIndex !== undefined) {
-            // Editing existing chart
             const chart = analyticsCharts[chartIndex];
             currentEditingChart = chartIndex;
             document.getElementById('chartBuilderModalTitle').textContent = 'Edit Chart';
@@ -1959,7 +2069,6 @@
             document.getElementById('chartPhaseFilter').value = chart.phaseFilter || '';
             selectedColorScheme = chart.colorScheme || 'default';
         } else {
-            // Adding new chart
             currentEditingChart = null;
             document.getElementById('chartBuilderModalTitle').textContent = 'Add Analytics Chart';
             document.getElementById('chartTitle').value = '';
@@ -2069,10 +2178,429 @@
     }
 
     function exportAnalyticsReport() {
-        // TODO: Implement CSV/PDF export
         alert('Analytics export will be available when response data is connected.');
     }
 
+    // ═══════════════════════════════════════
+    // MODAL CLOSE ON OVERLAY CLICK
+    // ═══════════════════════════════════════
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+            }
+        });
+    });
+
+    // ESC to close modals
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        }
+    });
+
+    // ═══════════════════════════════════════
+    // INITIALIZATION
+    // ═══════════════════════════════════════
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search & filter for responses
+        const searchInput = document.getElementById('responsesSearch');
+        const filterSelect = document.getElementById('responsesFilter');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterResponses);
+        }
+        if (filterSelect) {
+            filterSelect.addEventListener('change', filterResponses);
+        }
+
+        // Note: filterResponses now works with loaded data
+        let allResponsesData = [];
+        
+        async function filterResponses() {
+            if (allResponsesData.length === 0 && currentFormId) {
+                try {
+                    allResponsesData = await apiFetch(`${API_BASE}/${currentFormId}/recent-submissions`);
+                } catch (e) {
+                    allResponsesData = [];
+                }
+            }
+            
+            const query = (searchInput?.value || '').toLowerCase();
+            const status = filterSelect?.value || 'all';
+            
+            const filtered = allResponsesData.filter(r => {
+                const nameMatch = (r.alumni_name || '').toLowerCase().includes(query);
+                const programMatch = (r.program || '').toLowerCase().includes(query);
+                const statusMatch = status === 'all' || r.status === status || 
+                                   (status === 'complete' && r.status === 'completed') ||
+                                   (status === 'in-progress' && r.status === 'in_progress');
+                return (nameMatch || programMatch) && statusMatch;
+            });
+            
+            renderResponsesTable(filtered);
+        }
+
+        // Loading states
+        const phasesList = document.getElementById('phasesList');
+        phasesList.innerHTML = `
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="skeleton-phase">
+                <div class="skeleton-phase-inner">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-lines">
+                        <div class="skeleton-line"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const emptyState = document.getElementById('emptyBuilderState');
+        const detailContent = document.getElementById('phaseDetailContent');
+        const builderContent = document.getElementById('builderContent');
+        
+        builderContent.style.cssText = 'display: flex; flex-direction: column; flex: 1; height: 100%; position: relative;';
+        
+        emptyState.innerHTML = `
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                <div class="loading-spinner" style="margin: 0 auto 0.75rem auto;"></div>
+                <p class="loading-text">Loading tracer form...</p>
+            </div>
+        `;
+        emptyState.style.cssText = 'position: relative; flex: 1; width: 100%;';
+        detailContent.style.display = 'none';
+
+        // Load tracer form and initial data
+        loadForms().then(async () => {
+            // Load responses for the responses tab
+            if (document.getElementById('responses-panel').classList.contains('active')) {
+                await loadResponses();
+            }
+            // Load dashboard data if dashboard tab is active
+            if (document.getElementById('dashboard-panel').classList.contains('active')) {
+                await loadDashboardData();
+            }
+        }).catch(err => {
+            console.error('Failed to load tracer form:', err);
+            renderBuilder();
+            renderResponsesTable([]);
+        });
+    });
+
+    // ═══════════════════════════════════════
+// REMINDERS FUNCTIONALITY
+// ═══════════════════════════════════════
+
+let incompleteAlumni = [];
+let reminderStats = null;
+let sendingReminders = false;
+
+// Update the Send Reminders button click handler
+document.addEventListener('DOMContentLoaded', function() {
+    // Find the Send Reminders button in the quick actions header
+    const sendRemindersBtn = document.querySelector('.quick-action-btn-sm i.fa-paper-plane');
+    if (sendRemindersBtn && sendRemindersBtn.parentElement) {
+        sendRemindersBtn.parentElement.addEventListener('click', function(e) {
+            e.preventDefault();
+            openReminderModal();
+        });
+    }
+});
+
+async function openReminderModal() {
+    if (!currentFormId) {
+        showToast('No tracer form found. Please create a form first.', 'error');
+        return;
+    }
+    
+    document.getElementById('reminderModal').classList.add('active');
+    document.getElementById('reminderAlumniList').innerHTML = `
+        <div class="reminder-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading alumni list...</p>
+        </div>
+    `;
+    
+    try {
+        const data = await apiFetch(`${API_BASE}/${currentFormId}/incomplete-alumni`);
+        incompleteAlumni = data.alumni || [];
+        reminderStats = data.stats;
+        
+        updateReminderStats();
+        renderReminderAlumniList();
+        
+    } catch (error) {
+        console.error('Failed to load alumni data:', error);
+        document.getElementById('reminderAlumniList').innerHTML = `
+            <div class="reminder-empty-state">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; font-size: 2.5rem;"></i>
+                <p style="margin-top: 0.5rem; font-weight: 500;">Failed to load alumni data</p>
+                <p style="font-size: 0.8125rem; color: var(--gray-400);">Please try again later.</p>
+            </div>
+        `;
+        showToast('Failed to load alumni data. Please try again.', 'error');
+    }
+}
+
+function closeReminderModal() {
+    document.getElementById('reminderModal').classList.remove('active');
+    incompleteAlumni = [];
+    reminderStats = null;
+    document.getElementById('reminderSearch').value = '';
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateSelectedCount();
+}
+
+function updateReminderStats() {
+    if (!reminderStats) return;
+    
+    document.getElementById('statTotal').textContent = reminderStats.total_alumni || 0;
+    document.getElementById('statDone').textContent = reminderStats.completed || 0;
+    document.getElementById('statProgress').textContent = reminderStats.in_progress || 0;
+    document.getElementById('statNotStarted').textContent = reminderStats.not_started || 0;
+    
+    document.getElementById('reminderStats').textContent = 
+        `${reminderStats.not_started || 0} haven't started · ${reminderStats.in_progress || 0} in progress`;
+}
+
+function renderReminderAlumniList(filteredList = null) {
+    const container = document.getElementById('reminderAlumniList');
+    const list = filteredList || incompleteAlumni;
+    
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="reminder-empty-state">
+                <i class="fa-solid fa-check-circle" style="color: #10b981; font-size: 2.5rem;"></i>
+                <p style="margin-top: 0.5rem; font-weight: 500;">All alumni have completed the tracer!</p>
+                <p style="font-size: 0.8125rem; color: var(--gray-400);">No reminders needed at this time.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = list.map(alumni => `
+        <div class="reminder-alumni-item" data-alumni-id="${alumni.id}">
+            <label class="reminder-checkbox-wrapper">
+                <input type="checkbox" class="alumni-checkbox" value="${alumni.id}" onchange="updateSelectedCount()">
+                <span class="checkmark"></span>
+            </label>
+            <div class="reminder-alumni-avatar">
+                ${alumni.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+            </div>
+            <div class="reminder-alumni-info">
+                <span class="reminder-alumni-name">${alumni.name}</span>
+                <span class="reminder-alumni-details">
+                    ${alumni.email} · ${alumni.program} · Batch ${alumni.year_graduated}
+                </span>
+            </div>
+            <div class="reminder-alumni-status">
+                ${alumni.has_started ? `
+                    <span class="reminder-badge in-progress">
+                        <i class="fa-solid fa-clock-rotate-left"></i> ${alumni.completion}% done
+                    </span>
+                ` : `
+                    <span class="reminder-badge not-started">
+                        <i class="fa-solid fa-circle"></i> Not Started
+                    </span>
+                `}
+                ${alumni.last_activity ? `
+                    <span class="reminder-last-activity" title="Last activity">${alumni.last_activity}</span>
+                ` : ''}
+            </div>
+            <div class="reminder-alumni-actions">
+                <button class="btn-remind-individual" 
+                        onclick="sendIndividualReminder(${alumni.id}, this)" 
+                        title="Send reminder to ${alumni.name}">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Send Reminder</span>
+                </button>
+            </div>
+        </div>
+    `).join('');
+    
+    updateSelectedCount();
+}
+
+function filterReminderAlumni() {
+    const query = document.getElementById('reminderSearch').value.toLowerCase();
+    
+    if (!query) {
+        renderReminderAlumniList();
+        return;
+    }
+    
+    const filtered = incompleteAlumni.filter(alumni => 
+        alumni.name.toLowerCase().includes(query) ||
+        alumni.email.toLowerCase().includes(query) ||
+        alumni.program.toLowerCase().includes(query) ||
+        alumni.year_graduated.toString().includes(query)
+    );
+    
+    renderReminderAlumniList(filtered);
+}
+
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.alumni-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selectedCheckboxes = document.querySelectorAll('.alumni-checkbox:checked');
+    const count = selectedCheckboxes.length;
+    document.getElementById('selectedCount').textContent = count;
+    
+    const sendBtn = document.getElementById('btnSendSelected');
+    sendBtn.disabled = count === 0;
+    sendBtn.style.opacity = count === 0 ? '0.5' : '1';
+    
+    // Update select all checkbox state
+    const allCheckboxes = document.querySelectorAll('.alumni-checkbox');
+    const selectAll = document.getElementById('selectAllCheckbox');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = count === allCheckboxes.length;
+        selectAll.indeterminate = count > 0 && count < allCheckboxes.length;
+    }
+}
+
+async function sendIndividualReminder(alumniId, button) {
+    if (sendingReminders) return;
+    
+    // Show loading state
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Sending...</span>';
+    button.disabled = true;
+    
+    try {
+        const response = await apiFetch(`${API_BASE}/${currentFormId}/send-reminder/${alumniId}`, {
+            method: 'POST'
+        });
+        
+        showToast(response.message || 'Reminder sent successfully!', 'success');
+        
+        // Update button to show success
+        button.innerHTML = '<i class="fa-solid fa-check"></i><span>Sent!</span>';
+        button.style.background = '#10b981';
+        button.style.color = '#ffffff';
+        
+        // Reset after 2 seconds
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.style.background = '';
+            button.style.color = '';
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Failed to send reminder:', error);
+        showToast(error.message || 'Failed to send reminder. Please try again.', 'error');
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+    }
+}
+
+async function sendBulkReminders() {
+    if (sendingReminders) return;
+    
+    const selectedCheckboxes = document.querySelectorAll('.alumni-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        showToast('Please select at least one alumni.', 'warning');
+        return;
+    }
+    
+    const alumniIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
+    const alumniNames = Array.from(selectedCheckboxes).map(cb => {
+        const item = cb.closest('.reminder-alumni-item');
+        return item ? item.querySelector('.reminder-alumni-name').textContent : 'Unknown';
+    });
+    
+    if (!confirm(`Are you sure you want to send reminder emails to ${alumniIds.length} alumni?\n\nThis will send emails to:\n${alumniNames.slice(0, 5).join('\n')}${alumniNames.length > 5 ? '\n...and ' + (alumniNames.length - 5) + ' more' : ''}`)) {
+        return;
+    }
+    
+    sendingReminders = true;
+    const btnSend = document.getElementById('btnSendSelected');
+    const originalHTML = btnSend.innerHTML;
+    btnSend.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    btnSend.disabled = true;
+    
+    try {
+        const response = await apiFetch(`${API_BASE}/${currentFormId}/send-reminder-all`, {
+            method: 'POST',
+            body: JSON.stringify({ alumni_ids: alumniIds })
+        });
+        
+        showToast(response.message || `Successfully sent ${response.sent_count} reminders!`, 'success');
+        
+        // Refresh the modal after a short delay
+        setTimeout(async () => {
+            await openReminderModal();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Failed to send bulk reminders:', error);
+        showToast(error.message || 'Failed to send reminders. Please try again.', 'error');
+        btnSend.innerHTML = originalHTML;
+        btnSend.disabled = false;
+    } finally {
+        sendingReminders = false;
+    }
+}
+
+// Toast notification system
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    
+    const icons = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-circle',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-info-circle'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <i class="fa-solid ${icons[type] || icons.info}"></i>
+        <span>${message}</span>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'toastOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 4000);
+}
 
 </script>
 

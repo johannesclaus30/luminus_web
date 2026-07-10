@@ -149,7 +149,7 @@
                         <span class="stat-label">Archived</span>
                     </div>
                 </div>
-                <div class="stat-card">
+                {{-- <div class="stat-card">
                     <div class="stat-icon-wrapper">
                         <div class="stat-icon views">
                             <i class="fa-regular fa-eye"></i>
@@ -159,7 +159,7 @@
                         <span class="stat-value">{{ $perks->sum('views') ?? 0 }}</span>
                         <span class="stat-label">Total Views</span>
                     </div>
-                </div>
+                </div> --}}
             </div>
 
             <!-- Perks Card Grid -->
@@ -220,10 +220,10 @@
                                         <i class="fa-regular fa-calendar"></i>
                                         <span>Until {{ $perk->valid_until->format('M d') }}</span>
                                     </div>
-                                    <div class="analytics-item">
+                                    {{-- <div class="analytics-item">
                                         <i class="fa-regular fa-eye"></i>
                                         <span>{{ $perk->views ?? 0 }}</span>
-                                    </div>
+                                    </div> --}}
                                 </div>
                                 <div class="perk-actions">
                                     @if ((int) $perk->status === 1 || is_null($perk->status))

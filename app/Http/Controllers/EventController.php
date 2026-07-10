@@ -157,7 +157,7 @@ class EventController extends Controller
             'venue_latitude' => 'nullable|numeric|between:-90,90',
             'venue_longitude' => 'nullable|numeric|between:-180,180',
             'deleted_media' => 'nullable|array',
-            'deleted_media.*' => 'integer|exists:event_images,id',
+            'deleted_media.*' => 'integer|exists:images_events,id',
             'images' => 'nullable|array|max:5',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ], [
