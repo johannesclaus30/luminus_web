@@ -306,363 +306,350 @@
         </main>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <script>
+    // ========================================
+    // Mobile Menu Toggle
+    // ========================================
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) toggleMobileMenu();
+        });
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }, 250);
+    });
+
+    // ========================================
+    // Attachment Handling (global scope)
+    // ========================================
+    window.removeExistingImage = function(buttonElement, imageId) {
+        window.showWarningModal({
+            title: 'Remove Attachment',
+            message: 'Are you sure you want to <strong>remove</strong> this attachment?<br><small>It will be permanently deleted when you save the changes.</small>',
+            iconType: 'warning',
+            confirmText: 'Remove',
+            confirmClass: 'btn-warning',
+            onConfirm: function() {
+                const deletedContainer = document.getElementById('deleted-media-container');
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'deleted_media[]';
+                hiddenInput.value = imageId;
+                deletedContainer.appendChild(hiddenInput);
+                buttonElement.closest('.attachment-item').remove();
+            }
+        });
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
         // ========================================
-        // Mobile Menu Toggle
+        // WARNING MODAL SYSTEM
         // ========================================
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const modalCancelBtn = document.getElementById('warningModalCancel');
+
+        let pendingCallback = null;
+
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            pendingCallback = null;
         }
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
+        modalCancelBtn.addEventListener('click', closeWarningModal);
+        warningOverlay.addEventListener('click', function(e) { if (e.target === warningOverlay) closeWarningModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && warningOverlay.classList.contains('active')) closeWarningModal(); });
+        confirmBtn.addEventListener('click', function() { if (pendingCallback) pendingCallback(); closeWarningModal(); });
+
+        window.showWarningModal = function(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning',
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger',
+                onConfirm = null,
+                hideCancel = false
+            } = config;
+
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') iconElement.className = 'fa-solid fa-triangle-exclamation';
+            else if (iconType === 'success') iconElement.className = 'fa-solid fa-circle-question';
+            else iconElement.className = 'fa-solid fa-triangle-exclamation';
+
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+
+            modalCancelBtn.style.display = hideCancel ? 'none' : 'inline-flex';
+
+            pendingCallback = onConfirm;
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        };
+
+        // Cancel button confirmation
+        const cancelLink = document.querySelector('.form-actions .btn-secondary');
+        if (cancelLink) {
+            cancelLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const href = this.getAttribute('href');
+                window.showWarningModal({
+                    title: 'Discard Changes',
+                    message: 'Are you sure you want to <strong>cancel</strong>?<br><small>All unsaved changes will be lost.</small>',
+                    iconType: 'warning',
+                    confirmText: 'Discard',
+                    confirmClass: 'btn-warning',
+                    onConfirm: function() { window.location.href = href; }
+                });
+            });
+        }
+
+        // ========================================
+        // Rest of the form logic...
+        // ========================================
+        const fileInput = document.getElementById('attachmentInput');
+        const triggerBtn = document.getElementById('triggerFileInput');
+        const previewContainer = document.getElementById('attachment-preview-container');
+        const MAX_FILES = 5;
+        const MAX_SIZE = 5 * 1024 * 1024;
+
+        const eventTypeField = document.getElementById('event_type');
+        const venueAddressField = document.getElementById('venueAddress');
+        const venueNameField = document.getElementById('venueName');
+        const venueLatitudeField = document.getElementById('venueLatitude');
+        const venueLongitudeField = document.getElementById('venueLongitude');
+        const venueSuggestions = document.getElementById('venueSuggestions');
+        const venueSection = document.getElementById('venueSection');
+        const onlineSection = document.getElementById('onlineSection');
+        const platformField = document.getElementById('platformField');
+        const platformUrlField = document.getElementById('platformUrlField');
+        const venueStatus = document.getElementById('venueStatus');
+        const venueMapElement = document.getElementById('venueMap');
+        const defaultCenter = [14.5995, 120.9842];
+        const existingLatitude = parseFloat(venueLatitudeField?.value || '');
+        const existingLongitude = parseFloat(venueLongitudeField?.value || '');
+        const existingAddress = (venueAddressField?.value || '').trim();
+        let venueMap = null;
+        let venueMarker = null;
+        let addressDebounce = null;
+        let suggestionDebounce = null;
+        let lastSuggestionQuery = '';
+
+        const setSectionVisibility = () => {
+            const mode = eventTypeField?.value;
+            const showVenue = ['In-Person', 'Hybrid'].includes(mode);
+            const showOnline = ['Online', 'Hybrid'].includes(mode);
+            venueSection?.classList.toggle('hidden-section', !showVenue);
+            onlineSection?.classList.toggle('hidden-section', !showOnline);
+            if (venueAddressField) { venueAddressField.required = showVenue; venueAddressField.disabled = !showVenue; }
+            if (venueNameField) venueNameField.disabled = !showVenue;
+            if (platformField) { platformField.required = showOnline; platformField.disabled = !showOnline; }
+            if (platformUrlField) platformUrlField.disabled = !showOnline;
+            if (venueMapElement) venueMapElement.style.display = showVenue ? 'block' : 'none';
+            if (!showVenue) { venueSuggestions?.classList.add('hidden-section'); venueSuggestions.innerHTML = ''; }
+            if (venueStatus) {
+                venueStatus.textContent = showVenue ? 'Search an address or click the map to pin the venue.' : 'Venue details are hidden for this event mode.';
+            }
+        };
+
+        if (triggerBtn && fileInput) {
+            triggerBtn.addEventListener('click', function(e) { e.preventDefault(); fileInput.click(); });
+        }
+
+        fileInput.addEventListener('change', function(event) {
+            const files = Array.from(event.target.files);
+            const existingCount = document.querySelectorAll('.attachment-item').length;
+            if (files.length + existingCount > MAX_FILES) {
+                window.showWarningModal({
+                    title: 'Too Many Files',
+                    message: `You can only upload up to <strong>${MAX_FILES}</strong> images.`,
+                    iconType: 'warning',
+                    confirmText: 'OK',
+                    confirmClass: 'btn-warning',
+                    hideCancel: true
+                });
+                this.value = "";
+                return;
+            }
+            document.querySelectorAll('.new-image-preview').forEach(el => el.remove());
+            files.forEach((file) => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                    window.showWarningModal({
+                        title: 'Invalid File Type',
+                        message: `<strong>${file.name}</strong> is not a supported format.<br><small>Please use JPG, PNG, or WEBP only.</small>`,
+                        iconType: 'warning',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-warning',
+                        hideCancel: true
+                    });
+                    return;
                 }
+                if (file.size > MAX_SIZE) {
+                    window.showWarningModal({
+                        title: 'File Too Large',
+                        message: `<strong>${file.name}</strong> exceeds the 5MB limit.`,
+                        iconType: 'warning',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-warning',
+                        hideCancel: true
+                    });
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'attachment-item new-image-preview';
+                    wrapper.innerHTML = `<img src="${e.target.result}" class="attachment-img" style="border: 2px dashed var(--nu-gold);"><button type="button" class="remove-attachment-btn" onclick="this.parentElement.remove()" title="Remove"><i class="fa-solid fa-xmark"></i></button>`;
+                    previewContainer.appendChild(wrapper);
+                };
+                reader.readAsDataURL(file);
             });
         });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
+        const renderVenueSuggestions = (items) => {
+            if (!venueSuggestions) return;
+            venueSuggestions.innerHTML = '';
+            if (!items.length) { venueSuggestions.classList.add('hidden-section'); return; }
+            items.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'venue-suggestion-item';
+                row.textContent = item.display_name;
+                row.dataset.lat = item.lat; row.dataset.lon = item.lon; row.dataset.name = item.display_name;
+                row.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    venueAddressField.value = item.display_name;
+                    venueNameField.value = venueNameField.value.trim() || item.display_name;
+                    venueSuggestions.classList.add('hidden-section'); venueSuggestions.innerHTML = '';
+                    setVenuePoint(parseFloat(item.lat), parseFloat(item.lon), false);
+                    venueStatus.textContent = 'Venue selected from suggestions.';
+                });
+                venueSuggestions.appendChild(row);
+            });
+            venueSuggestions.classList.remove('hidden-section');
+        };
 
-        // ========================================
-        // Attachment Handling
-        // ========================================
-        function removeExistingImage(buttonElement, imageId) {
-            const deletedContainer = document.getElementById('deleted-media-container');
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'deleted_media[]';
-            hiddenInput.value = imageId;
-            deletedContainer.appendChild(hiddenInput);
-            buttonElement.closest('.attachment-item').remove();
+        const searchVenueSuggestions = (query) => {
+            const trimmedQuery = query.trim();
+            if (!trimmedQuery || trimmedQuery.length < 2 || trimmedQuery === lastSuggestionQuery) {
+                if (!trimmedQuery) { venueSuggestions?.classList.add('hidden-section'); venueSuggestions.innerHTML = ''; }
+                return;
+            }
+            lastSuggestionQuery = trimmedQuery;
+            fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmedQuery)}`)
+                .then(r => r.json()).then(results => renderVenueSuggestions(results))
+                .catch(() => { venueSuggestions?.classList.add('hidden-section'); });
+        };
+
+        if (venueMapElement && window.L) {
+            const mapCenter = Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude) ? [existingLatitude, existingLongitude] : defaultCenter;
+            venueMap = L.map('venueMap').setView(mapCenter, Number.isFinite(existingLatitude) ? 16 : 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(venueMap);
+            venueMarker = L.marker(mapCenter, { draggable: true }).addTo(venueMap);
+
+            const setVenuePoint = (lat, lng, updateAddress = true) => {
+                venueLatitudeField.value = lat.toFixed(6);
+                venueLongitudeField.value = lng.toFixed(6);
+                venueMarker.setLatLng([lat, lng]);
+                venueMap.setView([lat, lng], 16);
+                if (updateAddress) {
+                    venueStatus.textContent = 'Resolving address from map pin...';
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`)
+                        .then(r => r.json()).then(data => {
+                            const address = data.display_name || '';
+                            if (address) { venueAddressField.value = address; venueStatus.textContent = 'Address updated from map pin.'; }
+                            else venueStatus.textContent = 'Unable to resolve an address for that pin.';
+                        }).catch(() => { venueStatus.textContent = 'Address lookup failed.'; });
+                }
+            };
+
+            const geocodeAddress = (address) => {
+                const query = address.trim();
+                if (!query) return;
+                venueStatus.textContent = 'Looking up the typed address...';
+                fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`)
+                    .then(r => r.json()).then(results => {
+                        if (!results.length) { venueStatus.textContent = 'No map result found.'; return; }
+                        const place = results[0];
+                        venueAddressField.value = place.display_name;
+                        venueStatus.textContent = 'Map updated from typed address.';
+                        setVenuePoint(parseFloat(place.lat), parseFloat(place.lon), false);
+                    }).catch(() => { venueStatus.textContent = 'Address lookup failed.'; });
+            };
+
+            venueMarker.on('dragend', () => { const { lat, lng } = venueMarker.getLatLng(); setVenuePoint(lat, lng, true); });
+            venueMap.on('click', (event) => { setVenuePoint(event.latlng.lat, event.latlng.lng, true); });
+            venueAddressField?.addEventListener('blur', () => {
+                if (['In-Person', 'Hybrid'].includes(eventTypeField?.value)) {
+                    clearTimeout(addressDebounce);
+                    addressDebounce = setTimeout(() => geocodeAddress(venueAddressField.value), 300);
+                }
+            });
+            venueAddressField?.addEventListener('input', () => {
+                clearTimeout(suggestionDebounce);
+                if (!['In-Person', 'Hybrid'].includes(eventTypeField?.value)) { venueSuggestions?.classList.add('hidden-section'); venueSuggestions.innerHTML = ''; return; }
+                suggestionDebounce = setTimeout(() => searchVenueSuggestions(venueAddressField.value), 300);
+            });
+            venueAddressField?.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); geocodeAddress(venueAddressField.value); } });
+            if (Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)) {
+                venueMarker.setLatLng([existingLatitude, existingLongitude]);
+                venueMap.setView([existingLatitude, existingLongitude], 16);
+            } else if (existingAddress) { geocodeAddress(existingAddress); }
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileInput = document.getElementById('attachmentInput');
-            const triggerBtn = document.getElementById('triggerFileInput');
-            const previewContainer = document.getElementById('attachment-preview-container');
-            const MAX_FILES = 5;
-            const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-            
-            // ========================================
-            // Event Mode / Venue / Online Visibility
-            // ========================================
-            const eventTypeField = document.getElementById('event_type');
-            const venueAddressField = document.getElementById('venueAddress');
-            const venueNameField = document.getElementById('venueName');
-            const venueLatitudeField = document.getElementById('venueLatitude');
-            const venueLongitudeField = document.getElementById('venueLongitude');
-            const venueSuggestions = document.getElementById('venueSuggestions');
-            const venueSection = document.getElementById('venueSection');
-            const onlineSection = document.getElementById('onlineSection');
-            const platformField = document.getElementById('platformField');
-            const platformUrlField = document.getElementById('platformUrlField');
-            const venueStatus = document.getElementById('venueStatus');
-            const venueMapElement = document.getElementById('venueMap');
-            const defaultCenter = [14.5995, 120.9842];
-            const existingLatitude = parseFloat(venueLatitudeField?.value || '');
-            const existingLongitude = parseFloat(venueLongitudeField?.value || '');
-            const existingAddress = (venueAddressField?.value || '').trim();
-            let venueMap = null;
-            let venueMarker = null;
-            let addressDebounce = null;
-            let suggestionDebounce = null;
-            let lastSuggestionQuery = '';
-
-            const setSectionVisibility = () => {
-                const mode = eventTypeField?.value;
-                const showVenue = ['In-Person', 'Hybrid'].includes(mode);
-                const showOnline = ['Online', 'Hybrid'].includes(mode);
-
-                venueSection?.classList.toggle('hidden-section', !showVenue);
-                onlineSection?.classList.toggle('hidden-section', !showOnline);
-
-                if (venueAddressField) {
-                    venueAddressField.required = showVenue;
-                    venueAddressField.disabled = !showVenue;
-                }
-
-                if (venueNameField) {
-                    venueNameField.disabled = !showVenue;
-                }
-
-                if (platformField) {
-                    platformField.required = showOnline;
-                    platformField.disabled = !showOnline;
-                }
-
-                if (platformUrlField) {
-                    platformUrlField.disabled = !showOnline;
-                }
-
-                if (venueMapElement) {
-                    venueMapElement.style.display = showVenue ? 'block' : 'none';
-                }
-
-                if (!showVenue) {
-                    venueSuggestions?.classList.add('hidden-section');
-                    venueSuggestions.innerHTML = '';
-                }
-
-                if (venueStatus) {
-                    venueStatus.textContent = showVenue
-                        ? 'Search an address or click the map to pin the venue.'
-                        : 'Venue details are hidden for this event mode.';
-                }
-            };
-
-            // ========================================
-            // Attachment Triggers
-            // ========================================
-            if (triggerBtn && fileInput) {
-                triggerBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    fileInput.click();
-                });
-            }
-
-            fileInput.addEventListener('change', function(event) {
-                const files = Array.from(event.target.files);
-                const existingCount = document.querySelectorAll('.attachment-item').length;
-
-                if (files.length + existingCount > MAX_FILES) {
-                    alert(`You can only upload up to ${MAX_FILES} images.`);
-                    this.value = ""; 
-                    return;
-                }
-
-                // Clear previous new previews
-                document.querySelectorAll('.new-image-preview').forEach(el => el.remove());
-
-                files.forEach((file) => {
-                    // Validate file type
-                    const ext = file.name.split('.').pop().toLowerCase();
-                    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
-                        alert(`${file.name} is not a supported format. Please use JPG, PNG, or WEBP.`);
-                        return;
-                    }
-
-                    // Validate file size
-                    if (file.size > MAX_SIZE) {
-                        alert(`${file.name} exceeds the 5MB limit.`);
-                        return;
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const wrapper = document.createElement('div');
-                        wrapper.className = 'attachment-item new-image-preview';
-                        
-                        wrapper.innerHTML = `
-                            <img src="${e.target.result}" class="attachment-img" style="border: 2px dashed var(--nu-gold);">
-                            <button type="button" class="remove-attachment-btn" onclick="this.parentElement.remove()" title="Remove">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                        `;
-                        
-                        previewContainer.appendChild(wrapper);
-                    }
-                    reader.readAsDataURL(file);
-                });
-            });
-
-            // ========================================
-            // Venue Suggestions
-            // ========================================
-            const renderVenueSuggestions = (items) => {
-                if (!venueSuggestions) return;
-
-                venueSuggestions.innerHTML = '';
-
-                if (!items.length) {
-                    venueSuggestions.classList.add('hidden-section');
-                    return;
-                }
-
-                items.forEach((item) => {
-                    const row = document.createElement('div');
-                    row.className = 'venue-suggestion-item';
-                    row.textContent = item.display_name;
-                    row.dataset.lat = item.lat;
-                    row.dataset.lon = item.lon;
-                    row.dataset.name = item.display_name;
-
-                    row.addEventListener('mousedown', (event) => {
-                        event.preventDefault();
-                        venueAddressField.value = item.display_name;
-                        venueNameField.value = venueNameField.value.trim() || item.display_name;
-                        venueSuggestions.classList.add('hidden-section');
-                        venueSuggestions.innerHTML = '';
-                        setVenuePoint(parseFloat(item.lat), parseFloat(item.lon), false);
-                        venueStatus.textContent = 'Venue selected from suggestions.';
-                    });
-
-                    venueSuggestions.appendChild(row);
-                });
-
-                venueSuggestions.classList.remove('hidden-section');
-            };
-
-            const searchVenueSuggestions = (query) => {
-                const trimmedQuery = query.trim();
-
-                if (!trimmedQuery || trimmedQuery.length < 2 || trimmedQuery === lastSuggestionQuery) {
-                    if (!trimmedQuery) {
-                        venueSuggestions?.classList.add('hidden-section');
-                        venueSuggestions.innerHTML = '';
-                    }
-                    return;
-                }
-
-                lastSuggestionQuery = trimmedQuery;
-
-                fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmedQuery)}`)
-                    .then((response) => response.json())
-                    .then((results) => renderVenueSuggestions(results))
-                    .catch(() => {
-                        venueSuggestions?.classList.add('hidden-section');
-                    });
-            };
-
-            // ========================================
-            // Leaflet Map
-            // ========================================
-            if (venueMapElement && window.L) {
-                const mapCenter = Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)
-                    ? [existingLatitude, existingLongitude]
-                    : defaultCenter;
-
-                venueMap = L.map('venueMap').setView(mapCenter, Number.isFinite(existingLatitude) ? 16 : 11);
-
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap contributors',
-                }).addTo(venueMap);
-
-                venueMarker = L.marker(mapCenter, { draggable: true }).addTo(venueMap);
-
-                const setVenuePoint = (lat, lng, updateAddress = true) => {
-                    venueLatitudeField.value = lat.toFixed(6);
-                    venueLongitudeField.value = lng.toFixed(6);
-                    venueMarker.setLatLng([lat, lng]);
-                    venueMap.setView([lat, lng], 16);
-
-                    if (updateAddress) {
-                        venueStatus.textContent = 'Resolving address from map pin...';
-                        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`)
-                            .then((response) => response.json())
-                            .then((data) => {
-                                const address = data.display_name || '';
-                                if (address) {
-                                    venueAddressField.value = address;
-                                    venueStatus.textContent = 'Address updated from map pin.';
-                                } else {
-                                    venueStatus.textContent = 'Unable to resolve an address for that pin.';
-                                }
-                            })
-                            .catch(() => {
-                                venueStatus.textContent = 'Address lookup failed. You can still type the exact address manually.';
-                            });
-                    }
-                };
-
-                const geocodeAddress = (address) => {
-                    const query = address.trim();
-                    if (!query) return;
-
-                    venueStatus.textContent = 'Looking up the typed address...';
-
-                    fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`)
-                        .then((response) => response.json())
-                        .then((results) => {
-                            if (!results.length) {
-                                venueStatus.textContent = 'No map result found for that address. Try a more exact address.';
-                                return;
-                            }
-
-                            const place = results[0];
-                            const lat = parseFloat(place.lat);
-                            const lng = parseFloat(place.lon);
-                            venueAddressField.value = place.display_name;
-                            venueStatus.textContent = 'Map updated from typed address.';
-                            setVenuePoint(lat, lng, false);
-                        })
-                        .catch(() => {
-                            venueStatus.textContent = 'Address lookup failed. The venue can still be submitted with the typed address.';
-                        });
-                };
-
-                venueMarker.on('dragend', () => {
-                    const { lat, lng } = venueMarker.getLatLng();
-                    setVenuePoint(lat, lng, true);
-                });
-
-                venueMap.on('click', (event) => {
-                    setVenuePoint(event.latlng.lat, event.latlng.lng, true);
-                });
-
-                venueAddressField?.addEventListener('blur', () => {
-                    const currentType = eventTypeField?.value;
-                    if (['In-Person', 'Hybrid'].includes(currentType)) {
-                        clearTimeout(addressDebounce);
-                        addressDebounce = setTimeout(() => geocodeAddress(venueAddressField.value), 300);
-                    }
-                });
-
-                venueAddressField?.addEventListener('input', () => {
-                    clearTimeout(suggestionDebounce);
-                    const currentType = eventTypeField?.value;
-                    if (!['In-Person', 'Hybrid'].includes(currentType)) {
-                        venueSuggestions?.classList.add('hidden-section');
-                        venueSuggestions.innerHTML = '';
-                        return;
-                    }
-                    suggestionDebounce = setTimeout(() => searchVenueSuggestions(venueAddressField.value), 300);
-                });
-
-                venueAddressField?.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        geocodeAddress(venueAddressField.value);
-                    }
-                });
-
-                if (Number.isFinite(existingLatitude) && Number.isFinite(existingLongitude)) {
-                    venueMarker.setLatLng([existingLatitude, existingLongitude]);
-                    venueMap.setView([existingLatitude, existingLongitude], 16);
-                } else if (existingAddress) {
-                    geocodeAddress(existingAddress);
-                }
-            }
-
-            // Initialize section visibility
-            const syncVenueRequirement = () => {
-                setSectionVisibility();
-            };
-
-            eventTypeField?.addEventListener('change', syncVenueRequirement);
-            syncVenueRequirement();
-        });
-    </script>
+        eventTypeField?.addEventListener('change', setSectionVisibility);
+        setSectionVisibility();
+    });
+</script>
 
 </body>
 </html>

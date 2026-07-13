@@ -248,8 +248,7 @@
                                         
                                         {{-- Permanent Delete (only for archived) --}}
                                         <form action="{{ route('perks.permanent-delete', $perk->id) }}" 
-                                            method="POST" class="inline-form"
-                                            onsubmit="return confirm('Permanently delete this perk? This cannot be undone. All associated images will be removed.')">
+                                            method="POST" class="inline-form">
                                             @csrf 
                                             @method('DELETE')
                                             <button type="submit" class="btn-action" style="background:#fee; color:#ef4444;" title="Delete Permanently">
@@ -305,75 +304,185 @@
         </div>
     </div>
 
-    <script>
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-        }
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
-        // Archive toggle button logic
-        document.addEventListener('DOMContentLoaded', function () {
-            const btn = document.getElementById('archiveToggleBtn');
-            if (!btn) return;
-            
-            const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
+    <script>
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    // Image modal functions
+    function openModal(src) {
+        const modal = document.getElementById("imageModal");
+        const modalImg = document.getElementById("enlargedImage");
+        modal.style.display = "flex";
+        modalImg.src = src;
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("imageModal");
+        modal.style.display = "none";
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") { closeModal(); }
+    });
+
+    document.getElementById('imageModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
+    // Close sidebar when clicking on a nav item (mobile)
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) toggleMobileMenu();
+        });
+    });
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }, 250);
+    });
+
+    // ========================================
+    // INITIALIZE EVERYTHING ON DOM LOAD
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // === Archive toggle button logic ===
+        const archiveBtn = document.getElementById('archiveToggleBtn');
+        if (archiveBtn) {
+            const archivedPath = new URL(archiveBtn.href).pathname.replace(/\/$/, '');
             const currentPath = window.location.pathname.replace(/\/$/, '');
 
             if (currentPath === archivedPath) {
-                btn.classList.add('active');
-                btn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Perks</span>';
-                btn.href = '{{ route('perks.index') }}';
+                archiveBtn.classList.add('active');
+                archiveBtn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Perks</span>';
+                archiveBtn.href = '{{ route('perks.index') }}';
             }
-        });
-
-        // Modal functions
-        function openModal(src) {
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("enlargedImage");
-            modal.style.display = "flex";
-            modalImg.src = src;
-            document.body.style.overflow = 'hidden';
         }
 
-        function closeModal() {
-            const modal = document.getElementById("imageModal");
-            modal.style.display = "none";
+        // ========================================
+        // WARNING MODAL SYSTEM
+        // ========================================
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const cancelBtn = document.getElementById('warningModalCancel');
+
+        let pendingForm = null;
+
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
             document.body.style.overflow = '';
+            pendingForm = null;
         }
 
-        document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") { closeModal(); }
+        cancelBtn.addEventListener('click', closeWarningModal);
+        warningOverlay.addEventListener('click', function(e) { if (e.target === warningOverlay) closeWarningModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && warningOverlay.classList.contains('active')) closeWarningModal(); });
+
+        confirmBtn.addEventListener('click', function() {
+            if (pendingForm) pendingForm.submit();
+            closeWarningModal();
         });
 
-        document.getElementById('imageModal').addEventListener('click', function(e) {
-            if (e.target === this) closeModal();
-        });
+        function showWarningModal(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning',
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger'
+            } = config;
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') iconElement.className = 'fa-solid fa-triangle-exclamation';
+            else if (iconType === 'success') iconElement.className = 'fa-solid fa-circle-question';
+            else iconElement.className = 'fa-solid fa-triangle-exclamation';
+
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        }
+
+        // Intercept all inline forms (Archive, Restore, Permanent Delete)
+        document.querySelectorAll('.inline-form').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                pendingForm = form;
+                const action = this.action;
+
+                if (action.includes('restore')) {
+                    showWarningModal({
+                        title: 'Restore Perk',
+                        message: 'Are you sure you want to <strong>restore</strong> this perk?<br><small>It will be moved back to active perks and visible to alumni.</small>',
+                        iconType: 'success',
+                        confirmText: 'Restore',
+                        confirmClass: 'btn-success'
+                    });
+                } else if (action.includes('permanent-delete')) {
+                    showWarningModal({
+                        title: 'Delete Permanently',
+                        message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you absolutely sure you want to <strong>permanently delete</strong> this perk?<br><small>All associated images will be permanently removed.</small>',
+                        iconType: 'danger',
+                        confirmText: 'Delete Permanently',
+                        confirmClass: 'btn-danger'
+                    });
+                } else {
+                    // Default: Archive
+                    showWarningModal({
+                        title: 'Archive Perk',
+                        message: 'Are you sure you want to <strong>archive</strong> this perk?<br><small>It will be moved to the archived section and hidden from alumni.</small>',
+                        iconType: 'warning',
+                        confirmText: 'Archive',
+                        confirmClass: 'btn-warning'
+                    });
                 }
             });
         });
+    });
+</script>
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
-    </script>
 </body>
 </html>

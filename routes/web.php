@@ -162,23 +162,37 @@ Route::prefix('admin')->group(function () {
         Route::get('/alumni_tracer/deleted', [TracerFormController::class, 'deleted'])
             ->name('admin.alumni_tracer.deleted');
 
+        // Alumni Tracer
+        Route::get('/alumni_tracer', [TracerFormController::class, 'index'])
+            ->name('admin.alumni_tracer');
+
+        // List routes (static paths - NO wildcards)
+        Route::get('/alumni_tracer/list', [TracerFormController::class, 'list'])
+            ->name('admin.alumni_tracer.list');
+
+        Route::get('/alumni_tracer/deleted', [TracerFormController::class, 'deleted'])
+            ->name('admin.alumni_tracer.deleted');
+
+        // ⬇️ ALL specific sub-routes MUST come BEFORE the {id} wildcard ⬇️
+
         // Dashboard & Analytics routes
         Route::get('/alumni_tracer/{formId}/dashboard-stats', [TracerFormController::class, 'dashboardStats']);
         Route::get('/alumni_tracer/{formId}/recent-submissions', [TracerFormController::class, 'recentSubmissions']);
+        Route::get('/alumni_tracer/{formId}/recent-activities', [TracerFormController::class, 'recentActivities']);
         Route::get('/alumni_tracer/question/{questionId}/analytics', [TracerFormController::class, 'questionAnalytics']);
         Route::get('/alumni_tracer/{formId}/analytics-kpis', [TracerFormController::class, 'analyticsKPIs']);
 
-        // These must be after the specific routes to avoid conflicts
+        // Reminder routes
+        Route::get('/alumni_tracer/{formId}/incomplete-alumni', [TracerFormController::class, 'getIncompleteAlumni']);
+        Route::post('/alumni_tracer/{formId}/send-reminder/{alumniId}', [TracerFormController::class, 'sendReminder']);
+        Route::post('/alumni_tracer/{formId}/send-reminder-all', [TracerFormController::class, 'sendReminderToAll']);
+
+        // ⬇️ CRUD routes with {id} wildcard come LAST ⬇️
         Route::get('/alumni_tracer/{id}', [TracerFormController::class, 'show'])
             ->name('admin.alumni_tracer.show');
 
         Route::post('/alumni_tracer', [TracerFormController::class, 'store'])
             ->name('admin.alumni_tracer.store');
-
-        // Alumni Tracer - Reminder Routes (add BEFORE the {id} wildcard routes)
-        Route::get('/alumni_tracer/{formId}/incomplete-alumni', [TracerFormController::class, 'getIncompleteAlumni']);
-        Route::post('/alumni_tracer/{formId}/send-reminder/{alumniId}', [TracerFormController::class, 'sendReminder']);
-        Route::post('/alumni_tracer/{formId}/send-reminder-all', [TracerFormController::class, 'sendReminderToAll']);
 
         Route::put('/alumni_tracer/{id}', [TracerFormController::class, 'update'])
             ->name('admin.alumni_tracer.update');
@@ -191,8 +205,6 @@ Route::prefix('admin')->group(function () {
 
         Route::patch('/alumni_tracer/{id}/toggle-status', [TracerFormController::class, 'toggleStatus'])
             ->name('admin.alumni_tracer.toggle-status');
-
-
 
         // View Alumni Profile
         Route::get('/alumni/{id}/view', [AdminController::class, 'show'])

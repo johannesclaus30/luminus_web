@@ -152,7 +152,7 @@
                     <div id="uploadError" class="error-message"></div>
                     
                     <div id="clearImagesBtn" style="display: none; margin-bottom: 0.75rem; text-align: right;">
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.removeAllImages()" style="font-size: 0.8125rem;">
+                        <button type="button" class="clearimg btn btn-sm btn-secondary" onclick="window.removeAllImages()" style="font-size: 0.8125rem;">
                             <i class="fa-solid fa-xmark"></i> Clear All Images
                         </button>
                     </div>
@@ -171,6 +171,27 @@
         </main>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Mobile menu toggle
         function toggleMobileMenu() {
@@ -181,30 +202,120 @@
             document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
         }
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
+        // ========================================
+        // WARNING MODAL SYSTEM
+        // ========================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get modal elements
+            const warningOverlay = document.getElementById('warningModal');
+            const warningTitle = document.getElementById('warningModalTitle');
+            const warningMessage = document.getElementById('warningModalMessage');
+            const warningIcon = document.getElementById('warningModalIcon');
+            const confirmBtn = document.getElementById('warningModalConfirm');
+            const cancelBtn = document.getElementById('warningModalCancel');
+            
+            let pendingCallback = null;
+            
+            // Close modal function
+            function closeWarningModal() {
+                warningOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+                pendingCallback = null;
+            }
+            
+            // Cancel button
+            cancelBtn.addEventListener('click', closeWarningModal);
+            
+            // Close on overlay click
+            warningOverlay.addEventListener('click', function(e) {
+                if (e.target === warningOverlay) {
+                    closeWarningModal();
                 }
             });
-        });
-
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
+            
+            // Close on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && warningOverlay.classList.contains('active')) {
+                    closeWarningModal();
                 }
-            }, 250);
-        });
+            });
+            
+            // Confirm button - execute the pending callback
+            confirmBtn.addEventListener('click', function() {
+                if (pendingCallback) {
+                    pendingCallback();
+                }
+                closeWarningModal();
+            });
+            
+            // Show modal function
+            window.showWarningModal = function(config) {
+                const {
+                    title = 'Confirm Action',
+                    message = 'Are you sure?',
+                    iconType = 'warning',
+                    confirmText = 'Confirm',
+                    confirmClass = 'btn-danger',
+                    onConfirm = null
+                } = config;
+                
+                // Set title and message
+                warningTitle.textContent = title;
+                warningMessage.innerHTML = message;
+                
+                // Set icon
+                warningIcon.className = 'warning-modal-icon ' + iconType;
+                const iconElement = warningIcon.querySelector('i');
+                if (iconType === 'danger') {
+                    iconElement.className = 'fa-solid fa-triangle-exclamation';
+                } else if (iconType === 'success') {
+                    iconElement.className = 'fa-solid fa-circle-question';
+                } else {
+                    iconElement.className = 'fa-solid fa-triangle-exclamation';
+                }
+                
+                // Set confirm button
+                confirmBtn.className = 'btn ' + confirmClass;
+                confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+                
+                // Store callback
+                pendingCallback = onConfirm;
+                
+                // Show modal
+                warningOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                confirmBtn.focus();
+            };
 
-        // Form-specific JS for file uploads
-        document.addEventListener('DOMContentLoaded', function() {
+            const formCancelBtn = document.querySelector('.form-actions .btn-secondary');
+            if (formCancelBtn) {
+                formCancelBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    window.showWarningModal({
+                        title: 'Discard Changes',
+                        message: 'Are you sure you want to <strong>cancel</strong>?<br><small>All unsaved changes will be lost.</small>',
+                        iconType: 'warning',
+                        confirmText: 'Discard',
+                        confirmClass: 'btn-warning',
+                        onConfirm: function() {
+                            window.location.href = href;
+                        }
+                    });
+                });
+            }
+            
+            // Close sidebar when clicking on a nav item (mobile)
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 1024) {
+                        toggleMobileMenu();
+                    }
+                });
+            });
+
+            // Form-specific JS for file uploads
             const imageInput = document.getElementById('imageInput');
             const videoInput = document.getElementById('videoInput');
             const imageZone = document.getElementById('imageZone');
@@ -309,48 +420,32 @@
                     reader.readAsDataURL(file);
                 });
                 
-                // Show the clear all button
                 document.getElementById('clearImagesBtn').style.display = 'block';
             }
 
-            // Expose to global scope
             window.removeSingleImage = function(index) {
                 const dt = new DataTransfer();
                 const files = Array.from(imageInput.files);
                 
-                // Remove the file at the given index
                 files.splice(index, 1);
-                
-                // Rebuild the FileList
                 files.forEach(file => dt.items.add(file));
                 imageInput.files = dt.files;
                 
-                // If no files left, reset everything
                 if (files.length === 0) {
                     removeAllImages();
                 } else {
-                    // Refresh previews with remaining files
                     updateImagePreviews(files);
                 }
             };
 
             window.removeAllImages = function() {
-                // Clear the preview
                 previewContainer.innerHTML = '';
-                
-                // Clear the file input
                 imageInput.value = '';
-                
-                // Hide the clear button
                 document.getElementById('clearImagesBtn').style.display = 'none';
-                
-                // Re-enable both zones
                 imageZone.classList.remove('active');
                 videoZone.classList.remove('disabled');
                 videoInput.disabled = false;
                 imageInput.disabled = false;
-                
-                // Clear any error messages
                 clearError();
             };
 
@@ -374,25 +469,29 @@
                 reader.readAsDataURL(file);
             }
 
-            // Expose to global scope so inline onclick works
             window.removeVideoPreview = function() {
-                // Clear the preview
                 previewContainer.innerHTML = '';
-                
-                // Clear the video input
                 videoInput.value = '';
-                
-                // Re-enable both zones
                 videoZone.classList.remove('active', 'disabled');
                 imageZone.classList.remove('disabled', 'active');
                 videoInput.disabled = false;
                 imageInput.disabled = false;
-                
-                // Clear any error messages
                 clearError();
             };
         });
-        
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                if (window.innerWidth > 1024) {
+                    document.getElementById('adminSidebar').classList.remove('mobile-open');
+                    document.getElementById('mobileOverlay').classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
+        });
     </script>
 </body>
 </html>

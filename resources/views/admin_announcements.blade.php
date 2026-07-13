@@ -160,17 +160,6 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon-wrapper">
-                        <div class="stat-icon archived">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                        </div>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $archivedAnnouncements ?? 0 }}</span>
-                        <span class="stat-label">Archived</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon-wrapper">
                         <div class="stat-icon views">
                             <i class="fa-regular fa-calendar"></i>
                         </div>
@@ -180,6 +169,18 @@
                         <span class="stat-label">Scheduled</span>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper">
+                        <div class="stat-icon archived">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value">{{ $archivedAnnouncements ?? 0 }}</span>
+                        <span class="stat-label">Archived</span>
+                    </div>
+                </div>
+                
             </div>
 
             <!-- Announcements Card Grid -->
@@ -297,8 +298,7 @@
                                     @if ((int) $announcement->status === 0)
                                         {{-- Archived: Show Restore + Permanent Delete --}}
                                         <form action="{{ route('announcements.restore', $announcement->id) }}" 
-                                            method="POST" class="inline-form"
-                                            onsubmit="return confirm('Restore this announcement?')">
+                                            method="POST" class="inline-form">
                                             @csrf @method('PUT')
                                             <button type="submit" class="btn-action btn-restore" title="Restore">
                                                 <i class="fa-solid fa-rotate-left"></i>
@@ -307,8 +307,7 @@
                                         
                                         {{-- ONLY show permanent delete if archived --}}
                                         <form action="{{ route('announcements.permanent-delete', $announcement->id) }}" 
-                                            method="POST" class="inline-form"
-                                            onsubmit="return confirm('Permanently delete this announcement? This cannot be undone.')">
+                                            method="POST" class="inline-form">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn-action" style="background:#fee; color:#ef4444;" title="Delete Permanently">
                                                 <i class="fa-solid fa-trash-can"></i>
@@ -320,8 +319,7 @@
                                             <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
                                         <form action="{{ route('announcements.destroy', $announcement->id) }}" 
-                                            method="POST" class="inline-form"
-                                            onsubmit="return confirm('Archive this announcement?')">
+                                            method="POST" class="inline-form">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn-action btn-archive" title="Archive">
                                                 <i class="fa-solid fa-box-archive"></i>
@@ -377,21 +375,166 @@
         </div>
     </div>
 
-    <script>
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-        }
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed with this action?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
-        // Archive toggle button logic
-        document.addEventListener('DOMContentLoaded', function () {
-            const btn = document.getElementById('archiveToggleBtn');
-            if (!btn) return;
+    <script>
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    // ========================================
+    // WARNING MODAL SYSTEM
+    // ========================================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get modal elements
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const cancelBtn = document.getElementById('warningModalCancel');
+        
+        let pendingForm = null;
+        
+        // Close modal function
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            pendingForm = null;
+        }
+        
+        // Cancel button
+        cancelBtn.addEventListener('click', closeWarningModal);
+        
+        // Close on overlay click
+        warningOverlay.addEventListener('click', function(e) {
+            if (e.target === warningOverlay) {
+                closeWarningModal();
+            }
+        });
+        
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && warningOverlay.classList.contains('active')) {
+                closeWarningModal();
+            }
+        });
+        
+        // Confirm button - submit the pending form
+        confirmBtn.addEventListener('click', function() {
+            if (pendingForm) {
+                pendingForm.submit();
+            }
+            closeWarningModal();
+        });
+        
+        // Show modal function
+        function showWarningModal(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning', // warning, danger, success
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger'
+            } = config;
             
+            // Set title and message
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            
+            // Set icon
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') {
+                iconElement.className = 'fa-solid fa-triangle-exclamation';
+            } else if (iconType === 'success') {
+                iconElement.className = 'fa-solid fa-circle-question';
+            } else {
+                iconElement.className = 'fa-solid fa-triangle-exclamation';
+            }
+            
+            // Set confirm button
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+            
+            // Show modal
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        }
+        
+        // Attach event listeners to all inline forms
+        document.querySelectorAll('.inline-form').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const submitButton = form.querySelector('button[type="submit"]');
+                const isArchive = submitButton.classList.contains('btn-archive');
+                const isRestore = submitButton.classList.contains('btn-restore');
+                const hasTrashIcon = submitButton.querySelector('.fa-trash-can') !== null;
+                
+                // Store the form to submit later
+                pendingForm = form;
+                
+                // Show appropriate modal
+                if (isArchive) {
+                    showWarningModal({
+                        title: 'Archive Announcement',
+                        message: 'Are you sure you want to <strong>archive</strong> this announcement?<br><small>It will be moved to the archived section and hidden from alumni.</small>',
+                        iconType: 'warning',
+                        confirmText: 'Archive',
+                        confirmClass: 'btn-warning'
+                    });
+                } else if (isRestore) {
+                    showWarningModal({
+                        title: 'Restore Announcement',
+                        message: 'Are you sure you want to <strong>restore</strong> this announcement?<br><small>It will be moved back to active announcements and visible to alumni.</small>',
+                        iconType: 'success',
+                        confirmText: 'Restore',
+                        confirmClass: 'btn-success'
+                    });
+                } else if (hasTrashIcon) {
+                    showWarningModal({
+                        title: 'Delete Permanently',
+                        message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you absolutely sure you want to <strong>permanently delete</strong> this announcement?<br><small>All associated data, images, and attachments will be permanently removed.</small>',
+                        iconType: 'danger',
+                        confirmText: 'Delete Permanently',
+                        confirmClass: 'btn-danger'
+                    });
+                }
+            });
+        });
+        
+        console.log('Warning modal initialized. Forms found:', document.querySelectorAll('.inline-form').length);
+        
+        // Archive toggle button logic
+        const btn = document.getElementById('archiveToggleBtn');
+        if (btn) {
             const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
             const currentPath = window.location.pathname.replace(/\/$/, '');
 
@@ -400,159 +543,76 @@
                 btn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Announcements</span>';
                 btn.href = '{{ route('announcements.index') }}';
             }
-        });
-
-        // Modal functions
-        function openModal(src) {
-            if (!src) return;
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("enlargedImage");
-            modal.style.display = "flex";
-            modalImg.src = src;
-            document.body.style.overflow = 'hidden';
         }
-
-        function closeModal() {
-            const modal = document.getElementById("imageModal");
-            modal.style.display = "none";
-            document.body.style.overflow = '';
-        }
-
-        document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") { closeModal(); }
+        
+        // Make attachment thumbnails clickable
+        document.querySelectorAll(".attachment-thumb").forEach(function(img) {
+            if (!img.classList.contains('placeholder')) {
+                img.style.cursor = "zoom-in";
+                img.addEventListener('click', function() {
+                    openModal(this.src);
+                });
+            }
         });
-
-        document.getElementById('imageModal').addEventListener('click', function(e) {
-            if (e.target === this) closeModal();
-        });
-
+        
         // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
+        document.querySelectorAll('.nav-item').forEach(function(item) {
             item.addEventListener('click', function() {
                 if (window.innerWidth <= 1024) {
                     toggleMobileMenu();
                 }
             });
         });
+    });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
+    // ========================================
+    // IMAGE MODAL FUNCTIONS
+    // ========================================
+    
+    function openModal(src) {
+        if (!src) return;
+        const modal = document.getElementById("imageModal");
+        const modalImg = document.getElementById("enlargedImage");
+        modal.style.display = "flex";
+        modalImg.src = src;
+        document.body.style.overflow = 'hidden';
+    }
 
-        // Make attachment thumbnails clickable
-        document.addEventListener("DOMContentLoaded", function() {
-            const images = document.querySelectorAll(".attachment-thumb");
-            images.forEach(img => {
-                if (!img.classList.contains('placeholder')) {
-                    img.style.cursor = "zoom-in";
-                    img.onclick = function() {
-                        openModal(this.src);
-                    };
-                }
-            });
-        });
+    function closeModal() {
+        const modal = document.getElementById("imageModal");
+        modal.style.display = "none";
+        document.body.style.overflow = '';
+    }
 
-    </script>
-
-    <script>
-    (function() {
-        'use strict';
-        
-        window.countdownIntervals = window.countdownIntervals || {};
-        
-        function updateCountdown(elementId, targetTimestamp, publishedDate) {
-            const el = document.getElementById(elementId);
-            if (!el) {
-                if (window.countdownIntervals[elementId]) {
-                    clearInterval(window.countdownIntervals[elementId]);
-                    delete window.countdownIntervals[elementId];
-                }
-                return;
-            }
-            
-            // Get current time from user's device
-            const now = Date.now();
-            const distance = targetTimestamp - now;
-            const textSpan = el.querySelector('.countdown-text');
-            
-            // Time is up
-            if (distance <= 0) {
-                if (window.countdownIntervals[elementId]) {
-                    clearInterval(window.countdownIntervals[elementId]);
-                    delete window.countdownIntervals[elementId];
-                }
-                
-                // Update date to "Published"
-                const dateItem = el.closest('.announcement-dates').querySelector('.date-item:first-child span');
-                if (dateItem) {
-                    dateItem.textContent = 'Published: ' + publishedDate;
-                }
-                
-                // Smooth removal
-                el.style.transition = 'opacity 0.3s ease';
-                el.style.opacity = '0';
-                setTimeout(() => el.remove(), 300);
-                
-                return;
-            }
-            
-            // Calculate time remaining
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-            
-            // Format display
-            let display = '';
-            if (days > 0) display += `${days}d `;
-            display += `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            
-            if (textSpan) {
-                textSpan.textContent = display;
-            }
+    // Image modal keyboard and click handlers
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") { 
+            closeModal(); 
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const countdownElements = document.querySelectorAll('[id^="countdown-"]');
-            
-            countdownElements.forEach(el => {
-                const elementId = el.id;
-                // Timestamp is already in milliseconds from Laravel
-                const targetTimestamp = parseInt(el.dataset.target, 10);
-                const publishedDate = el.dataset.publishedDate;
-                
-                if (window.countdownIntervals[elementId]) {
-                    clearInterval(window.countdownIntervals[elementId]);
-                }
-                
-                // Update immediately
-                updateCountdown(elementId, targetTimestamp, publishedDate);
-                
-                // Set interval
-                window.countdownIntervals[elementId] = setInterval(() => {
-                    updateCountdown(elementId, targetTimestamp, publishedDate);
-                }, 1000);
-            });
+    });
+
+    const imageModal = document.getElementById('imageModal');
+    if (imageModal) {
+        imageModal.addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
         });
-        
-        window.addEventListener('beforeunload', function() {
-            if (window.countdownIntervals) {
-                Object.values(window.countdownIntervals).forEach(interval => {
-                    clearInterval(interval);
-                });
+    }
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                const sidebar = document.getElementById('adminSidebar');
+                const overlay = document.getElementById('mobileOverlay');
+                if (sidebar) sidebar.classList.remove('mobile-open');
+                if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
             }
-        });
-    })();
-    </script>
+        }, 250);
+    });
+</script>
 
 </body>
 </html>

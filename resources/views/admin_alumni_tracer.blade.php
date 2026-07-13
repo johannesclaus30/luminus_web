@@ -221,7 +221,7 @@
                 </div>
             </div>
 
-                <!-- Charts Row -->
+                <!-- Charts Row - Phase Completion & Program Distribution -->
                 <div class="charts-grid">
                     <div class="chart-card">
                         <h3>Phase Completion Rate</h3>
@@ -231,9 +231,26 @@
                     </div>
 
                     <div class="chart-card">
-                        <h3>Employment Status</h3>
-                        <div class="employment-list" id="employmentStatusList">
-                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No employment data yet.</p>
+                        <h3>Program Distribution</h3>
+                        <div class="distribution-list" id="programDistributionList">
+                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No program data yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row - Graduation Year & Top Responders -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Graduation Year Distribution</h3>
+                        <div class="distribution-list" id="yearDistributionList">
+                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No year data yet.</p>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3>Top Responders</h3>
+                        <div class="top-responders-list" id="topRespondersList">
+                            <p style="color: var(--gray-400); text-align: center; padding: 2rem;">No responses yet.</p>
                         </div>
                     </div>
                 </div>
@@ -1080,7 +1097,9 @@
             
             updateFunnelChart(stats);
             updatePhaseCompletionChart(stats);
-            updateEmploymentStatus(stats);
+            updateProgramDistribution(stats);
+            updateYearDistribution(stats);
+            updateTopResponders(stats);
             
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
@@ -1180,19 +1199,87 @@
         `).join('');
     }
 
-    function updateEmploymentStatus(stats) {
-        const container = document.getElementById('employmentStatusList');
-        if (!stats.employmentStats || stats.employmentStats.length === 0) {
-            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No employment data yet.</p>';
+    function updateProgramDistribution(stats) {
+        const container = document.getElementById('programDistributionList');
+        if (!stats.programStats || stats.programStats.length === 0) {
+            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No program data yet.</p>';
             return;
         }
         
-        container.innerHTML = stats.employmentStats.map(emp => `
-            <div class="employment-item">
-                <span class="employment-label">${emp.status}</span>
-                <span class="employment-count">${emp.count}</span>
+        const maxVal = Math.max(...stats.programStats.map(p => p.count), 1);
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316'];
+        
+        container.innerHTML = stats.programStats.map((prog, i) => `
+            <div class="distribution-item">
+                <div class="distribution-item-header">
+                    <span class="distribution-dot" style="background:${colors[i % colors.length]};"></span>
+                    <span class="distribution-name">${prog.program || 'Unknown'}</span>
+                    <span class="distribution-count">${prog.count}</span>
+                </div>
+                <div class="h-bar-track">
+                    <div class="h-bar-fill" style="width:${(prog.count / maxVal) * 100}%; background:${colors[i % colors.length]};"></div>
+                </div>
             </div>
         `).join('');
+    }
+
+    function updateYearDistribution(stats) {
+        const container = document.getElementById('yearDistributionList');
+        if (!stats.yearStats || stats.yearStats.length === 0) {
+            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No year data yet.</p>';
+            return;
+        }
+        
+        const maxVal = Math.max(...stats.yearStats.map(y => y.count), 1);
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'];
+        
+        container.innerHTML = stats.yearStats.map((year, i) => `
+            <div class="distribution-item">
+                <div class="distribution-item-header">
+                    <span class="distribution-dot" style="background:${colors[i % colors.length]};"></span>
+                    <span class="distribution-name">Batch ${year.year || 'Unknown'}</span>
+                    <span class="distribution-count">${year.count}</span>
+                </div>
+                <div class="h-bar-track">
+                    <div class="h-bar-fill" style="width:${(year.count / maxVal) * 100}%; background:${colors[i % colors.length]};"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function updateTopResponders(stats) {
+        const container = document.getElementById('topRespondersList');
+        if (!stats.topResponders || stats.topResponders.length === 0) {
+            container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 2rem;">No responses yet.</p>';
+            return;
+        }
+        
+        const maxCompletion = Math.max(...stats.topResponders.map(r => r.completion), 1);
+        
+        container.innerHTML = stats.topResponders.map((responder, i) => {
+            const initials = responder.name.split(' ').map(n => n[0]).join('').toUpperCase();
+            const medalColors = ['#f59e0b', '#94a3b8', '#cd7f32']; // gold, silver, bronze
+            const barColors = ['#3b82f6', '#6366f1', '#8b5cf6', '#10b981', '#06b6d4'];
+            
+            return `
+                <div class="top-responder-item">
+                    <div class="top-responder-rank">
+                        ${i < 3 ? `<i class="fa-solid fa-medal" style="color:${medalColors[i]};"></i>` : `<span style="color:var(--gray-400); font-weight:600;">#${i + 1}</span>`}
+                    </div>
+                    <div class="top-responder-avatar" style="background:${barColors[i % barColors.length]};">
+                        ${initials}
+                    </div>
+                    <div class="top-responder-info">
+                        <span class="top-responder-name">${responder.name}</span>
+                        <span class="top-responder-program">${responder.program || 'N/A'} · Batch ${responder.year || 'N/A'}</span>
+                    </div>
+                    <div class="top-responder-completion">
+                        <span class="top-responder-pct">${responder.completion}%</span>
+                        <div class="mini-progress-bar" style="width:${(responder.completion / maxCompletion) * 60}px; background:${barColors[i % barColors.length]};"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function showDashboardError() {

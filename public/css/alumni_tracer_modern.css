@@ -3158,3 +3158,134 @@ body {
         border-bottom: 1px solid #F3F4F6;
     }
 }
+
+/* ========================================
+   DASHBOARD DISTRIBUTION & TOP RESPONDERS
+   ======================================== */
+
+.distribution-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.distribution-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.distribution-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.distribution-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.distribution-name {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: var(--gray-700);
+    font-weight: 500;
+}
+
+.distribution-count {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+.top-responders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.top-responder-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.top-responder-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.top-responder-item:first-child {
+    padding-top: 0;
+}
+
+.top-responder-rank {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.top-responder-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.top-responder-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.top-responder-name {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top-responder-program {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--gray-400);
+    margin-top: 0.125rem;
+}
+
+.top-responder-completion {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.top-responder-pct {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+
+.mini-progress-bar {
+    height: 4px;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    background: var(--gray-200);
+}

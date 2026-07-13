@@ -212,6 +212,27 @@
         </main>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Mobile menu toggle
         function toggleMobileMenu() {
@@ -222,30 +243,120 @@
             document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
         }
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
+        // ========================================
+        // WARNING MODAL SYSTEM
+        // ========================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get modal elements
+            const warningOverlay = document.getElementById('warningModal');
+            const warningTitle = document.getElementById('warningModalTitle');
+            const warningMessage = document.getElementById('warningModalMessage');
+            const warningIcon = document.getElementById('warningModalIcon');
+            const confirmBtn = document.getElementById('warningModalConfirm');
+            const cancelBtn = document.getElementById('warningModalCancel');
+            
+            let pendingCallback = null;
+            
+            // Close modal function
+            function closeWarningModal() {
+                warningOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+                pendingCallback = null;
+            }
+            
+            // Cancel button
+            cancelBtn.addEventListener('click', closeWarningModal);
+            
+            // Close on overlay click
+            warningOverlay.addEventListener('click', function(e) {
+                if (e.target === warningOverlay) {
+                    closeWarningModal();
                 }
             });
-        });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
+            const formCancelBtn = document.querySelector('.form-actions .btn-secondary');
+            if (formCancelBtn) {
+                formCancelBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    window.showWarningModal({
+                        title: 'Discard Changes',
+                        message: 'Are you sure you want to <strong>cancel</strong>?<br><small>All unsaved changes will be lost.</small>',
+                        iconType: 'warning',
+                        confirmText: 'Discard',
+                        confirmClass: 'btn-warning',
+                        onConfirm: function() {
+                            window.location.href = href;
+                        }
+                    });
+                });
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && warningOverlay.classList.contains('active')) {
+                    closeWarningModal();
                 }
-            }, 250);
-        });
+            });
+            
+            // Confirm button - execute the pending callback
+            confirmBtn.addEventListener('click', function() {
+                if (pendingCallback) {
+                    pendingCallback();
+                }
+                closeWarningModal();
+            });
+            
+            // Show modal function
+            window.showWarningModal = function(config) {
+                const {
+                    title = 'Confirm Action',
+                    message = 'Are you sure?',
+                    iconType = 'warning',
+                    confirmText = 'Confirm',
+                    confirmClass = 'btn-danger',
+                    onConfirm = null
+                } = config;
+                
+                // Set title and message
+                warningTitle.textContent = title;
+                warningMessage.innerHTML = message;
+                
+                // Set icon
+                warningIcon.className = 'warning-modal-icon ' + iconType;
+                const iconElement = warningIcon.querySelector('i');
+                if (iconType === 'danger') {
+                    iconElement.className = 'fa-solid fa-triangle-exclamation';
+                } else if (iconType === 'success') {
+                    iconElement.className = 'fa-solid fa-circle-question';
+                } else {
+                    iconElement.className = 'fa-solid fa-triangle-exclamation';
+                }
+                
+                // Set confirm button
+                confirmBtn.className = 'btn ' + confirmClass;
+                confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+                
+                // Store callback
+                pendingCallback = onConfirm;
+                
+                // Show modal
+                warningOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                confirmBtn.focus();
+            };
+            
+            // Close sidebar when clicking on a nav item (mobile)
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 1024) {
+                        toggleMobileMenu();
+                    }
+                });
+            });
 
-        // Form-specific JS
-        document.addEventListener('DOMContentLoaded', function() {
+            // Form-specific JS
             const imageInput = document.getElementById('imageInput');
             const videoInput = document.getElementById('videoInput');
             const imageZone = document.getElementById('imageZone');
@@ -256,24 +367,19 @@
             const existingMediaSection = document.getElementById('existingMediaSection');
             const clearImagesBtn = document.getElementById('clearImagesBtn');
 
-            // Track counts — these update dynamically as things are removed
+            // Track counts
             let existingImageCount = {{ $existingImageCount }};
             let existingVideoCount = {{ $existingVideoCount }};
-            
-            // Track if a NEW video has been uploaded (separate from existing)
             let newVideoUploaded = false;
             let newImagesUploaded = false;
 
-            // Initial state: Disable zones based on existing media
             updateZoneStates();
 
             function updateZoneStates() {
-                // Determine total active images (existing not marked for deletion + new)
                 const totalActiveImages = existingImageCount + (newImagesUploaded ? imageInput.files.length : 0);
                 const totalActiveVideos = existingVideoCount + (newVideoUploaded ? 1 : 0);
                 
                 if (totalActiveImages > 0) {
-                    // Has images — disable video zone
                     videoZone.classList.add('disabled');
                     videoInput.disabled = true;
                 } else {
@@ -282,7 +388,6 @@
                 }
                 
                 if (totalActiveVideos > 0) {
-                    // Has videos — disable image zone
                     imageZone.classList.add('disabled');
                     imageInput.disabled = true;
                 } else {
@@ -305,7 +410,6 @@
                 if (files.length === 0) return;
 
                 let errorMsg = '';
-                // Check total limit (existing not-deleted + new)
                 if ((existingImageCount + files.length) > 5) {
                     errorMsg = `You can only have 5 images total. You currently have ${existingImageCount} existing image(s).`;
                 }
@@ -422,7 +526,6 @@
                 reader.readAsDataURL(file);
             }
 
-            // Remove single new image
             window.removeSingleNewImage = function(index) {
                 const dt = new DataTransfer();
                 const files = Array.from(imageInput.files);
@@ -438,7 +541,6 @@
                 }
             };
 
-            // Remove all new images
             window.removeAllNewImages = function() {
                 previewContainer.innerHTML = '';
                 imageInput.value = '';
@@ -449,7 +551,6 @@
                 clearError();
             };
 
-            // Remove new video preview
             window.removeVideoPreview = function() {
                 previewContainer.innerHTML = '';
                 videoInput.value = '';
@@ -459,50 +560,70 @@
                 clearError();
             };
 
-            // Mark existing attachment for deletion
+            // ✅ FIXED: Use custom modal instead of confirm()
             window.markForDeletion = function(id, type) {
-                if(!confirm('Are you sure you want to remove this attachment? It will be deleted when you save.')) return;
+                window.showWarningModal({
+                    title: 'Remove Attachment',
+                    message: 'Are you sure you want to <strong>remove</strong> this attachment?<br><small>It will be permanently deleted when you save the changes.</small>',
+                    iconType: 'warning',
+                    confirmText: 'Remove',
+                    confirmClass: 'btn-warning',
+                    onConfirm: function() {
+                        const item = document.getElementById(`existing-media-${id}`);
+                        if (item) {
+                            item.style.opacity = '0.3';
+                            item.style.pointerEvents = 'none';
+                        }
 
-                const item = document.getElementById(`existing-media-${id}`);
-                if (item) {
-                    item.style.opacity = '0.3';
-                    item.style.pointerEvents = 'none';
-                }
+                        // Add hidden input for the controller
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'deleted_media[]';
+                        input.value = id;
+                        deletedMediaContainer.appendChild(input);
 
-                // Add hidden input for the controller
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'deleted_media[]';
-                input.value = id;
-                deletedMediaContainer.appendChild(input);
+                        // Update counts
+                        if (type === 'image') {
+                            existingImageCount--;
+                        } else {
+                            existingVideoCount--;
+                        }
 
-                // Update counts
-                if (type === 'image') {
-                    existingImageCount--;
-                } else {
-                    existingVideoCount--;
-                }
+                        // Check if all existing media is now marked for deletion
+                        const remainingVisible = document.querySelectorAll('.existing-media-item:not([style*="opacity: 0.3"])');
+                        if (remainingVisible.length === 0 && existingMediaSection) {
+                            existingMediaSection.style.opacity = '0.5';
+                        }
 
-                // Check if all existing media is now marked for deletion
-                const remainingVisible = document.querySelectorAll('.existing-media-item:not([style*="opacity: 0.3"])');
-                if (remainingVisible.length === 0 && existingMediaSection) {
-                    existingMediaSection.style.opacity = '0.5';
-                }
+                        // Update zone states
+                        updateZoneStates();
+                        
+                        // If removing a video, clear any new video upload too
+                        if (type === 'video' && newVideoUploaded) {
+                            window.removeVideoPreview();
+                        }
+                        // If removing all images, clear any new image uploads too
+                        if (type === 'image' && existingImageCount === 0 && newImagesUploaded) {
+                            window.removeAllNewImages();
+                        }
 
-                // Update zone states
-                updateZoneStates();
-                
-                // If removing a video, clear any new video upload too
-                if (type === 'video' && newVideoUploaded) {
-                    window.removeVideoPreview();
-                }
-                // If removing all images, clear any new image uploads too
-                if (type === 'image' && existingImageCount === 0 && newImagesUploaded) {
-                    window.removeAllNewImages();
-                }
-
-                clearError();
+                        clearError();
+                    }
+                });
             };
+        });
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                if (window.innerWidth > 1024) {
+                    document.getElementById('adminSidebar').classList.remove('mobile-open');
+                    document.getElementById('mobileOverlay').classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
         });
     </script>
 </body>

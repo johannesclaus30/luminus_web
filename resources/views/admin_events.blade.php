@@ -475,68 +475,155 @@
         </div>
     </div>
 
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="confirm-modal-overlay" style="display:none;">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon">⚠️</div>
-            <h3 id="confirmTitle" class="confirm-modal-title">Confirm Action</h3>
-            <p id="confirmMessage" class="confirm-modal-message">Are you sure you want to proceed?</p>
-            <div class="confirm-modal-actions">
-                <button id="confirmCancel" class="confirm-btn confirm-btn-cancel">Cancel</button>
-                <button id="confirmOk" class="confirm-btn confirm-btn-ok">Confirm</button>
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-        }
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
 
-        // Archive toggle button logic
-        document.addEventListener('DOMContentLoaded', function () {
-            const btn = document.getElementById('archiveToggleBtn');
-            if (!btn) return;
-            
-            const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
+    // Image modal functions
+    function openModal(src) {
+        const modal = document.getElementById("imageModal");
+        const modalImg = document.getElementById("enlargedImage");
+        modal.style.display = "flex";
+        modalImg.src = src;
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("imageModal");
+        modal.style.display = "none";
+        document.body.style.overflow = '';
+    }
+
+    // Venue Map Modal (global scope)
+    let venueModalMap = null;
+    let venueModalMarker = null;
+
+    function openVenueModal(lat, lng, eventTitle, venueName, address, capacity, eventType, startDate, endDate) {
+        const modal = document.getElementById('venueModal');
+        
+        document.getElementById('venueModalEventTitle').innerHTML = 
+            '<i class="fa-solid fa-location-dot"></i> ' + eventTitle;
+        
+        let dateStr = startDate;
+        if (endDate && endDate !== startDate) {
+            dateStr += ' – ' + endDate;
+        }
+        document.getElementById('venueModalEventDate').textContent = dateStr;
+        document.getElementById('venueModalVenueName').textContent = venueName;
+        document.getElementById('venueModalAddress').textContent = address;
+        document.getElementById('venueModalCapacity').textContent = capacity;
+        document.getElementById('venueModalEventType').textContent = eventType;
+        
+        const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
+        document.getElementById('venueModalDirections').href = directionsUrl;
+        
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(function() {
+            initVenueModalMap(parseFloat(lat), parseFloat(lng), venueName);
+        }, 150);
+    }
+
+    function closeVenueModal(event) {
+        if (event && event.target !== document.getElementById('venueModal')) return;
+        
+        const modal = document.getElementById('venueModal');
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        
+        if (venueModalMap) {
+            venueModalMap.remove();
+            venueModalMap = null;
+            venueModalMarker = null;
+        }
+    }
+
+    function initVenueModalMap(lat, lng, venueName) {
+        const mapContainer = document.getElementById('venueModalMap');
+        
+        if (venueModalMap) {
+            venueModalMap.remove();
+            venueModalMap = null;
+        }
+        
+        if (mapContainer.offsetHeight === 0) {
+            mapContainer.style.height = '450px';
+        }
+        
+        venueModalMap = L.map('venueModalMap', {
+            center: [lat, lng],
+            zoom: 17,
+            zoomControl: true,
+            scrollWheelZoom: true
+        });
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(venueModalMap);
+        
+        venueModalMarker = L.marker([lat, lng])
+            .addTo(venueModalMap)
+            .bindPopup(`<strong>${venueName}</strong>`)
+            .openPopup();
+        
+        setTimeout(function() {
+            venueModalMap.invalidateSize();
+        }, 100);
+    }
+
+    // ========================================
+    // INITIALIZE EVERYTHING ON DOM LOAD
+    // ========================================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // === Archive toggle button logic ===
+        const archiveBtn = document.getElementById('archiveToggleBtn');
+        if (archiveBtn) {
+            const archivedPath = new URL(archiveBtn.href).pathname.replace(/\/$/, '');
             const currentPath = window.location.pathname.replace(/\/$/, '');
 
             if (currentPath === archivedPath) {
-                btn.classList.add('active');
-                btn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Events</span>';
-                btn.href = '{{ route('events.index') }}';
+                archiveBtn.classList.add('active');
+                archiveBtn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Events</span>';
+                archiveBtn.href = '{{ route('events.index') }}';
             }
-        });
-
-        // Image modal functions
-        function openModal(src) {
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("enlargedImage");
-            modal.style.display = "flex";
-            modalImg.src = src;
-            document.body.style.overflow = 'hidden';
         }
 
-        function closeModal() {
-            const modal = document.getElementById("imageModal");
-            modal.style.display = "none";
-            document.body.style.overflow = '';
-        }
-
-        document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") { closeModal(); }
-        });
-
+        // === Image modal click handlers ===
         document.getElementById('imageModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
         });
 
-        // Close sidebar when clicking on a nav item (mobile)
+        // === Close sidebar on nav item click (mobile) ===
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', function() {
                 if (window.innerWidth <= 1024) {
@@ -545,187 +632,160 @@
             });
         });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
-
-        // Confirmation Modal Logic
-        document.addEventListener('DOMContentLoaded', function() {
-            const confirmModal   = document.getElementById('confirmModal');
-            const confirmTitle   = document.getElementById('confirmTitle');
-            const confirmMessage = document.getElementById('confirmMessage');
-            const confirmOk      = document.getElementById('confirmOk');
-            const confirmCancel  = document.getElementById('confirmCancel');
-
-            let pendingForm = null;
-
-            function openConfirmModal(form, message) {
-                pendingForm = form;
-                confirmMessage.textContent = message || 'Are you sure?';
-                confirmTitle.textContent = form.action.includes('restore') ? 'Restore Event' : 'Archive Event';
-                confirmModal.style.display = 'flex';
-            }
-
-            function closeConfirmModal() {
-                confirmModal.style.display = 'none';
-                pendingForm = null;
-            }
-
-            // Intercept all forms with data-confirm
-            document.querySelectorAll('form[data-confirm]').forEach(function (form) {
-                form.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    openConfirmModal(this, this.dataset.confirm);
-                });
-            });
-
-            confirmOk.addEventListener('click', function () {
-                if (pendingForm) {
-                    pendingForm.submit();
-                }
-                closeConfirmModal();
-            });
-
-            confirmCancel.addEventListener('click', closeConfirmModal);
-
-            confirmModal.addEventListener('click', function (e) {
-                if (e.target === confirmModal) {
-                    closeConfirmModal();
-                }
-            });
-
-            // Initialize Leaflet mini maps
-            document.querySelectorAll('.venue-mini-map').forEach(function (mapDiv) {
-                const lat = parseFloat(mapDiv.dataset.lat);
-                const lng = parseFloat(mapDiv.dataset.lng);
-                if (isNaN(lat) || isNaN(lng)) return;
-
-                const map = L.map(mapDiv.id, {
-                    center: [lat, lng],
-                    zoom: 15,
-                    scrollWheelZoom: false,
-                    dragging: false,
-                    zoomControl: false
-                });
-
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(map);
-
-                L.marker([lat, lng]).addTo(map);
-                setTimeout(function () { map.invalidateSize(); }, 100);
-            });
-        });
-
-        // Venue Map Modal
-        let venueModalMap = null;
-        let venueModalMarker = null;
-
-        function openVenueModal(lat, lng, eventTitle, venueName, address, capacity, eventType, startDate, endDate) {
-            const modal = document.getElementById('venueModal');
-            
-            // Populate event details
-            document.getElementById('venueModalEventTitle').innerHTML = 
-                '<i class="fa-solid fa-location-dot"></i> ' + eventTitle;
-            
-            // Format date string
-            let dateStr = startDate;
-            if (endDate && endDate !== startDate) {
-                dateStr += ' – ' + endDate;
-            }
-            document.getElementById('venueModalEventDate').textContent = dateStr;
-            document.getElementById('venueModalVenueName').textContent = venueName;
-            document.getElementById('venueModalAddress').textContent = address;
-            document.getElementById('venueModalCapacity').textContent = capacity;
-            document.getElementById('venueModalEventType').textContent = eventType;
-            
-            // Set directions link
-            const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
-            document.getElementById('venueModalDirections').href = directionsUrl;
-            
-            // Show modal
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            
-            // Initialize or update map after a short delay (needed for hidden elements)
-            setTimeout(function() {
-                initVenueModalMap(parseFloat(lat), parseFloat(lng), venueName);
-            }, 150);
-        }
-
-        function closeVenueModal(event) {
-            // Allow clicking overlay to close, but not clicks inside the container
-            if (event && event.target !== document.getElementById('venueModal')) return;
-            
-            const modal = document.getElementById('venueModal');
-            modal.style.display = 'none';
+        // ========================================
+        // WARNING MODAL SYSTEM
+        // ========================================
+        
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const cancelBtn = document.getElementById('warningModalCancel');
+        
+        let pendingForm = null;
+        
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
             document.body.style.overflow = '';
-            
-            // Clean up map
-            if (venueModalMap) {
-                venueModalMap.remove();
-                venueModalMap = null;
-                venueModalMarker = null;
-            }
+            pendingForm = null;
         }
-
-        function initVenueModalMap(lat, lng, venueName) {
-            const mapContainer = document.getElementById('venueModalMap');
-            
-            // If map already exists, remove it first
-            if (venueModalMap) {
-                venueModalMap.remove();
-                venueModalMap = null;
-            }
-            
-            // Ensure the container has dimensions
-            if (mapContainer.offsetHeight === 0) {
-                mapContainer.style.height = '450px';
-            }
-            
-            venueModalMap = L.map('venueModalMap', {
-                center: [lat, lng],
-                zoom: 17,
-                zoomControl: true,
-                scrollWheelZoom: true
-            });
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            }).addTo(venueModalMap);
-            
-            // Add marker with popup
-            venueModalMarker = L.marker([lat, lng])
-                .addTo(venueModalMap)
-                .bindPopup(`<strong>${venueName}</strong>`)
-                .openPopup();
-            
-            // Force map to recalculate size
-            setTimeout(function() {
-                venueModalMap.invalidateSize();
-            }, 100);
-        }
-
-        // Close venue modal on Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === "Escape") {
-                const venueModal = document.getElementById('venueModal');
-                if (venueModal && venueModal.style.display === 'flex') {
-                    closeVenueModal();
-                }
+        
+        cancelBtn.addEventListener('click', closeWarningModal);
+        
+        warningOverlay.addEventListener('click', function(e) {
+            if (e.target === warningOverlay) {
+                closeWarningModal();
             }
         });
+        
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && warningOverlay.classList.contains('active')) {
+                closeWarningModal();
+            }
+        });
+        
+        confirmBtn.addEventListener('click', function() {
+            if (pendingForm) {
+                pendingForm.submit();
+            }
+            closeWarningModal();
+        });
+        
+        function showWarningModal(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning',
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger'
+            } = config;
+            
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') {
+                iconElement.className = 'fa-solid fa-triangle-exclamation';
+            } else if (iconType === 'success') {
+                iconElement.className = 'fa-solid fa-circle-question';
+            } else {
+                iconElement.className = 'fa-solid fa-triangle-exclamation';
+            }
+            
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+            
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        }
+        
+        // Intercept all forms with data-confirm
+        document.querySelectorAll('form[data-confirm]').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                pendingForm = form;
+                const action = this.action;
+                
+                if (action.includes('restore')) {
+                    showWarningModal({
+                        title: 'Restore Event',
+                        message: 'Are you sure you want to <strong>restore</strong> this event?<br><small>It will be moved back to active events and visible to alumni.</small>',
+                        iconType: 'success',
+                        confirmText: 'Restore',
+                        confirmClass: 'btn-success'
+                    });
+                } else if (action.includes('permanent-delete')) {
+                    showWarningModal({
+                        title: 'Delete Permanently',
+                        message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you absolutely sure you want to <strong>permanently delete</strong> this event?<br><small>All associated data, images, and venue information will be permanently removed.</small>',
+                        iconType: 'danger',
+                        confirmText: 'Delete Permanently',
+                        confirmClass: 'btn-danger'
+                    });
+                } else {
+                    showWarningModal({
+                        title: 'Archive Event',
+                        message: 'Are you sure you want to <strong>archive</strong> this event?<br><small>It will be moved to the archived section and hidden from alumni.</small>',
+                        iconType: 'warning',
+                        confirmText: 'Archive',
+                        confirmClass: 'btn-warning'
+                    });
+                }
+            });
+        });
 
-    </script>
+        // === Initialize Leaflet mini maps ===
+        document.querySelectorAll('.venue-mini-map').forEach(function(mapDiv) {
+            const lat = parseFloat(mapDiv.dataset.lat);
+            const lng = parseFloat(mapDiv.dataset.lng);
+            if (isNaN(lat) || isNaN(lng)) return;
+
+            const map = L.map(mapDiv.id, {
+                center: [lat, lng],
+                zoom: 15,
+                scrollWheelZoom: false,
+                dragging: false,
+                zoomControl: false
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            L.marker([lat, lng]).addTo(map);
+            setTimeout(function() { map.invalidateSize(); }, 100);
+        });
+    });
+
+    // === Global event listeners ===
+    
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape") { 
+            closeModal();
+            const venueModal = document.getElementById('venueModal');
+            if (venueModal && venueModal.style.display === 'flex') {
+                closeVenueModal();
+            }
+        }
+    });
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }, 250);
+    });
+</script>
+
 </body>
 </html>
