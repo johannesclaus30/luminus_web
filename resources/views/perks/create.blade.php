@@ -196,103 +196,200 @@
         </main>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
+    // ========================================
+    // Mobile Menu Toggle
+    // ========================================
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) toggleMobileMenu();
+        });
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }, 250);
+    });
+
+    // ========================================
+    // INITIALIZE EVERYTHING ON DOM LOAD
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
         // ========================================
-        // Mobile Menu Toggle
+        // WARNING MODAL SYSTEM
         // ========================================
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const modalCancelBtn = document.getElementById('warningModalCancel');
+
+        let pendingCallback = null;
+
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            pendingCallback = null;
         }
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
-                }
-            });
-        });
+        modalCancelBtn.addEventListener('click', closeWarningModal);
+        warningOverlay.addEventListener('click', function(e) { if (e.target === warningOverlay) closeWarningModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && warningOverlay.classList.contains('active')) closeWarningModal(); });
+        confirmBtn.addEventListener('click', function() { if (pendingCallback) pendingCallback(); closeWarningModal(); });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
+        window.showWarningModal = function(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning',
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger',
+                onConfirm = null,
+                hideCancel = false
+            } = config;
+
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') iconElement.className = 'fa-solid fa-triangle-exclamation';
+            else if (iconType === 'success') iconElement.className = 'fa-solid fa-circle-question';
+            else iconElement.className = 'fa-solid fa-triangle-exclamation';
+
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+            modalCancelBtn.style.display = hideCancel ? 'none' : 'inline-flex';
+            pendingCallback = onConfirm;
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        };
+
+        // Cancel button confirmation
+        const cancelLink = document.querySelector('.form-actions .btn-secondary');
+        if (cancelLink) {
+            cancelLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const href = this.getAttribute('href');
+                window.showWarningModal({
+                    title: 'Discard Changes',
+                    message: 'Are you sure you want to <strong>cancel</strong>?<br><small>All unsaved changes will be lost.</small>',
+                    iconType: 'warning',
+                    confirmText: 'Discard',
+                    confirmClass: 'btn-warning',
+                    onConfirm: function() { window.location.href = href; }
+                });
+            });
+        }
 
         // ========================================
         // Attachment Handling
         // ========================================
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileInput = document.getElementById('attachmentInput');
-            const triggerBtn = document.getElementById('triggerFileInput');
-            const previewContainer = document.getElementById('attachment-preview-container');
-            const MAX_FILES = 5;
-            const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+        const fileInput = document.getElementById('attachmentInput');
+        const triggerBtn = document.getElementById('triggerFileInput');
+        const previewContainer = document.getElementById('attachment-preview-container');
+        const MAX_FILES = 5;
+        const MAX_SIZE = 5 * 1024 * 1024;
 
-            if (triggerBtn && fileInput) {
-                triggerBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    fileInput.click();
+        if (triggerBtn && fileInput) {
+            triggerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                fileInput.click();
+            });
+        }
+
+        fileInput.addEventListener('change', function(event) {
+            const files = Array.from(event.target.files);
+            const existingCount = document.querySelectorAll('.attachment-item').length;
+
+            if (files.length + existingCount > MAX_FILES) {
+                window.showWarningModal({
+                    title: 'Too Many Files',
+                    message: `You can only upload up to <strong>${MAX_FILES}</strong> images.`,
+                    iconType: 'warning',
+                    confirmText: 'OK',
+                    confirmClass: 'btn-warning',
+                    hideCancel: true
                 });
+                this.value = "";
+                return;
             }
 
-            fileInput.addEventListener('change', function(event) {
-                const files = Array.from(event.target.files);
-                const existingCount = document.querySelectorAll('.attachment-item').length;
+            document.querySelectorAll('.new-image-preview').forEach(el => el.remove());
 
-                if (files.length + existingCount > MAX_FILES) {
-                    alert(`You can only upload up to ${MAX_FILES} images.`);
-                    this.value = ""; 
+            files.forEach((file) => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                    window.showWarningModal({
+                        title: 'Invalid File Type',
+                        message: `<strong>${file.name}</strong> is not a supported format.<br><small>Please use JPG, PNG, or WEBP only.</small>`,
+                        iconType: 'warning',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-warning',
+                        hideCancel: true
+                    });
                     return;
                 }
-
-                // Clear previous new previews
-                document.querySelectorAll('.new-image-preview').forEach(el => el.remove());
-
-                files.forEach((file) => {
-                    // Validate file type
-                    const ext = file.name.split('.').pop().toLowerCase();
-                    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
-                        alert(`${file.name} is not a supported format. Please use JPG, PNG, or WEBP.`);
-                        return;
-                    }
-
-                    // Validate file size
-                    if (file.size > MAX_SIZE) {
-                        alert(`${file.name} exceeds the 5MB limit.`);
-                        return;
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const wrapper = document.createElement('div');
-                        wrapper.className = 'attachment-item new-image-preview';
-                        
-                        wrapper.innerHTML = `
-                            <img src="${e.target.result}" class="attachment-img" style="border: 2px dashed var(--nu-gold);">
-                            <button type="button" class="remove-attachment-btn" onclick="this.parentElement.remove()" title="Remove">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                        `;
-                        
-                        previewContainer.appendChild(wrapper);
-                    }
-                    reader.readAsDataURL(file);
-                });
+                if (file.size > MAX_SIZE) {
+                    window.showWarningModal({
+                        title: 'File Too Large',
+                        message: `<strong>${file.name}</strong> exceeds the 5MB limit.`,
+                        iconType: 'warning',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-warning',
+                        hideCancel: true
+                    });
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'attachment-item new-image-preview';
+                    wrapper.innerHTML = `<img src="${e.target.result}" class="attachment-img" style="border: 2px dashed var(--nu-gold);"><button type="button" class="remove-attachment-btn" onclick="this.parentElement.remove()" title="Remove"><i class="fa-solid fa-xmark"></i></button>`;
+                    previewContainer.appendChild(wrapper);
+                };
+                reader.readAsDataURL(file);
             });
         });
-    </script>
+    });
+</script>
 
 </body>
 </html>

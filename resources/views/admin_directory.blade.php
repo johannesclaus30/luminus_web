@@ -74,12 +74,12 @@
                 </a>
             </nav>
             
-            <div class="sidebar-footer">
+            {{-- <div class="sidebar-footer">
                 <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Sign Out</span>
                 </a>
-            </div>
+            </div> --}}
         </aside>
 
         <!-- Main Content -->

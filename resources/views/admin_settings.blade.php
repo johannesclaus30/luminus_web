@@ -141,12 +141,12 @@
                 </a>
             </nav>
             
-            <div class="sidebar-footer">
+            {{-- <div class="sidebar-footer">
                 <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Sign Out</span>
                 </a>
-            </div>
+            </div> --}}
         </aside>
 
         <!-- Main Content -->
@@ -347,7 +347,7 @@
                                         <label class="form-label">Authentication Method</label>
                                         <select class="form-control">
                                             <option>Authenticator App</option>
-                                            <option>SMS</option>
+                                            <option>Email</option>
                                         </select>
                                     </div>
                                     <div class="form-actions full-width">
@@ -674,181 +674,244 @@
         </main>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-        }
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
 
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
-                }
-            });
+    // Close sidebar when clicking on a nav item (mobile)
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) toggleMobileMenu();
         });
+    });
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar').classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay').classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
-
-        // Toggle password visibility
-        function togglePassword(button) {
-            const input = button.parentElement.querySelector('input');
-            const icon = button.querySelector('i');
-            
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar').classList.remove('mobile-open');
+                document.getElementById('mobileOverlay').classList.remove('active');
+                document.body.style.overflow = '';
             }
-        }
+        }, 250);
+    });
 
-        // Toggle 2FA settings visibility
-        document.addEventListener('DOMContentLoaded', function(){
-            var t2 = document.getElementById('toggle-2fa');
-            if(t2){
-                t2.addEventListener('change', function(e){
-                    var settings = document.getElementById('2fa-settings');
-                    if(this.checked) settings.style.display = 'block'; else settings.style.display = 'none';
-                });
-                if(t2.checked){
-                    var s = document.getElementById('2fa-settings'); if(s) s.style.display = 'block';
-                }
-            }
-        });
-
-        function resetForm(id){
-            var f = document.getElementById(id);
-            if(f) f.reset();
+    // Toggle password visibility
+    function togglePassword(button) {
+        const input = button.parentElement.querySelector('input');
+        const icon = button.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
         }
+    }
 
-        function fakeSave(msg){
-            alert(msg);
-        }
+    // Reset form
+    function resetForm(id) {
+        var f = document.getElementById(id);
+        if (f) f.reset();
+    }
 
-        // Photo Preview Function
-        function previewPhoto(input, previewContainerId, uploadZoneId) {
-            const previewContainer = document.getElementById(previewContainerId);
-            const uploadZone = document.getElementById(uploadZoneId);
-            
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    const previewImage = previewContainer.querySelector('.photo-preview-image');
-                    const filenameEl = previewContainer.querySelector('.photo-preview-filename');
-                    
-                    previewImage.src = e.target.result;
-                    filenameEl.textContent = file.name;
-                    
-                    previewContainer.classList.add('active');
-                    if (uploadZone) {
-                        uploadZone.classList.add('has-preview');
-                    }
-                };
-                
-                reader.readAsDataURL(file);
-            }
-        }
-        
-        // Remove Photo Function
-        function removePhoto(inputId, previewContainerId, uploadZoneId) {
-            const previewContainer = document.getElementById(previewContainerId);
-            const uploadZone = document.getElementById(uploadZoneId);
-            
-            // Reset file input if ID provided
-            if (inputId) {
-                const fileInput = document.getElementById(inputId);
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-            }
-            
-            // Hide preview
-            if (previewContainer) {
-                previewContainer.classList.remove('active');
+    // Photo Preview Function
+    function previewPhoto(input, previewContainerId, uploadZoneId) {
+        const previewContainer = document.getElementById(previewContainerId);
+        const uploadZone = document.getElementById(uploadZoneId);
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
                 const previewImage = previewContainer.querySelector('.photo-preview-image');
-                if (previewImage) {
-                    previewImage.src = '';
+                const filenameEl = previewContainer.querySelector('.photo-preview-filename');
+                previewImage.src = e.target.result;
+                filenameEl.textContent = file.name;
+                previewContainer.classList.add('active');
+                if (uploadZone) uploadZone.classList.add('has-preview');
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Remove Photo Function
+    function removePhoto(inputId, previewContainerId, uploadZoneId) {
+        const previewContainer = document.getElementById(previewContainerId);
+        const uploadZone = document.getElementById(uploadZoneId);
+        if (inputId) {
+            const fileInput = document.getElementById(inputId);
+            if (fileInput) fileInput.value = '';
+        }
+        if (previewContainer) {
+            previewContainer.classList.remove('active');
+            const previewImage = previewContainer.querySelector('.photo-preview-image');
+            if (previewImage) previewImage.src = '';
+        }
+        if (uploadZone) uploadZone.classList.remove('has-preview');
+    }
+
+    // Handle account photo upload
+    function handleAccountPhotoUpload(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const profileWrapper = document.querySelector('.profile-avatar-wrapper');
+                const initialsSpan = document.getElementById('current-profile-initials');
+                if (initialsSpan) initialsSpan.style.display = 'none';
+                const existingImg = profileWrapper.querySelector('img');
+                if (existingImg) {
+                    existingImg.src = e.target.result;
+                } else {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = 'Profile photo';
+                    img.id = 'current-profile-photo';
+                    profileWrapper.innerHTML = '';
+                    profileWrapper.appendChild(img);
                 }
-            }
-            
-            // Remove has-preview class
-            if (uploadZone) {
-                uploadZone.classList.remove('has-preview');
-            }
+                profileWrapper.classList.add('has-photo');
+                profileWrapper.classList.remove('is-initials');
+            };
+            reader.readAsDataURL(input.files[0]);
         }
-        
-        // Handle account photo upload (shows preview in the profile avatar)
-        function handleAccountPhotoUpload(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    const profileWrapper = document.querySelector('.profile-avatar-wrapper');
-                    const existingImg = profileWrapper.querySelector('img');
-                    const initialsSpan = document.getElementById('current-profile-initials');
-                    
-                    // Remove initials if present
-                    if (initialsSpan) {
-                        initialsSpan.style.display = 'none';
-                    }
-                    
-                    if (existingImg) {
-                        existingImg.src = e.target.result;
-                    } else {
-                        // Create new image element
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        img.alt = 'Profile photo';
-                        img.id = 'current-profile-photo';
-                        profileWrapper.innerHTML = '';
-                        profileWrapper.appendChild(img);
-                    }
-                    
-                    profileWrapper.classList.add('has-photo');
-                    profileWrapper.classList.remove('is-initials');
-                };
-                
-                reader.readAsDataURL(input.files[0]);
-            }
+    }
+
+    // ========================================
+    // INITIALIZE EVERYTHING ON DOM LOAD
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // ========================================
+        // WARNING MODAL SYSTEM
+        // ========================================
+        const warningOverlay = document.getElementById('warningModal');
+        const warningTitle = document.getElementById('warningModalTitle');
+        const warningMessage = document.getElementById('warningModalMessage');
+        const warningIcon = document.getElementById('warningModalIcon');
+        const confirmBtn = document.getElementById('warningModalConfirm');
+        const modalCancelBtn = document.getElementById('warningModalCancel');
+
+        let pendingCallback = null;
+
+        function closeWarningModal() {
+            warningOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            pendingCallback = null;
         }
 
-        // Remove photo logic
-        document.addEventListener('DOMContentLoaded', function() {
-            const removeBtn = document.getElementById('remove-photo-btn');
-            const form = document.getElementById('account-form');
-            const removeFlag = document.getElementById('remove-photo-flag');
+        modalCancelBtn.addEventListener('click', closeWarningModal);
+        warningOverlay.addEventListener('click', function(e) { if (e.target === warningOverlay) closeWarningModal(); });
+        document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && warningOverlay.classList.contains('active')) closeWarningModal(); });
+        confirmBtn.addEventListener('click', function() { if (pendingCallback) pendingCallback(); closeWarningModal(); });
 
-            if (removeBtn && form && removeFlag) {
-                removeBtn.addEventListener('click', function() {
-                    if (confirm('Are you sure you want to remove your profile photo?')) {
+        window.showWarningModal = function(config) {
+            const {
+                title = 'Confirm Action',
+                message = 'Are you sure?',
+                iconType = 'warning',
+                confirmText = 'Confirm',
+                confirmClass = 'btn-danger',
+                onConfirm = null,
+                hideCancel = false
+            } = config;
+
+            warningTitle.textContent = title;
+            warningMessage.innerHTML = message;
+            warningIcon.className = 'warning-modal-icon ' + iconType;
+            const iconElement = warningIcon.querySelector('i');
+            if (iconType === 'danger') iconElement.className = 'fa-solid fa-triangle-exclamation';
+            else if (iconType === 'success') iconElement.className = 'fa-solid fa-circle-question';
+            else if (iconType === 'info') iconElement.className = 'fa-solid fa-circle-info';
+            else iconElement.className = 'fa-solid fa-triangle-exclamation';
+
+            confirmBtn.className = 'btn ' + confirmClass;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+            modalCancelBtn.style.display = hideCancel ? 'none' : 'inline-flex';
+            pendingCallback = onConfirm;
+            warningOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            confirmBtn.focus();
+        };
+
+        // ✅ Replace fakeSave with modal
+        window.fakeSave = function(msg) {
+            window.showWarningModal({
+                title: 'Settings Saved',
+                message: `<strong>${msg}</strong>`,
+                iconType: 'info',
+                confirmText: 'OK',
+                confirmClass: 'btn-info',
+                hideCancel: true
+            });
+        };
+
+        // ✅ Replace confirm() for remove photo with modal
+        const removeBtn = document.getElementById('remove-photo-btn');
+        const form = document.getElementById('account-form');
+        const removeFlag = document.getElementById('remove-photo-flag');
+
+        if (removeBtn && form && removeFlag) {
+            removeBtn.addEventListener('click', function() {
+                window.showWarningModal({
+                    title: 'Remove Profile Photo',
+                    message: 'Are you sure you want to <strong>remove</strong> your profile photo?<br><small>This will revert to the default initials avatar.</small>',
+                    iconType: 'warning',
+                    confirmText: 'Remove',
+                    confirmClass: 'btn-warning',
+                    onConfirm: function() {
                         removeFlag.value = '1';
                         form.submit();
                     }
                 });
+            });
+        }
+
+        // Toggle 2FA settings visibility
+        var t2 = document.getElementById('toggle-2fa');
+        if (t2) {
+            t2.addEventListener('change', function(e) {
+                var settings = document.getElementById('2fa-settings');
+                if (this.checked) settings.style.display = 'block';
+                else settings.style.display = 'none';
+            });
+            if (t2.checked) {
+                var s = document.getElementById('2fa-settings');
+                if (s) s.style.display = 'block';
             }
-        });
-    </script>
+        }
+    });
+</script>
+
+
 </body>
 </html>
