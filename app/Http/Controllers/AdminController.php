@@ -335,7 +335,7 @@ class AdminController extends Controller
             
             // 2. Render your email template to HTML
             // This converts your Blade view into plain HTML
-            $htmlContent = view('emails.test-email', [
+            $htmlContent = view('emails.test-alumni', [
                 'alumnus' => $alumnus
             ])->render();
             
