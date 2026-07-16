@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
+use App\Services\BrevoMailService; 
+
 use App\Mail\AlumniWelcomeMail;
 use App\Mail\TestAlumniEmail;  
 use Illuminate\Support\Facades\Mail;
@@ -328,10 +330,25 @@ class AdminController extends Controller
         }
 
         try {
-            Mail::to($alumnus->email)->send(new TestAlumniEmail($alumnus));
+            // 1. Create the service
+            $service = new BrevoMailService();
+            
+            // 2. Render your email template to HTML
+            // This converts your Blade view into plain HTML
+            $htmlContent = view('emails.test-alumni', [
+                'alumnus' => $alumnus
+            ])->render();
+            
+            // 3. Send the email using Brevo's API
+            $service->sendEmail(
+                $alumnus->email,              // Recipient
+                'Test Email from LumiNUs',    // Subject
+                $htmlContent                  // HTML content
+            );
+            
             return redirect()->back()->with('success', "Test email successfully sent to {$alumnus->email}!");
+            
         } catch (\Exception $e) {
-            // Show the real error temporarily
             return redirect()->back()->with('error', 'Mail error: ' . $e->getMessage());
         }
     }
