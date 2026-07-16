@@ -331,8 +331,8 @@ class AdminController extends Controller
             Mail::to($alumnus->email)->send(new TestAlumniEmail($alumnus));
             return redirect()->back()->with('success', "Test email successfully sent to {$alumnus->email}!");
         } catch (\Exception $e) {
-            // Log the actual error for debugging: \Log::error($e->getMessage());
-            return redirect()->back()->with('error', 'Failed to send email. Check your .env mail configuration.');
+            // Show the real error temporarily
+            return redirect()->back()->with('error', 'Mail error: ' . $e->getMessage());
         }
     }
 
