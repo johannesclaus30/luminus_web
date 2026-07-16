@@ -235,3 +235,14 @@ Route::prefix('admin')->group(function () {
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/debug-mail', function() {
+    return [
+        'mail_host' => config('mail.mailers.smtp.host'),
+        'mail_port' => config('mail.mailers.smtp.port'),
+        'mail_username' => config('mail.mailers.smtp.username'),
+        'mail_password' => substr(config('mail.mailers.smtp.password'), 0, 10) . '...',
+        'queue_connection' => config('queue.default'),
+        'mail_timeout' => config('mail.mailers.smtp.timeout'),
+    ];
+});
