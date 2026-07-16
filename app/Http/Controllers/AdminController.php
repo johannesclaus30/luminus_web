@@ -14,7 +14,9 @@ use Illuminate\Validation\Rule;
 use App\Services\BrevoMailService; 
 
 use App\Mail\AlumniWelcomeMail;
-use App\Mail\TestAlumniEmail;  
+use App\Mail\TestAlumniEmail;
+use App\Mail\AdminInvitationMail;
+use App\Mail\AdminPasswordResetMail;
 use Illuminate\Support\Facades\Mail;
 
 class AdminController extends Controller
@@ -137,11 +139,8 @@ class AdminController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created admin and send invitation email.
      */
-    /**
- * Store a newly created admin and send invitation email.
- */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -174,9 +173,19 @@ class AdminController extends Controller
             $admin->save();
         }
 
-        // Send invitation email
+        // Send invitation email using Brevo API
         try {
-            Mail::to($admin->admin_email)->send(new \App\Mail\AdminInvitationMail($admin, $temporaryPassword));
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.admin_invitation', [
+                'admin' => $admin,
+                'temporaryPassword' => $temporaryPassword
+            ])->render();
+            
+            $service->sendEmail(
+                $admin->admin_email,
+                'Welcome to LumiNUs - Your Admin Account',
+                $htmlContent
+            );
             
             return redirect()
                 ->route('admin.settings', ['section' => 'add-admin'])
@@ -209,7 +218,6 @@ class AdminController extends Controller
             'admin_email'      => ['required', 'email', 'max:255', Rule::unique('admins', 'admin_email')->ignore($admin->id)],
             'phone_number'     => ['required', 'string', 'max:50'],
             'photo'            => ['nullable', 'image', 'max:4096'],
-            // 'remove_photo'     => ['nullable', 'string'],
             'remove_photo' => ['nullable', 'string'],
         ]);
 
@@ -294,12 +302,20 @@ class AdminController extends Controller
             'card_photo' => $cardPhotoPath,
         ]);
 
-        // 📧 2. Send the Welcome Email
+        // 📧 2. Send the Welcome Email using Brevo API
         try {
-            Mail::to($alumni->email)->send(new AlumniWelcomeMail($alumni));
-        } catch (\Throwable $e) { // <--- CHANGE \Exception TO \Throwable
-            // If the email fails (e.g., SMTP timeout), log the error 
-            // but DO NOT stop the account creation process.
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.welcome-alumni', [
+                'alumnus' => $alumni
+            ])->render();
+            
+            $service->sendEmail(
+                $alumni->email,
+                'Welcome to LumiNUs Alumni Network',
+                $htmlContent
+            );
+        } catch (\Throwable $e) {
+            // If the email fails, log the error but DO NOT stop the account creation process.
             \Log::error('Failed to send welcome email to ' . $alumni->email . ': ' . $e->getMessage());
         }
 
@@ -315,7 +331,7 @@ class AdminController extends Controller
     public function show(string $id)
     {
         $alumnus = Alumni::findOrFail($id);
-        return view('directory.show', compact('alumnus')); // 👈 Changed from 'admin.alumni.show'
+        return view('directory.show', compact('alumnus'));
     }
 
     /**
@@ -334,16 +350,15 @@ class AdminController extends Controller
             $service = new BrevoMailService();
             
             // 2. Render your email template to HTML
-            // This converts your Blade view into plain HTML
             $htmlContent = view('emails.test-alumni', [
                 'alumnus' => $alumnus
             ])->render();
             
             // 3. Send the email using Brevo's API
             $service->sendEmail(
-                $alumnus->email,              // Recipient
-                'Test Email from LumiNUs',    // Subject
-                $htmlContent                  // HTML content
+                $alumnus->email,
+                'Test Email from LumiNUs',
+                $htmlContent
             );
             
             return redirect()->back()->with('success', "Test email successfully sent to {$alumnus->email}!");
@@ -532,75 +547,75 @@ class AdminController extends Controller
     }
 
     /**
- * Show the form for editing the specified alumni.
- */
-public function editAlumni(string $id)
-{
-    $alumnus = Alumni::findOrFail($id);
-    
-    return view('directory.edit', compact('alumnus'));
-}
-
-/**
- * Update the specified alumni in storage.
- */
-public function updateAlumni(Request $request, string $id)
-{
-    $alumnus = Alumni::findOrFail($id);
-
-    $validated = $request->validate([
-        'first_name' => ['required', 'string', 'max:255'],
-        'middle_name' => ['nullable', 'string', 'max:255'],
-        'last_name' => ['required', 'string', 'max:255'],
-        'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')->ignore($alumnus->id)],
-        'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')->ignore($alumnus->id)],
-        'date_of_birth' => ['nullable', 'date'],
-        'sex' => ['nullable', 'string', 'max:50'],
-        'year_graduated' => ['required', 'date'],
-        'phone_number' => ['nullable', 'string', 'max:50'],
-        'program' => ['nullable', 'string', 'max:255'],
-        'card_photo' => ['nullable', 'image', 'max:4096'],
-        'remove_photo' => ['nullable', 'boolean'],
-    ]);
-
-    // Handle photo removal
-    if ($request->has('remove_photo') && $request->input('remove_photo')) {
-        if ($alumnus->card_photo) {
-            $this->deleteAlumniPhoto($alumnus->card_photo);
-            $alumnus->card_photo = null;
-        }
-    } elseif ($request->hasFile('card_photo')) {
-        // Delete old photo if exists
-        if ($alumnus->card_photo) {
-            $this->deleteAlumniPhoto($alumnus->card_photo);
-        }
+     * Show the form for editing the specified alumni.
+     */
+    public function editAlumni(string $id)
+    {
+        $alumnus = Alumni::findOrFail($id);
         
-        // Upload new photo
-        $storedPath = $request->file('card_photo')->store('card_photo', 's3');
-        
-        if ($storedPath) {
-            $alumnus->card_photo = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
-        }
+        return view('directory.edit', compact('alumnus'));
     }
 
-    // Update alumni information
-    $alumnus->update([
-        'first_name' => $validated['first_name'],
-        'middle_name' => $validated['middle_name'] ?? null,
-        'last_name' => $validated['last_name'],
-        'student_id_number' => $validated['student_id_number'],
-        'email' => $validated['email'],
-        'date_of_birth' => $validated['date_of_birth'] ?? null,
-        'sex' => $validated['sex'] ?? null,
-        'year_graduated' => $validated['year_graduated'],
-        'phone_number' => $validated['phone_number'] ?? null,
-        'program' => $validated['program'] ?? null,
-    ]);
+    /**
+     * Update the specified alumni in storage.
+     */
+    public function updateAlumni(Request $request, string $id)
+    {
+        $alumnus = Alumni::findOrFail($id);
 
-    return redirect()
-        ->route('admin.directory')
-        ->with('status', 'Alumni information updated successfully.');
-}
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')->ignore($alumnus->id)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')->ignore($alumnus->id)],
+            'date_of_birth' => ['nullable', 'date'],
+            'sex' => ['nullable', 'string', 'max:50'],
+            'year_graduated' => ['required', 'date'],
+            'phone_number' => ['nullable', 'string', 'max:50'],
+            'program' => ['nullable', 'string', 'max:255'],
+            'card_photo' => ['nullable', 'image', 'max:4096'],
+            'remove_photo' => ['nullable', 'boolean'],
+        ]);
+
+        // Handle photo removal
+        if ($request->has('remove_photo') && $request->input('remove_photo')) {
+            if ($alumnus->card_photo) {
+                $this->deleteAlumniPhoto($alumnus->card_photo);
+                $alumnus->card_photo = null;
+            }
+        } elseif ($request->hasFile('card_photo')) {
+            // Delete old photo if exists
+            if ($alumnus->card_photo) {
+                $this->deleteAlumniPhoto($alumnus->card_photo);
+            }
+            
+            // Upload new photo
+            $storedPath = $request->file('card_photo')->store('card_photo', 's3');
+            
+            if ($storedPath) {
+                $alumnus->card_photo = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
+            }
+        }
+
+        // Update alumni information
+        $alumnus->update([
+            'first_name' => $validated['first_name'],
+            'middle_name' => $validated['middle_name'] ?? null,
+            'last_name' => $validated['last_name'],
+            'student_id_number' => $validated['student_id_number'],
+            'email' => $validated['email'],
+            'date_of_birth' => $validated['date_of_birth'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'year_graduated' => $validated['year_graduated'],
+            'phone_number' => $validated['phone_number'] ?? null,
+            'program' => $validated['program'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('admin.directory')
+            ->with('status', 'Alumni information updated successfully.');
+    }
 
     /**
      * Send message to alumni (placeholder)
@@ -634,154 +649,160 @@ public function updateAlumni(Request $request, string $id)
         }
     }
 
-    // Add these methods to your AdminController
-
-/**
- * Show the forgot password form.
- */
-public function showForgotPassword()
-{
-    return view('admin_forgot_password');
-}
-
-/**
- * Send a password reset link to the admin's email.
- */
-public function sendResetLink(Request $request)
-{
-    $request->validate([
-        'admin_email' => ['required', 'email', 'exists:admins,admin_email'],
-    ], [
-        'admin_email.exists' => 'No admin account found with this email address.',
-    ]);
-
-    $admin = Admin::where('admin_email', $request->admin_email)->first();
-
-    // Generate a unique reset token
-    $token = Str::random(64);
-    
-    // Store token in database with expiration (1 hour)
-    $admin->update([
-        'reset_token' => $token,
-        'reset_token_expires_at' => now()->addHour(),
-    ]);
-
-    // Send reset email
-    try {
-        Mail::to($admin->admin_email)->send(new \App\Mail\AdminPasswordResetMail($admin, $token));
-        
-        return back()->with('status', 'Password reset link has been sent to your email address.');
-    } catch (\Exception $e) {
-        \Log::error('Failed to send password reset email: ' . $e->getMessage());
-        
-        // Still return success to prevent email enumeration
-        return back()->with('status', 'Password reset link has been sent to your email address.');
-    }
-}
-
-/**
- * Show the reset password form.
- */
-public function showResetForm(Request $request)
-{
-    $token = $request->query('token');
-    $email = $request->query('email');
-    
-    if (!$token || !$email) {
-        return redirect()->route('admin.forgot-password')
-            ->with('error', 'Invalid password reset link.');
+    /**
+     * Show the forgot password form.
+     */
+    public function showForgotPassword()
+    {
+        return view('admin_forgot_password');
     }
 
-    // Verify token is valid
-    $admin = Admin::where('admin_email', $email)
-        ->where('reset_token', $token)
-        ->where('reset_token_expires_at', '>', now())
-        ->first();
-
-    if (!$admin) {
-        return redirect()->route('admin.forgot-password')
-            ->with('error', 'This password reset link is invalid or has expired.');
-    }
-
-    return view('admin_reset_password', compact('token', 'email'));
-}
-
-/**
- * Process the password reset.
- */
-public function resetPassword(Request $request)
-{
-    $request->validate([
-        'token' => ['required', 'string'],
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string', 'min:8', 'confirmed'],
-    ], [
-        'password.min' => 'Password must be at least 8 characters.',
-        'password.confirmed' => 'Password confirmation does not match.',
-    ]);
-
-    $admin = Admin::where('admin_email', $request->email)
-        ->where('reset_token', $request->token)
-        ->where('reset_token_expires_at', '>', now())
-        ->first();
-
-    if (!$admin) {
-        return back()->with('error', 'This password reset link is invalid or has expired.');
-    }
-
-    // Update password and clear reset token
-    $admin->update([
-        'admin_password_hash' => Hash::make($request->password),
-        'reset_token' => null,
-        'reset_token_expires_at' => null,
-    ]);
-
-    return redirect()->route('admin.login')
-        ->with('status', 'Your password has been reset successfully. Please login with your new password.');
-}
-
-
-/**
- * Update the authenticated admin's password.
- */
-public function changePassword(Request $request)
-{
-    $admin = $this->getAuthenticatedAdmin($request);
-
-    if (!$admin) {
-        abort(403);
-    }
-
-    $request->validate([
-        'current_password' => ['required', 'string'],
-        'password' => ['required', 'string', 'min:8', 'confirmed'],
-    ], [
-        'password.min' => 'New password must be at least 8 characters.',
-        'password.confirmed' => 'Password confirmation does not match.',
-    ]);
-
-    // Verify current password
-    $storedPassword = (string) ($admin->admin_password_hash ?? '');
-    $isHashedPassword = password_get_info($storedPassword)['algo'] !== 0;
-    
-    $passwordMatches = $isHashedPassword 
-        ? Hash::check($request->current_password, $storedPassword)
-        : $storedPassword === $request->current_password;
-
-    if (!$passwordMatches) {
-        throw ValidationException::withMessages([
-            'current_password' => 'The current password you entered is incorrect.',
+    /**
+     * Send a password reset link to the admin's email.
+     */
+    public function sendResetLink(Request $request)
+    {
+        $request->validate([
+            'admin_email' => ['required', 'email', 'exists:admins,admin_email'],
+        ], [
+            'admin_email.exists' => 'No admin account found with this email address.',
         ]);
+
+        $admin = Admin::where('admin_email', $request->admin_email)->first();
+
+        // Generate a unique reset token
+        $token = Str::random(64);
+        
+        // Store token in database with expiration (1 hour)
+        $admin->update([
+            'reset_token' => $token,
+            'reset_token_expires_at' => now()->addHour(),
+        ]);
+
+        // Send reset email using Brevo API
+        try {
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.admin_password_reset', [
+                'admin' => $admin,
+                'token' => $token
+            ])->render();
+            
+            $service->sendEmail(
+                $admin->admin_email,
+                'Password Reset Request - LumiNUs',
+                $htmlContent
+            );
+            
+            return back()->with('status', 'Password reset link has been sent to your email address.');
+        } catch (\Exception $e) {
+            \Log::error('Failed to send password reset email: ' . $e->getMessage());
+            
+            // Still return success to prevent email enumeration
+            return back()->with('status', 'Password reset link has been sent to your email address.');
+        }
     }
 
-    // Update password
-    $admin->update([
-        'admin_password_hash' => Hash::make($request->password),
-    ]);
+    /**
+     * Show the reset password form.
+     */
+    public function showResetForm(Request $request)
+    {
+        $token = $request->query('token');
+        $email = $request->query('email');
+        
+        if (!$token || !$email) {
+            return redirect()->route('admin.forgot-password')
+                ->with('error', 'Invalid password reset link.');
+        }
 
-    return redirect()
-        ->route('admin.settings', ['section' => 'security'])
-        ->with('status', 'Your password has been changed successfully.');
-}
+        // Verify token is valid
+        $admin = Admin::where('admin_email', $email)
+            ->where('reset_token', $token)
+            ->where('reset_token_expires_at', '>', now())
+            ->first();
 
+        if (!$admin) {
+            return redirect()->route('admin.forgot-password')
+                ->with('error', 'This password reset link is invalid or has expired.');
+        }
+
+        return view('admin_reset_password', compact('token', 'email'));
+    }
+
+    /**
+     * Process the password reset.
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'password.min' => 'Password must be at least 8 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
+        ]);
+
+        $admin = Admin::where('admin_email', $request->email)
+            ->where('reset_token', $request->token)
+            ->where('reset_token_expires_at', '>', now())
+            ->first();
+
+        if (!$admin) {
+            return back()->with('error', 'This password reset link is invalid or has expired.');
+        }
+
+        // Update password and clear reset token
+        $admin->update([
+            'admin_password_hash' => Hash::make($request->password),
+            'reset_token' => null,
+            'reset_token_expires_at' => null,
+        ]);
+
+        return redirect()->route('admin.login')
+            ->with('status', 'Your password has been reset successfully. Please login with your new password.');
+    }
+
+    /**
+     * Update the authenticated admin's password.
+     */
+    public function changePassword(Request $request)
+    {
+        $admin = $this->getAuthenticatedAdmin($request);
+
+        if (!$admin) {
+            abort(403);
+        }
+
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'password.min' => 'New password must be at least 8 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
+        ]);
+
+        // Verify current password
+        $storedPassword = (string) ($admin->admin_password_hash ?? '');
+        $isHashedPassword = password_get_info($storedPassword)['algo'] !== 0;
+        
+        $passwordMatches = $isHashedPassword 
+            ? Hash::check($request->current_password, $storedPassword)
+            : $storedPassword === $request->current_password;
+
+        if (!$passwordMatches) {
+            throw ValidationException::withMessages([
+                'current_password' => 'The current password you entered is incorrect.',
+            ]);
+        }
+
+        // Update password
+        $admin->update([
+            'admin_password_hash' => Hash::make($request->password),
+        ]);
+
+        return redirect()
+            ->route('admin.settings', ['section' => 'security'])
+            ->with('status', 'Your password has been changed successfully.');
+    }
 }
