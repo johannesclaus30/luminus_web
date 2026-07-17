@@ -250,14 +250,12 @@ private function deriveKeyMethod3($password, $salt)
             
             // Get last message with sender info
             $lastMessage = Message::where(function($query) use ($adminId, $user, $type) {
-                    // Messages sent BY admin TO this user
                     $query->where('sender_id', $adminId)
                         ->where('sender_type', 'admin')
                         ->where('receiver_id', $user->id)
                         ->where('receiver_type', $type);
                 })
                 ->orWhere(function($query) use ($adminId, $user, $type) {
-                    // Messages sent BY this user TO admin
                     $query->where('sender_id', $user->id)
                         ->where('sender_type', $type)
                         ->where('receiver_id', $adminId)
@@ -294,7 +292,7 @@ private function deriveKeyMethod3($password, $salt)
                 $program = $user->program ?? 'N/A';
                 $batch = $user->year_graduated ? date('Y', strtotime($user->year_graduated)) : 'N/A';
                 $isOnline = $user->is_online ?? false;
-                $adminRole = null; // Not an admin
+                $adminRole = null;
             }
             
             // Resolve avatar URL
@@ -314,6 +312,9 @@ private function deriveKeyMethod3($password, $salt)
             // Decrypt last message content
             $lastMessageContent = null;
             $lastMessageFromMe = false;
+            // 🔧 FIX: Return ISO 8601 string, NOT formatted time
+            $lastMessageTimestamp = null;
+            
             if ($lastMessage) {
                 $lastMessageContent = $this->decryptMessageContent(
                     $lastMessage->content, 
@@ -321,17 +322,9 @@ private function deriveKeyMethod3($password, $salt)
                     $lastMessage->receiver_type
                 );
                 $lastMessageFromMe = ($lastMessage->sender_id == $adminId && $lastMessage->sender_type === 'admin');
-            }
-            
-            // Format timestamp
-            $lastMessageTimestamp = $lastMessage ? strtotime($lastMessage->created_at) : 0;
-            $lastMessageTime = null;
-            if ($lastMessage && $lastMessage->created_at) {
-                try {
-                    $lastMessageTime = $lastMessage->created_at->diffForHumans();
-                } catch (\Exception $e) {
-                    $lastMessageTime = $lastMessage->created_at->format('M d, Y');
-                }
+                
+                // 🔧 FIX: Always return ISO 8601 string (UTC)
+                $lastMessageTimestamp = $lastMessage->created_at->toISOString();
             }
             
             return [
@@ -343,12 +336,13 @@ private function deriveKeyMethod3($password, $salt)
                 'batch' => $batch,
                 'is_online' => $isOnline,
                 'last_message' => $lastMessageContent,
-                'last_message_time' => $lastMessageTime,
-                'last_message_timestamp' => $lastMessageTimestamp,
+                // 🔧 FIX: Don't send formatted time - let JavaScript format it
+                'last_message_time' => null, // Will be formatted by JavaScript
+                'last_message_timestamp' => $lastMessageTimestamp, // ISO string for JS
                 'last_message_from_me' => $lastMessageFromMe,
                 'unread_count' => $unreadCount,
                 'avatar' => $avatar,
-                'admin_role' => $adminRole, // Add admin role to the response
+                'admin_role' => $adminRole,
             ];
         } catch (\Exception $e) {
             Log::error('Error building contact data: ' . $e->getMessage());
@@ -371,16 +365,13 @@ private function deriveKeyMethod3($password, $salt)
         }
         
         try {
-            // 🔧 FIXED: Added sender_type and receiver_type to the query
             $messages = Message::where(function($query) use ($adminId, $contactId, $type) {
-                    // Messages sent BY admin TO this contact
                     $query->where('sender_id', $adminId)
                         ->where('sender_type', 'admin')
                         ->where('receiver_id', $contactId)
                         ->where('receiver_type', $type);
                 })
                 ->orWhere(function($query) use ($adminId, $contactId, $type) {
-                    // Messages sent BY this contact TO admin
                     $query->where('sender_id', $contactId)
                         ->where('sender_type', $type)
                         ->where('receiver_id', $adminId)
@@ -404,13 +395,15 @@ private function deriveKeyMethod3($password, $salt)
                         'receiver_type' => $message->receiver_type,
                         'is_read' => $message->is_read,
                         'is_outgoing' => $message->sender_id == $adminId,
+                        // 🔧 FIX: Always return ISO 8601 string (UTC), JS will convert to local
                         'created_at' => $message->created_at ? $message->created_at->toISOString() : null,
-                        'time' => $message->created_at ? $message->created_at->format('g:i A') : '',
+                        // 🔧 FIX: Don't format time on server - let JS handle it
+                        'time' => null, // Will be formatted by JavaScript
                         'attachments' => [],
                     ];
                 });
             
-            // 🔧 FIXED: Mark messages as read with type check
+            // Mark messages as read
             Message::where('sender_id', $contactId)
                 ->where('sender_type', $type)
                 ->where('receiver_id', $adminId)
@@ -459,6 +452,7 @@ private function deriveKeyMethod3($password, $salt)
             'is_read' => false,
         ]);
         
+        // 🔧 FIX: Return the ISO 8601 UTC string, let JavaScript convert to local time
         return response()->json([
             'success' => true,
             'message' => [
@@ -469,8 +463,8 @@ private function deriveKeyMethod3($password, $salt)
                 'receiver_id' => $message->receiver_id,
                 'receiver_type' => $message->receiver_type,
                 'is_read' => false,
-                'created_at' => $message->created_at->toISOString(),
-                'time' => $message->created_at->format('g:i A'),
+                'created_at' => $message->created_at->toISOString(), // 🔧 Always UTC ISO string
+                'time' => $message->created_at->format('g:i A'), // This will be overridden by JS anyway
             ]
         ]);
     }
@@ -863,6 +857,31 @@ private function deriveKeyMethod3($password, $salt)
             Log::error('Error fetching contact info: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to fetch contact info'], 500);
         }
+    }
+
+    public function markAsRead(Request $request)
+    {
+        $request->validate([
+            'sender_id' => 'required|integer',
+            'sender_type' => 'required|string|in:alumni,admin'
+        ]);
+
+        // 🔧 FIX: Use getAdminId() instead of auth()->guard('admin')->id()
+        $adminId = $this->getAdminId();
+        
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        
+        // Mark all unread messages from this sender to this admin as read
+        Message::where('sender_id', $request->sender_id)
+            ->where('sender_type', $request->sender_type)
+            ->where('receiver_id', $adminId)
+            ->where('receiver_type', 'admin')
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        return response()->json(['success' => true]);
     }
 
     protected function resolveAdminPhotoUrl(?string $photoPath): ?string

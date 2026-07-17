@@ -742,21 +742,30 @@
                 }
             });
     }
-    
+
     // ============================================
     // MESSAGE HANDLERS
     // ============================================
     async function handleIncomingMessage(message) {
-        // 🔧 FIXED: Check both ID AND type
         if (message.receiver_id != adminId || message.receiver_type !== 'admin') return;
         
-        await loadConversations();
+        // 🔧 FIX: Ensure the created_at is treated as UTC
+        const utcTimestamp = ensureUTCTimestamp(message.created_at);
         
-        // 🔧 FIXED: Match by ID AND type
+        // Update contacts panel immediately
+        updateContactWithNewMessage(
+            message.sender_id, 
+            message.sender_type || 'alumni', 
+            message.content, 
+            utcTimestamp, // 🔧 Use the fixed UTC timestamp
+            true
+        );
+        
         if (currentChat && message.sender_id == currentChat.id && message.sender_type === currentChat.type) {
             const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
             if (existingMsg) {
                 console.log('⚠️ Duplicate message prevented:', message.id);
+                await markMessagesAsRead(currentChat.id, currentChat.type);
                 return;
             }
             
@@ -774,8 +783,8 @@
                 receiver_id: message.receiver_id,
                 receiver_type: message.receiver_type,
                 is_read: message.is_read,
-                created_at: message.created_at,
-                time: formatTime(new Date(message.created_at)),
+                created_at: utcTimestamp, // 🔧 Use the fixed UTC timestamp
+                time: formatTime(new Date(utcTimestamp)), // 🔧 Proper local time
                 attachments: []
             };
             
@@ -784,6 +793,196 @@
             await markMessagesAsRead(currentChat.id, currentChat.type);
             lastMessageId = Math.max(lastMessageId, message.id);
         }
+        
+        refreshConversationsInBackground();
+    }
+
+    function handleOutgoingMessageFromOtherSession(message) {
+        if (message.sender_id != adminId || message.sender_type !== 'admin') return;
+        
+        // 🔧 FIX: Ensure the created_at is treated as UTC
+        const utcTimestamp = ensureUTCTimestamp(message.created_at);
+        
+        updateContactWithNewMessage(
+            message.receiver_id, 
+            message.receiver_type || 'alumni', 
+            message.content, 
+            utcTimestamp, // 🔧 Use the fixed UTC timestamp
+            false
+        );
+        
+        if (currentChat && message.receiver_id == currentChat.id && message.receiver_type === currentChat.type) {
+            const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
+            if (existingMsg) {
+                console.log('⚠️ Duplicate outgoing message prevented:', message.id);
+                return;
+            }
+            
+            appendMessage({
+                id: message.id,
+                content: message.content,
+                sender_id: message.sender_id,
+                sender_type: message.sender_type,
+                receiver_id: message.receiver_id,
+                receiver_type: message.receiver_type,
+                is_read: message.is_read,
+                created_at: utcTimestamp, // 🔧 Use the fixed UTC timestamp
+                time: formatTime(new Date(utcTimestamp)), // 🔧 Proper local time
+                attachments: []
+            });
+            scrollToBottom();
+            lastMessageId = Math.max(lastMessageId, message.id);
+        }
+    }
+
+    // ============================================
+    // 🔧 NEW: Helper function to ensure UTC timestamps
+    // ============================================
+    function ensureUTCTimestamp(timestamp) {
+        if (!timestamp) return new Date().toISOString();
+        
+        // If it's already an ISO string with Z or + timezone, return as-is
+        if (typeof timestamp === 'string') {
+            // Already has timezone indicator (Z, +08:00, etc.)
+            if (timestamp.endsWith('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
+                return timestamp;
+            }
+            
+            // Missing timezone - assume UTC by appending Z
+            // Supabase sends timestamps without timezone, so we must add it
+            if (timestamp.includes('T')) {
+                // Format: "2026-07-17T08:00:00" -> "2026-07-17T08:00:00Z"
+                return timestamp + 'Z';
+            }
+            
+            // If it's just a date string, create a proper UTC ISO string
+            const date = new Date(timestamp + 'Z'); // Force UTC interpretation
+            return date.toISOString();
+        }
+        
+        // If it's already a Date object or number, convert to ISO string
+        return new Date(timestamp).toISOString();
+    }
+
+    // ============================================
+    // NEW: UPDATE CONTACT IN PANEL WITHOUT FULL RELOAD
+    // ============================================
+    function updateContactWithNewMessage(contactId, contactType, content, timestamp, isUnread = false) {
+        let contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+        
+        if (!contact) {
+            console.log('📋 New contact detected, fetching info...');
+            fetchContactInfo(contactId, contactType, content, timestamp, isUnread);
+            return;
+        }
+        
+        // 🔧 Ensure timestamp is proper UTC ISO string
+        const utcTimestamp = ensureUTCTimestamp(timestamp);
+        const messageDate = new Date(utcTimestamp);
+        
+        contact.last_message = content;
+        contact.last_message_time = formatTime(messageDate);
+        contact.last_message_timestamp = utcTimestamp; // Store the fixed UTC string
+        contact.last_message_from_me = !isUnread;
+        
+        if (isUnread && (!currentChat || currentChat.id != contactId || currentChat.type !== contactType)) {
+            contact.unread_count = (contact.unread_count || 0) + 1;
+        }
+        
+        // Move this contact to the top of the list
+        allContacts = allContacts.filter(c => !(c.id == contactId && c.type === contactType));
+        allContacts.unshift(contact);
+        
+        applyFilter();
+    }
+
+    async function fetchContactInfo(contactId, contactType, content, timestamp, isUnread = false) {
+        try {
+            const response = await fetch(`/admin/messages/${contactType}/${contactId}/info`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // 🔧 Fix UTC timestamp
+                const utcTimestamp = ensureUTCTimestamp(timestamp);
+                
+                const newContact = {
+                    id: data.id,
+                    type: data.type,
+                    full_name: data.full_name,
+                    initials: data.initials,
+                    program: data.program || '',
+                    batch: data.batch || '-',
+                    is_online: data.is_online || false,
+                    last_message: content,
+                    last_message_time: formatTime(new Date(utcTimestamp)),
+                    last_message_timestamp: utcTimestamp,
+                    last_message_from_me: !isUnread,
+                    unread_count: isUnread ? 1 : 0,
+                    avatar: data.avatar || null
+                };
+                
+                allContacts.unshift(newContact);
+                applyFilter();
+            } else {
+                // Create placeholder with fixed UTC timestamp
+                const utcTimestamp = ensureUTCTimestamp(timestamp);
+                
+                const newContact = {
+                    id: contactId,
+                    type: contactType,
+                    full_name: contactType === 'admin' ? 'Admin Staff' : 'Alumni #' + contactId,
+                    initials: contactType === 'admin' ? 'AD' : 'AU',
+                    program: '',
+                    batch: '-',
+                    is_online: false,
+                    last_message: content,
+                    last_message_time: formatTime(new Date(utcTimestamp)),
+                    last_message_timestamp: utcTimestamp,
+                    last_message_from_me: !isUnread,
+                    unread_count: isUnread ? 1 : 0,
+                    avatar: null
+                };
+                
+                allContacts.unshift(newContact);
+                applyFilter();
+            }
+        } catch (error) {
+            console.error('Error fetching contact info:', error);
+        }
+    }
+
+    // ============================================
+    // NEW: BACKGROUND REFRESH FOR ACCURATE COUNTS
+    // ============================================
+    let refreshTimeout;
+    function refreshConversationsInBackground() {
+        // Debounce background refreshes
+        clearTimeout(refreshTimeout);
+        refreshTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch('/admin/messages/conversations');
+                if (!response.ok) return;
+                
+                const freshConversations = await response.json();
+                
+                // Update unread counts without disrupting the current order
+                freshConversations.forEach(fresh => {
+                    const existing = allContacts.find(c => c.id == fresh.id && c.type === fresh.type);
+                    if (existing) {
+                        existing.unread_count = fresh.unread_count;
+                        existing.last_message = fresh.last_message;
+                        existing.last_message_time = fresh.last_message_time;
+                        existing.last_message_from_me = fresh.last_message_from_me;
+                    }
+                });
+                
+                updateUnreadBadge();
+                applyFilter();
+            } catch (error) {
+                console.error('Background refresh error:', error);
+            }
+        }, 2000); // Wait 2 seconds before refreshing to avoid too many requests
     }
     
     function handleOutgoingMessageFromOtherSession(message) {
@@ -943,7 +1142,6 @@
         }
         
         contactsList.innerHTML = contacts.map(contact => {
-            // Determine if last message was sent by admin
             const isLastMessageFromMe = contact.last_message_from_me || false;
             const lastMessagePreview = contact.last_message 
                 ? (isLastMessageFromMe 
@@ -951,7 +1149,11 @@
                     : escapeHtml(truncateText(contact.last_message, 30)))
                 : '<span class="no-message">Start a conversation</span>';
             
-            // Get the admin role or default to 'Admin'
+            // 🔧 Format the timestamp using JavaScript's local timezone
+            const displayTime = contact.last_message_timestamp 
+                ? formatTime(new Date(contact.last_message_timestamp))
+                : '';
+            
             const adminRole = contact.admin_role || 'Admin';
             
             return `
@@ -962,21 +1164,16 @@
                         : `<div class="contact-avatar">${contact.initials || '??'}</div>`
                     }
                     <div class="contact-details">
-                        <!-- Row 1: Name and Time -->
                         <div class="contact-row-1">
                             <span class="contact-name" title="${escapeHtml(contact.full_name)}">${escapeHtml(contact.full_name)}</span>
-                            <span class="contact-time">${contact.last_message_time || ''}</span>
+                            <span class="contact-time">${displayTime}</span> <!-- 🔧 Local time -->
                         </div>
-                        
-                        <!-- Row 2: Admin Role Badge or Alumni Info -->
                         <div class="contact-row-2">
                             ${contact.type === 'admin' 
                                 ? `<span class="admin-role-badge">${escapeHtml(adminRole)}</span>`
                                 : `<span class="alumni-info-text">Batch ${escapeHtml(contact.batch || 'N/A')} | ${escapeHtml(contact.program || 'N/A')}</span>`
                             }
                         </div>
-                        
-                        <!-- Row 3: Last Message Preview -->
                         <div class="contact-row-3">
                             <span class="contact-preview">${lastMessagePreview}</span>
                             ${contact.unread_count > 0 
@@ -1118,7 +1315,6 @@
         // Update contact list active state
         document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
         
-        // Find the active card - check both regular and search result cards
         const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
         if (activeCard) activeCard.classList.add('active');
         
@@ -1174,10 +1370,10 @@
         
         // Load messages
         await loadMessages(contactId, type);
+        await markMessagesAsRead(contactId, type);
         
         // Focus input
         document.getElementById('messageInput').focus();
-        // Show chat panel on mobile
         showChatOnMobile();
     }
 
@@ -1244,10 +1440,13 @@
         let lastDate = null;
         
         messages.forEach(msg => {
-            const msgDate = new Date(msg.created_at).toLocaleDateString();
-            if (msgDate !== lastDate) {
-                html += `<div class="date-divider"><span>${formatDateDivider(new Date(msg.created_at))}</span></div>`;
-                lastDate = msgDate;
+            // 🔧 Parse the UTC timestamp and convert to local
+            const msgDate = new Date(msg.created_at);
+            const localDateStr = msgDate.toLocaleDateString();
+            
+            if (localDateStr !== lastDate) {
+                html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
+                lastDate = localDateStr;
             }
             
             const isSent = msg.sender_id == adminId;
@@ -1256,7 +1455,7 @@
                     <div class="message-bubble">
                         <p>${escapeHtml(msg.content)}</p>
                         <span class="msg-time">
-                            ${msg.time}
+                            ${msg.time || formatTime(msgDate)}
                             ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
                         </span>
                     </div>
@@ -1280,12 +1479,15 @@
         
         const isSent = msg.sender_id == adminId;
         
+        // 🔧 Ensure time is formatted correctly
+        const displayTime = msg.time || formatTime(new Date(msg.created_at));
+        
         const messageHtml = `
             <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
                 <div class="message-bubble">
                     <p>${escapeHtml(msg.content)}</p>
                     <span class="msg-time">
-                        ${msg.time}
+                        ${displayTime}
                         ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
                     </span>
                 </div>
@@ -1307,6 +1509,7 @@
         input.value = '';
         input.focus();
         
+        const now = new Date(); // 🔧 Local time
         const tempId = 'temp-' + Date.now();
         const tempMessage = {
             id: tempId,
@@ -1314,8 +1517,8 @@
             sender_id: adminId,
             sender_type: 'admin',
             is_read: false,
-            created_at: new Date().toISOString(),
-            time: formatTime(new Date()),
+            created_at: now.toISOString(), // 🔧 Store as ISO string
+            time: formatTime(now), // 🔧 Format using local time
             attachments: []
         };
         
@@ -1345,17 +1548,24 @@
                 const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
                 if (tempElement) tempElement.remove();
                 
+                // 🔧 Ensure the server message has proper local time
+                if (!data.message.time) {
+                    data.message.time = formatTime(new Date(data.message.created_at));
+                }
+                
                 appendMessage(data.message);
                 scrollToBottom();
                 
                 lastMessageId = Math.max(lastMessageId, data.message.id);
                 
-                const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
-                if (contact) {
-                    contact.last_message = content;
-                    contact.last_message_time = 'Just now';
-                }
-                applyFilter();
+                // Update contact panel immediately
+                updateContactWithNewMessage(
+                    currentChat.id,
+                    currentChat.type,
+                    content,
+                    data.message.created_at,
+                    false
+                );
             }
         } catch (error) {
             console.error('Error sending message:', error);
@@ -1370,9 +1580,34 @@
     async function markMessagesAsRead(contactId, contactType = 'alumni') {
         const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
         if (contact) {
+            // Update local state immediately for instant UI feedback
             contact.unread_count = 0;
             updateUnreadBadge();
             applyFilter();
+            
+            // 🔧 Send request to backend to persist read status
+            try {
+                const response = await fetch('/admin/messages/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sender_id: contactId,
+                        sender_type: contactType
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to mark messages as read on server');
+                } else {
+                    console.log('✅ Messages marked as read on server');
+                }
+            } catch (error) {
+                console.error('Error marking messages as read:', error);
+            }
         }
     }
     
@@ -1634,6 +1869,31 @@
     }
     
     function formatTime(date) {
+        if (typeof date === 'string') {
+            date = new Date(date);
+        }
+        
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        // Show "Just now" for messages less than 1 minute old
+        if (diffMins < 1) {
+            return 'Just now';
+        }
+        
+        // Show minutes for messages less than 1 hour old
+        if (diffMins < 60) {
+            return `${diffMins}m ago`;
+        }
+        
+        // Show hours for messages less than 24 hours old
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) {
+            return `${diffHours}h ago`;
+        }
+        
+        // Otherwise show the time
         return date.toLocaleTimeString('en-US', { 
             hour: 'numeric', 
             minute: '2-digit', 
@@ -1642,13 +1902,19 @@
     }
     
     function formatDateDivider(date) {
+        // 🔧 If the date is a string from the server (UTC), convert it properly
+        if (typeof date === 'string') {
+            date = new Date(date);
+        }
+        
         const now = new Date();
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         
-        if (date.toDateString() === now.toDateString()) {
+        // 🔧 Compare using local date strings
+        if (date.toLocaleDateString() === now.toLocaleDateString()) {
             return 'Today';
-        } else if (date.toDateString() === yesterday.toDateString()) {
+        } else if (date.toLocaleDateString() === yesterday.toLocaleDateString()) {
             return 'Yesterday';
         } else {
             return date.toLocaleDateString('en-US', { 

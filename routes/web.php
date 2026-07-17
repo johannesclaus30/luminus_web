@@ -222,6 +222,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/messages/{type}/{id}', [MessageController::class, 'getMessages'])->name('messages.get');
         Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
         Route::post('/messages/decrypt', [MessageController::class, 'decryptMessage'])->name('messages.decrypt');
+        Route::post('/messages/mark-read', [MessageController::class, 'markAsRead']); // 🔧 FIXED: removed extra /admin/
 
         // Get alumni info by ID (for chat redirect and new message)
         Route::get('/messages/{type}/{id}/info', [MessageController::class, 'getContactInfo'])
