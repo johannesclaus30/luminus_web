@@ -365,15 +365,6 @@
         font-size: 1.1rem;
     }
     
-    .search-container {
-        padding: 0.5rem 0.75rem;
-    }
-    
-    .search-container input {
-        padding: 0.625rem 0.875rem 0.625rem 2.5rem;
-        font-size: 0.8125rem;
-    }
-    
     .filter-tabs {
         padding: 0.5rem 0.75rem;
         gap: 0.375rem;
@@ -508,6 +499,8 @@
         transform: scale(0.9);
     }
 }
+
+
     </style>
 </head>
 <body>
@@ -594,7 +587,10 @@
 
                     <div class="search-container">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="searchContacts" placeholder="Search alumni by name..." oninput="filterContacts()">
+                        <input type="text" id="searchContacts" placeholder="Search alumni by name..." oninput="handleSearchInput()">
+                        <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display: none;" title="Clear search">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
 
                     <div class="filter-tabs">
@@ -696,7 +692,12 @@
     let pollingInterval;
     let lastMessageId = 0;
     let isDecrypting = false;
-    let conversationsLoaded = false; // Track if conversations have loaded
+    let conversationsLoaded = false;
+    let typingChannel;
+    let presenceChannel;
+    let typingTimeout;
+    let typingIndicatorTimeout;
+    const TYPING_TIMEOUT = 3000;
     
     // ============================================
     // SUPABASE INITIALIZATION
@@ -713,6 +714,9 @@
         
         supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         
+        // ============================================
+        // REALTIME: Message changes
+        // ============================================
         supabaseRealtimeChannel = supabaseClient
             .channel('admin-messages-' + adminId)
             .on('postgres_changes', {
@@ -741,7 +745,251 @@
                     startPolling();
                 }
             });
+        
+        // ============================================
+        // BROADCAST: Typing indicators
+        // ============================================
+        typingChannel = supabaseClient.channel('typing-indicators', {
+            config: {
+                broadcast: { self: false } // Don't receive own broadcasts
+            }
+        });
+        
+        typingChannel.on('broadcast', { event: 'typing' }, (payload) => {
+            handleTypingEvent(payload.payload);
+        }).subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Typing channel connected');
+            }
+        });
+        
+        // ============================================
+        // PRESENCE: Online status tracking
+        // ============================================
+        initPresence();
+        
+        // ============================================
+        // REALTIME: Alumni online status changes
+        // ============================================
+        supabaseClient
+            .channel('alumni-presence')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'alumnis',
+            }, (payload) => {
+                handleAlumniPresenceChange(payload.new, payload.old);
+            })
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Alumni presence tracking connected');
+                }
+            });
     }
+
+    // ============================================
+    // PRESENCE: Track admin online status
+    // ============================================
+    async function initPresence() {
+        presenceChannel = supabaseClient.channel('admin-presence', {
+            config: {
+                presence: {
+                    key: `admin-${adminId}`,
+                },
+            },
+        });
+        
+        presenceChannel.on('presence', { event: 'sync' }, () => {
+            updateAdminPresenceList();
+        });
+        
+        presenceChannel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+            console.log('🟢 Admin joined:', key);
+            updateAdminPresenceList();
+        });
+        
+        presenceChannel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+            console.log('🔴 Admin left:', key);
+            updateAdminPresenceList();
+        });
+        
+        presenceChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                // Track this admin as online
+                const status = await presenceChannel.track({
+                    admin_id: adminId,
+                    online_at: new Date().toISOString(),
+                });
+                console.log('✅ Presence tracking active');
+            }
+        });
+    }
+
+    // ============================================
+    // PRESENCE: Update admin online status in UI
+    // ============================================
+    function updateAdminPresenceList() {
+        if (!presenceChannel) return;
+        
+        const state = presenceChannel.presenceState();
+        const onlineAdminIds = new Set();
+        
+        // Collect all online admin IDs
+        Object.values(state).forEach(presences => {
+            presences.forEach(presence => {
+                if (presence.admin_id) {
+                    onlineAdminIds.add(presence.admin_id);
+                }
+            });
+        });
+        
+        console.log('🟢 Online admins:', Array.from(onlineAdminIds));
+        
+        // Update contacts list
+        allContacts.forEach(contact => {
+            if (contact.type === 'admin') {
+                const wasOnline = contact.is_online;
+                contact.is_online = onlineAdminIds.has(parseInt(contact.id));
+                
+                // Only re-render if changed
+                if (wasOnline !== contact.is_online) {
+                    applyFilter();
+                }
+            }
+        });
+        
+        // Update current chat if it's an admin
+        if (currentChat && currentChat.type === 'admin') {
+            const isOnline = onlineAdminIds.has(parseInt(currentChat.id));
+            document.getElementById('chatStatus').innerHTML = `
+                <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
+                ${isOnline ? 'Online' : 'Offline'}
+            `;
+        }
+        
+        // Update unread badge
+        updateUnreadBadge();
+    }
+
+    // ============================================
+    // HANDLE: Alumni presence changes from DB
+    // ============================================
+    function handleAlumniPresenceChange(newData, oldData) {
+        // Only process if is_online changed
+        if (!oldData || newData.is_online === oldData.is_online) return;
+        
+        const alumniId = parseInt(newData.id);
+        const isOnline = newData.is_online === true || newData.is_online === 'true';
+        
+        console.log(`🔔 Alumni ${alumniId} is now ${isOnline ? 'online' : 'offline'}`);
+        
+        // Update in contacts list
+        const contact = allContacts.find(c => c.id === alumniId && c.type === 'alumni');
+        if (contact) {
+            contact.is_online = isOnline;
+            applyFilter();
+        }
+        
+        // Update current chat if this is the active alumni
+        if (currentChat && currentChat.id == alumniId && currentChat.type === 'alumni') {
+            document.getElementById('chatStatus').innerHTML = `
+                <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
+                ${isOnline ? 'Online' : 'Offline'}
+            `;
+        }
+        
+        // Update unread badge
+        updateUnreadBadge();
+    }
+
+    // ============================================
+    // TYPING: Broadcast typing event
+    // ============================================
+    function broadcastTyping() {
+        if (!currentChat || !typingChannel) return;
+        
+        typingChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: {
+                sender_id: adminId,
+                sender_type: 'admin',
+                receiver_id: currentChat.id,
+                receiver_type: currentChat.type,
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
+
+    // ============================================
+    // TYPING: Handle incoming typing event
+    // ============================================
+    function handleTypingEvent(data) {
+        // Only process typing events for the current chat
+        if (!currentChat) return;
+        
+        if (
+            data.sender_id == currentChat.id && 
+            data.sender_type === currentChat.type &&
+            data.receiver_id == adminId &&
+            data.receiver_type === 'admin'
+        ) {
+            showTypingIndicator();
+        }
+    }
+
+    // ============================================
+    // TYPING: Show typing indicator in chat header
+    // ============================================
+    function showTypingIndicator() {
+        const statusEl = document.getElementById('chatStatus');
+        
+        // Update to show typing
+        statusEl.innerHTML = `
+            <span class="typing-indicator">
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+            </span>
+            <span class="typing-text">typing...</span>
+        `;
+        
+        // Auto-hide after timeout
+        clearTimeout(typingIndicatorTimeout);
+        typingIndicatorTimeout = setTimeout(() => {
+            hideTypingIndicator();
+        }, TYPING_TIMEOUT);
+    }
+
+    // ============================================
+    // TYPING: Hide typing indicator
+    // ============================================
+    function hideTypingIndicator() {
+        if (!currentChat) return;
+        
+        const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+        const isOnline = contact ? contact.is_online : false;
+        
+        document.getElementById('chatStatus').innerHTML = `
+            <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
+            ${isOnline ? 'Online' : 'Offline'}
+        `;
+    }
+
+    // ============================================
+    // TYPING: Debounced typing broadcast
+    // ============================================
+    function onMessageInput() {
+        // Debounce typing broadcast (every 2 seconds)
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            broadcastTyping();
+        }, 500); // Send typing event after 500ms of typing
+        
+        // Also reset the typing indicator timeout for the recipient
+        // (This is handled on their end via the broadcast)
+    }
+
 
     // ============================================
     // MESSAGE HANDLERS
@@ -1187,6 +1435,39 @@
         }).join('');
     }
     
+    // Handle search input - show/hide clear button and trigger search
+    function handleSearchInput() {
+        const input = document.getElementById('searchContacts');
+        const clearBtn = document.getElementById('searchClearBtn');
+        
+        if (input.value.length > 0) {
+            clearBtn.style.display = 'flex';
+        } else {
+            clearBtn.style.display = 'none';
+        }
+        
+        applyFilter();
+    }
+
+    // Clear the search input and reset the contacts list
+    function clearSearch() {
+        const input = document.getElementById('searchContacts');
+        const clearBtn = document.getElementById('searchClearBtn');
+        
+        // Clear the input
+        input.value = '';
+        
+        // Hide the clear button
+        clearBtn.style.display = 'none';
+        
+        // Reset to show all conversations
+        applyFilter();
+        
+        // Focus back on the input for convenience
+        input.focus();
+    }
+
+    // Keep this for backward compatibility if needed
     function filterContacts() {
         applyFilter();
     }
@@ -1312,9 +1593,13 @@
         lastMessageId = 0;
         currentChat = { id: contactId, type: type };
         
+        // Hide typing indicator from previous chat
+        hideTypingIndicator();
+        clearTimeout(typingTimeout);
+        clearTimeout(typingIndicatorTimeout);
+        
         // Update contact list active state
         document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
-        
         const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
         if (activeCard) activeCard.classList.add('active');
         
@@ -1324,12 +1609,10 @@
         document.getElementById('chatMessages').style.display = 'block';
         document.getElementById('chatInput').style.display = 'flex';
         
-        // Update header - check both allContacts and search results
+        // Update header
         let contact = allContacts.find(c => c.id == contactId && c.type === type);
         
-        // If not found in allContacts, it's a new contact from search
         if (!contact) {
-            // Create a temporary contact object from the card data
             const cardElement = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
             if (cardElement) {
                 const nameEl = cardElement.querySelector('.contact-name');
@@ -1345,7 +1628,8 @@
                     program: '',
                     batch: batchEl ? batchEl.textContent.trim().replace('Batch ', '') : '-',
                     is_online: false,
-                    avatar: avatarImgEl ? avatarImgEl.src : null
+                    avatar: avatarImgEl ? avatarImgEl.src : null,
+                    admin_role: type === 'admin' ? 'Admin' : null  // Add this line
                 };
             }
         }
@@ -1361,10 +1645,26 @@
                 chatAvatar.style.color = 'var(--nu-gold)';
             }
             
-            document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? '<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">ADMIN</span>' : ''}`;
+            document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? `<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">${escapeHtml(contact.admin_role || 'Admin')}</span>` : ''}`;            
+            
+            // Check real-time presence for admin contacts
+            let isOnline = contact.is_online;
+            if (contact.type === 'admin' && presenceChannel) {
+                const state = presenceChannel.presenceState();
+                let found = false;
+                Object.values(state).forEach(presences => {
+                    presences.forEach(presence => {
+                        if (presence.admin_id == contactId) {
+                            found = true;
+                        }
+                    });
+                });
+                isOnline = found;
+            }
+            
             document.getElementById('chatStatus').innerHTML = `
-                <span class="status-dot ${contact.is_online ? 'online' : ''}"></span> 
-                ${contact.is_online ? 'Online' : 'Offline'}
+                <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
+                ${isOnline ? 'Online' : 'Offline'}
             `;
         }
         
@@ -1506,10 +1806,13 @@
         
         if (!content || !currentChat) return;
         
+        // Clear typing timeout since we're sending
+        clearTimeout(typingTimeout);
+        
         input.value = '';
         input.focus();
         
-        const now = new Date(); // 🔧 Local time
+        const now = new Date();
         const tempId = 'temp-' + Date.now();
         const tempMessage = {
             id: tempId,
@@ -1517,13 +1820,29 @@
             sender_id: adminId,
             sender_type: 'admin',
             is_read: false,
-            created_at: now.toISOString(), // 🔧 Store as ISO string
-            time: formatTime(now), // 🔧 Format using local time
+            created_at: now.toISOString(),
+            time: formatTime(now),
             attachments: []
         };
         
         appendMessage(tempMessage);
         scrollToBottom();
+        
+        // Broadcast that we're no longer typing
+        if (typingChannel) {
+            typingChannel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: {
+                    sender_id: adminId,
+                    sender_type: 'admin',
+                    receiver_id: currentChat.id,
+                    receiver_type: currentChat.type,
+                    stopped: true,
+                    timestamp: new Date().toISOString(),
+                },
+            });
+        }
         
         try {
             const response = await fetch('/admin/messages/send', {
@@ -1548,7 +1867,6 @@
                 const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
                 if (tempElement) tempElement.remove();
                 
-                // 🔧 Ensure the server message has proper local time
                 if (!data.message.time) {
                     data.message.time = formatTime(new Date(data.message.created_at));
                 }
@@ -1558,7 +1876,6 @@
                 
                 lastMessageId = Math.max(lastMessageId, data.message.id);
                 
-                // Update contact panel immediately
                 updateContactWithNewMessage(
                     currentChat.id,
                     currentChat.type,
@@ -1615,6 +1932,9 @@
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendMessage();
+        } else {
+            // User is typing - broadcast typing indicator
+            onMessageInput();
         }
     }
     
@@ -2087,13 +2407,39 @@
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', function() {
+        // Clean up typing channel
+        if (typingChannel) {
+            supabaseClient.removeChannel(typingChannel);
+        }
+        
+        // Clean up presence channel (this will automatically untrack)
+        if (presenceChannel) {
+            supabaseClient.removeChannel(presenceChannel);
+        }
+        
+        // Clean up message channel
         if (supabaseRealtimeChannel) {
             supabaseClient.removeChannel(supabaseRealtimeChannel);
         }
+        
         if (pollingInterval) {
             clearInterval(pollingInterval);
         }
     });
+
+    // ============================================
+    // HANDLE: Typing event with stopped flag
+    // ============================================
+    // Update the handleTypingEvent function to handle stopped events
+    const originalHandleTypingEvent = handleTypingEvent;
+    handleTypingEvent = function(data) {
+        if (data.stopped) {
+            hideTypingIndicator();
+            return;
+        }
+        originalHandleTypingEvent(data);
+    };
+
 </script>
 
 </body>
