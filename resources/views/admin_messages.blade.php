@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="/css/messages_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 
+    <!-- Emoji Picker -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.21.0/index.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -637,16 +639,27 @@
                     <!-- Chat Messages Area -->
                     <div class="chat-messages-area" id="chatMessages" style="display: none;"></div>
 
+                    <!-- File Preview Area -->
+                    <div class="file-preview-container" id="filePreviewContainer">
+                        <div class="file-preview-list" id="filePreviewList"></div>
+                    </div>
+
                     <!-- Chat Input Area -->
                     <div class="chat-input-container" id="chatInput" style="display: none;">
-                        <button class="btn-attach" title="Attach file">
+                        <button class="btn-attach" title="Attach file" onclick="document.getElementById('fileInput').click()">
                             <i class="fa-solid fa-paperclip"></i>
                         </button>
+                        <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" multiple onchange="handleFileSelect(event)">
                         <div class="input-wrapper">
                             <input type="text" id="messageInput" placeholder="Type a message here..." onkeypress="handleKeyPress(event)">
-                            <button class="btn-emoji" title="Add emoji">
-                                <i class="fa-regular fa-face-smile"></i>
-                            </button>
+                                <div class="emoji-picker-container">
+                                    <button class="btn-emoji" title="Add emoji" onclick="toggleEmojiPicker(event)">
+                                        <i class="fa-regular fa-face-smile"></i>
+                                    </button>
+                                    <div class="emoji-picker-popup" id="emojiPickerPopup">
+                                        <emoji-picker></emoji-picker>
+                                    </div>
+                                </div>
                         </div>
                         <button class="btn-send" title="Send message" onclick="sendMessage()">
                             <i class="fa-solid fa-paper-plane"></i>
@@ -1740,7 +1753,6 @@
         let lastDate = null;
         
         messages.forEach(msg => {
-            // 🔧 Parse the UTC timestamp and convert to local
             const msgDate = new Date(msg.created_at);
             const localDateStr = msgDate.toLocaleDateString();
             
@@ -1754,6 +1766,7 @@
                 <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
                     <div class="message-bubble">
                         <p>${escapeHtml(msg.content)}</p>
+                        ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
                         <span class="msg-time">
                             ${msg.time || formatTime(msgDate)}
                             ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
@@ -1764,6 +1777,31 @@
         });
         
         container.innerHTML = html;
+    }
+
+    function renderAttachments(attachments, isSent) {
+        return attachments.map(att => {
+            if (att.type === 'image') {
+                return `
+                    <div class="message-attachment">
+                        <img src="${att.url}" alt="${escapeHtml(att.name)}" onclick="window.open('${att.url}', '_blank')" loading="lazy">
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="message-attachment">
+                        <a href="${att.url}" class="file-download" download="${escapeHtml(att.name)}">
+                            <i class="fa-solid ${getFileIcon(att.type || 'document')}"></i>
+                            <div class="file-info">
+                                <span class="file-name">${escapeHtml(att.name)}</span>
+                                <span class="file-size">${att.size ? formatFileSize(att.size) : ''}</span>
+                            </div>
+                            <i class="fa-solid fa-download"></i>
+                        </a>
+                    </div>
+                `;
+            }
+        }).join('');
     }
     
     function appendMessage(msg) {
@@ -1778,14 +1816,13 @@
         }
         
         const isSent = msg.sender_id == adminId;
-        
-        // 🔧 Ensure time is formatted correctly
         const displayTime = msg.time || formatTime(new Date(msg.created_at));
         
         const messageHtml = `
             <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
                 <div class="message-bubble">
                     <p>${escapeHtml(msg.content)}</p>
+                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
                     <span class="msg-time">
                         ${displayTime}
                         ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
@@ -2438,6 +2475,320 @@
             return;
         }
         originalHandleTypingEvent(data);
+    };
+
+    // ============================================
+    // EMOJI PICKER
+    // ============================================
+    let emojiPickerOpen = false;
+
+    function toggleEmojiPicker(event) {
+        event.stopPropagation();
+        const popup = document.getElementById('emojiPickerPopup');
+        const picker = popup.querySelector('emoji-picker');
+        
+        if (!emojiPickerOpen) {
+            // Open picker
+            popup.classList.add('active');
+            emojiPickerOpen = true;
+            
+            // Add emoji click listener if not already added
+            if (!picker.hasEmojiListener) {
+                picker.addEventListener('emoji-click', handleEmojiSelect);
+                picker.hasEmojiListener = true;
+            }
+        } else {
+            // Close picker
+            closeEmojiPicker();
+        }
+    }
+
+    function handleEmojiSelect(event) {
+        const input = document.getElementById('messageInput');
+        const emoji = event.detail.unicode;
+        
+        // Insert emoji at cursor position
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const text = input.value;
+        
+        input.value = text.substring(0, start) + emoji + text.substring(end);
+        
+        // Move cursor after the inserted emoji
+        input.selectionStart = input.selectionEnd = start + emoji.length;
+        
+        // Focus back on input
+        input.focus();
+        
+        // Trigger typing indicator
+        onMessageInput();
+    }
+
+    function closeEmojiPicker() {
+        const popup = document.getElementById('emojiPickerPopup');
+        popup.classList.remove('active');
+        emojiPickerOpen = false;
+    }
+
+    // Close emoji picker when clicking outside
+    document.addEventListener('click', function(event) {
+        if (emojiPickerOpen) {
+            const pickerContainer = document.querySelector('.emoji-picker-container');
+            if (pickerContainer && !pickerContainer.contains(event.target)) {
+                closeEmojiPicker();
+            }
+        }
+    });
+
+    // Close emoji picker when pressing Escape
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && emojiPickerOpen) {
+            closeEmojiPicker();
+        }
+    });
+
+    // ============================================
+// FILE SHARING
+// ============================================
+let selectedFiles = [];
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const ALLOWED_TYPES = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain', 'text/csv',
+    'application/zip', 'application/x-zip-compressed'
+];
+
+function handleFileSelect(event) {
+    const files = Array.from(event.target.files);
+    
+    const validFiles = files.filter(file => {
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            alert(`File "${file.name}" is not a supported type.`);
+            return false;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            alert(`File "${file.name}" is too large. Maximum size is 50MB.`);
+            return false;
+        }
+        return true;
+    });
+    
+    if (validFiles.length === 0) {
+        event.target.value = '';
+        return;
+    }
+    
+    selectedFiles = [...selectedFiles, ...validFiles];
+    renderFilePreviews();
+    event.target.value = '';
+}
+
+function renderFilePreviews() {
+    const container = document.getElementById('filePreviewContainer');
+    const list = document.getElementById('filePreviewList');
+    
+    if (selectedFiles.length === 0) {
+        container.classList.remove('active');
+        return;
+    }
+    
+    container.classList.add('active');
+    
+    list.innerHTML = selectedFiles.map((file, index) => {
+        const isImage = file.type.startsWith('image/');
+        const icon = getFileIcon(file.type);
+        const size = formatFileSize(file.size);
+        
+        return `
+            <div class="file-preview-item">
+                ${isImage 
+                    ? `<img src="${URL.createObjectURL(file)}" alt="${escapeHtml(file.name)}">`
+                    : `<i class="fa-solid ${icon} file-icon"></i>`
+                }
+                <div>
+                    <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+                    <div class="file-size">${size}</div>
+                </div>
+                <button class="remove-file" onclick="removeFile(${index})" title="Remove file">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFilePreviews();
+}
+
+function getFileIcon(mimeType) {
+    if (!mimeType) return 'fa-file';
+    if (mimeType.startsWith('image/')) return 'fa-image';
+    if (mimeType.startsWith('video/')) return 'fa-video';
+    if (mimeType.includes('pdf')) return 'fa-file-pdf';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'fa-file-word';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'fa-file-excel';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'fa-file-powerpoint';
+    if (mimeType.includes('text') || mimeType.includes('csv')) return 'fa-file-lines';
+    if (mimeType.includes('zip') || mimeType.includes('compressed')) return 'fa-file-zipper';
+    return 'fa-file';
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function renderAttachments(attachments, isSent) {
+    if (!attachments || attachments.length === 0) return '';
+    
+    return attachments.map(att => {
+        if (att.type === 'image') {
+            return `
+                <div class="message-attachment">
+                    <img src="${att.url}" alt="${escapeHtml(att.name || 'Image')}" onclick="window.open('${att.url}', '_blank')" loading="lazy">
+                </div>
+            `;
+        } else {
+            return `
+                <div class="message-attachment">
+                    <a href="${att.url}" class="file-download" download="${escapeHtml(att.name || 'file')}">
+                        <i class="fa-solid ${getFileIcon(att.type || 'document')}"></i>
+                        <div class="file-info">
+                            <span class="file-name">${escapeHtml(att.name || 'File')}</span>
+                            <span class="file-size">${formatFileSize(att.size)}</span>
+                        </div>
+                        <i class="fa-solid fa-download"></i>
+                    </a>
+                </div>
+            `;
+        }
+    }).join('');
+}
+
+    // Override sendMessage to handle files
+    const originalSendMessageFn = sendMessage;
+    sendMessage = async function() {
+        const input = document.getElementById('messageInput');
+        const content = input.value.trim();
+        
+        // If there are files, send with attachments
+        if (selectedFiles.length > 0) {
+            if (!currentChat) return;
+            
+            input.value = '';
+            input.focus();
+            
+            const tempId = 'temp-' + Date.now();
+            const fileNames = selectedFiles.map(f => f.name).join(', ');
+            const tempContent = content || `📎 ${fileNames}`;
+            
+            const tempMessage = {
+                id: tempId,
+                content: tempContent,
+                sender_id: adminId,
+                sender_type: 'admin',
+                is_read: false,
+                created_at: new Date().toISOString(),
+                time: formatTime(new Date()),
+                attachments: selectedFiles.map(f => ({
+                    name: f.name,
+                    size: f.size,
+                    type: f.type,
+                    uploading: true
+                }))
+            };
+            
+            appendMessage(tempMessage);
+            scrollToBottom();
+            
+            // Clear typing broadcast
+            clearTimeout(typingTimeout);
+            if (typingChannel) {
+                typingChannel.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: {
+                        sender_id: adminId,
+                        sender_type: 'admin',
+                        receiver_id: currentChat.id,
+                        receiver_type: currentChat.type,
+                        stopped: true,
+                        timestamp: new Date().toISOString(),
+                    },
+                });
+            }
+            
+            const filesToUpload = [...selectedFiles];
+            selectedFiles = [];
+            renderFilePreviews();
+            
+            try {
+                const formData = new FormData();
+                formData.append('receiver_id', currentChat.id);
+                formData.append('receiver_type', currentChat.type);
+                formData.append('content', content || '');
+                filesToUpload.forEach(file => {
+                    formData.append('attachments[]', file);
+                });
+                
+                const response = await fetch('/admin/messages/send-with-attachments', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to send files');
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+                    if (tempElement) tempElement.remove();
+                    
+                    data.message.time = formatTime(new Date(data.message.created_at));
+                    appendMessage(data.message);
+                    scrollToBottom();
+                    
+                    lastMessageId = Math.max(lastMessageId, data.message.id);
+                    
+                    updateContactWithNewMessage(
+                        currentChat.id,
+                        currentChat.type,
+                        content || '📎 Attachment',
+                        data.message.created_at,
+                        false
+                    );
+                }
+            } catch (error) {
+                console.error('Error sending files:', error);
+                const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+                if (tempElement) tempElement.remove();
+                alert('Failed to send files. Please try again.');
+            }
+            return;
+        }
+        
+        // No files, use original send
+        if (!content || !currentChat) return;
+        originalSendMessageFn();
     };
 
 </script>

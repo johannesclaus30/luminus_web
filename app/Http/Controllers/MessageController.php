@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Models\Alumni;
 use App\Models\Admin;
+use App\Models\MessagesAttachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema; 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
@@ -365,6 +367,7 @@ private function deriveKeyMethod3($password, $salt)
         }
         
         try {
+            // Removed ->with('attachments') to prevent BadMethodCallException if relationship is missing
             $messages = Message::where(function($query) use ($adminId, $contactId, $type) {
                     $query->where('sender_id', $adminId)
                         ->where('sender_type', 'admin')
@@ -386,6 +389,21 @@ private function deriveKeyMethod3($password, $salt)
                         $message->receiver_type
                     );
                     
+                    $attachmentsData = [];
+                    
+                    // Safely fetch attachments directly from the database to avoid model relationship crashes
+                    $attachments = MessagesAttachment::where('message_id', $message->id)->get();
+                    
+                    foreach ($attachments as $attachment) {
+                        $attachmentsData[] = [
+                            'id' => $attachment->id,
+                            'type' => $attachment->attachment_type,
+                            'name' => pathinfo($attachment->attachment_path, PATHINFO_BASENAME),
+                            'size' => null, 
+                            'url' => $this->getSecureAttachmentUrl($attachment),
+                        ];
+                    }
+                    
                     return [
                         'id' => $message->id,
                         'content' => $decryptedContent,
@@ -395,11 +413,9 @@ private function deriveKeyMethod3($password, $salt)
                         'receiver_type' => $message->receiver_type,
                         'is_read' => $message->is_read,
                         'is_outgoing' => $message->sender_id == $adminId,
-                        // 🔧 FIX: Always return ISO 8601 string (UTC), JS will convert to local
                         'created_at' => $message->created_at ? $message->created_at->toISOString() : null,
-                        // 🔧 FIX: Don't format time on server - let JS handle it
-                        'time' => null, // Will be formatted by JavaScript
-                        'attachments' => [],
+                        'time' => null, 
+                        'attachments' => $attachmentsData,
                     ];
                 });
             
@@ -414,8 +430,14 @@ private function deriveKeyMethod3($password, $salt)
             return response()->json($messages);
             
         } catch (\Exception $e) {
+            // Detailed logging to help you debug if it still fails
             Log::error('Error loading messages: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to load messages'], 500);
+            Log::error('Trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'error' => 'Failed to load messages', 
+                'details' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -884,6 +906,114 @@ private function deriveKeyMethod3($password, $salt)
         return response()->json(['success' => true]);
     }
 
+    public function sendWithAttachments(Request $request)
+    {
+        $request->validate([
+            'receiver_id' => 'required|integer',
+            'receiver_type' => 'required|in:alumni,admin',
+            'content' => 'nullable|string|max:5000',
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:51200', // 50MB max
+        ]);
+        
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        
+        $message = Message::create([
+            'sender_id' => $adminId,
+            'receiver_id' => $request->receiver_id,
+            'sender_type' => 'admin',
+            'receiver_type' => $request->receiver_type,
+            'content' => $request->content ?? '',
+            'is_read' => false,
+        ]);
+        
+        $attachments = [];
+        
+        if ($request->hasFile('attachments')) {
+            // Generate conversation folder name (consistent for both participants)
+            $conversationId = $this->generateConversationId(
+                'admin', $adminId,
+                $request->receiver_type, $request->receiver_id
+            );
+            
+            // Sender's folder within the conversation
+            $senderFolder = 'admin_' . $adminId;
+            
+            foreach ($request->file('attachments') as $file) {
+                // 1. Generate a safe, unique filename
+                $extension = strtolower($file->getClientOriginalExtension() ?: 'bin');
+                $safeName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) ?: 'file';
+                $fileName = $safeName . '-' . Str::random(12) . '.' . $extension;
+                
+                // 2. Create the organized path: convo/{conversation_id}/{sender_type}_{sender_id}/filename
+                $directory = 'convo/' . $conversationId . '/' . $senderFolder;
+                $fullPath = $directory . '/' . $fileName;
+                
+                // 3. Upload to the PRIVATE Supabase bucket
+                Storage::disk('supabase_private_messages')->putFileAs($directory, $file, $fileName, 'private');
+                
+                // 4. Determine type
+                $mimeType = $file->getMimeType();
+                $attachmentType = str_starts_with($mimeType, 'image/') ? 'image' 
+                                : (str_starts_with($mimeType, 'video/') ? 'video' : 'document');
+                
+                // 5. Save to database (store ONLY the path)
+                $attachment = MessagesAttachment::create([
+                    'message_id' => $message->id,
+                    'attachment_type' => $attachmentType,
+                    'attachment_path' => $fullPath, 
+                ]);
+                
+                // 6. Generate signed URL for immediate frontend display
+                $signedUrl = $this->getSecureAttachmentUrl($attachment);
+                
+                $attachments[] = [
+                    'id' => $attachment->id,
+                    'type' => $attachmentType,
+                    'name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'url' => $signedUrl, 
+                ];
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => [
+                'id' => $message->id,
+                'content' => $request->content ?? '',
+                'sender_id' => $adminId,
+                'sender_type' => 'admin',
+                'receiver_id' => $message->receiver_id,
+                'receiver_type' => $message->receiver_type,
+                'is_read' => false,
+                'created_at' => $message->created_at->toISOString(),
+                'attachments' => $attachments,
+            ]
+        ]);
+    }
+
+    /**
+     * Generate a consistent conversation ID for two participants
+     * Ensures admin_1_to_admin_2 and admin_2_to_admin_1 use the same folder
+     */
+    private function generateConversationId($type1, $id1, $type2, $id2)
+    {
+        // Create sortable identifiers
+        $participant1 = $type1 . '_' . $id1;
+        $participant2 = $type2 . '_' . $id2;
+        
+        // Sort alphabetically to ensure consistency
+        $participants = [$participant1, $participant2];
+        sort($participants);
+        
+        // Return combined ID
+        return $participants[0] . '_' . $participants[1];
+    }
+
     protected function resolveAdminPhotoUrl(?string $photoPath): ?string
     {
         $photoPath = trim((string) $photoPath);
@@ -909,6 +1039,71 @@ private function deriveKeyMethod3($password, $salt)
         }
 
         return Storage::disk('supabase_admin')->url($photoPath);
+    }
+
+        /**
+     * API Endpoint for React Native Mobile App
+     * Route: GET /api/messages/attachments/{id}/url
+     */
+    public function getAttachmentUrl($attachmentId, Request $request)
+    {
+        // 1. Identify the requester (Admin via Session OR Alumni via API Token/Sanctum)
+        $adminId = $this->getAdminId();
+        $requesterId = $adminId;
+        $requesterType = 'admin';
+        
+        // If not an admin, check if it's an authenticated alumni (Assuming Laravel Sanctum)
+        if (!$requesterId && $request->user()) { 
+            $requesterId = $request->user()->id;
+            $requesterType = 'alumni';
+        }
+
+        if (!$requesterId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // 2. Fetch the attachment and its parent message
+        $attachment = MessagesAttachment::with('message')->find($attachmentId);
+        
+        if (!$attachment || !$attachment->message) {
+            return response()->json(['error' => 'Attachment not found'], 404);
+        }
+
+        $msg = $attachment->message;
+
+        // 3. SECURITY CHECK: Is the requester the sender or receiver?
+        $isAuthorized = (
+            ($msg->sender_id == $requesterId && $msg->sender_type === $requesterType) ||
+            ($msg->receiver_id == $requesterId && $msg->receiver_type === $requesterType)
+        );
+
+        if (!$isAuthorized) {
+            Log::warning("Unauthorized attachment access attempt by {$requesterType} ID: {$requesterId}");
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+
+        // 4. Generate and return the temporary signed URL
+        return response()->json([
+            'success' => true,
+            'url' => $this->getSecureAttachmentUrl($attachment),
+        ]);
+    }
+
+    /**
+     * Helper to generate a temporary signed URL (Valid for 15 minutes)
+     */
+    private function getSecureAttachmentUrl($attachment)
+    {
+        try {
+            // Laravel's S3 driver temporaryUrl works perfectly with Supabase Storage
+            return Storage::disk('supabase_private_messages')->temporaryUrl(
+                $attachment->attachment_path,
+                now()->addMinutes(15) 
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to generate signed URL: ' . $e->getMessage());
+            return null;
+        }
     }
 
 }

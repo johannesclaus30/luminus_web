@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class MessageAttachment extends Model
+class MessagesAttachment extends Model
 {
     protected $table = 'messages_attachments';
     
@@ -13,9 +13,9 @@ class MessageAttachment extends Model
         'attachment_type',
         'attachment_path',
     ];
-
+    
     public function message()
     {
-        return $this->belongsTo(Message::class, 'message_id');
+        return $this->belongsTo(Message::class);
     }
 }
