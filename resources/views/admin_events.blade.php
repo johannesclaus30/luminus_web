@@ -292,7 +292,28 @@
                                             {{ $event->images->count() }} photo(s)
                                         </span>
                                         <div class="gallery-thumbnails">
-                                            {{-- ... same gallery markup ... --}}
+                                            @if ($event->images->isNotEmpty())
+                                                @foreach ($event->images->take(3) as $image)
+                                                    <div class="gallery-thumb-wrapper">
+                                                        <img src="{{ $image->image_url }}" 
+                                                            alt="Event image" 
+                                                            class="gallery-thumb"
+                                                            onclick="openModal(this.src)"
+                                                            onerror="this.src='/assets/FINAL-NULIPA.jpg'">
+                                                    </div>
+                                                @endforeach
+                                                @if ($event->images->count() > 3)
+                                                    <div class="gallery-more" onclick="openModal('{{ $event->images->first()->image_url }}')">
+                                                        <span>+{{ $event->images->count() - 3 }}</span>
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <div class="gallery-thumb-wrapper">
+                                                    <img src="{{ asset('assets/FINAL-NULIPA.jpg') }}" 
+                                                        alt="No image" 
+                                                        class="gallery-thumb placeholder">
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 @endif
@@ -302,15 +323,34 @@
                                 <div class="event-analytics">
                                     <div class="analytics-item">
                                         <i class="fa-solid fa-users"></i>
-                                        <span>Cap: {{ $event->max_capacity }}</span>
+                                        @php
+                                            $registeredCount = $event->registrations_count;
+                                            $maxCapacity = $event->max_capacity;
+                                            $fillPercentage = $maxCapacity > 0 ? ($registeredCount / $maxCapacity) * 100 : 0;
+                                        @endphp
+                                        
+                                        @if($registeredCount >= $maxCapacity)
+                                            <span class="capacity-full-badge">Maximum Capacity Reached</span>
+                                        @elseif($fillPercentage >= 80)
+                                            <span class="capacity-warning">
+                                                <i class="fa-solid fa-circle-exclamation"></i> 
+                                                {{ $registeredCount }}/{{ $maxCapacity }} registered
+                                            </span>
+                                        @else
+                                            <span>{{ $registeredCount }}/{{ $maxCapacity }} registered</span>
+                                        @endif
                                     </div>
-                                    <div class="analytics-item">
+                                    {{-- <div class="analytics-item">
                                         <i class="fa-regular fa-calendar"></i>
                                         <span>{{ $event->start_date ? $event->start_date->format('M d') : 'TBA' }}</span>
-                                    </div>
+                                    </div> --}}
                                 </div>
 
                                 <div class="event-actions">
+                                    {{-- Manage Event Registrations Button --}}
+                                    <a href="{{ route('events.registrations', $event) }}" class="btn-action btn-manage" title="Manage Registrations">
+                                        <i class="fa-solid fa-users-gear"></i>
+                                    </a>
                                     @if ((int) $event->status === 1 || is_null($event->status))
                                         {{-- Active: Show Edit + Archive --}}
                                         <a href="{{ route('events.edit', $event) }}" class="btn-action btn-edit" title="Edit Event">

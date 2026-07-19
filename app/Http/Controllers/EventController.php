@@ -14,13 +14,12 @@ class EventController extends Controller
 {
     public function index(Request $request)
     {
-        $filter = $request->get('filter', 'all'); // all, In-Person, Online, Hybrid
+        $filter = $request->get('filter', 'all');
         
         // Get counts from the FULL database (not filtered)
         $totalEvents = Event::count();
         $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
         $archivedEvents = Event::where('status', 0)->count();
-        $totalCapacity = Event::sum('max_capacity');
         
         // Build query for active events with optional type filter
         $query = Event::where(function($query) {
@@ -32,7 +31,10 @@ class EventController extends Controller
             $query->where('event_type', $filter);
         }
         
-        $events = $query->orderBy('created_at', 'desc')->paginate(6);
+        // ADD withCount here
+        $events = $query->withCount('registrations')
+            ->orderBy('created_at', 'desc')
+            ->paginate(6);
         
         return view('admin_events', compact(
             'events',
@@ -45,16 +47,16 @@ class EventController extends Controller
 
     public function archived()
     {
-        $filter = null; // No filter on archived page
+        $filter = null;
         
         // Get counts from the FULL database (not filtered)
         $totalEvents = Event::count();
         $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
         $archivedEvents = Event::where('status', 0)->count();
-        $totalCapacity = Event::sum('max_capacity');
         
-        // Get paginated archived events for display
+        // ADD withCount here
         $events = Event::where('status', 0)
+            ->withCount('registrations')
             ->orderBy('created_at', 'desc')
             ->paginate(6);
         
@@ -231,7 +233,7 @@ class EventController extends Controller
         return redirect()->route('events.archived')->with('success', 'Event restored.');
     }
 
-        public function permanentDelete(Event $event)
+    public function permanentDelete(Event $event)
     {
         // Only allow permanent deletion of archived events
         if ((int) $event->status !== 0) {
@@ -259,6 +261,39 @@ class EventController extends Controller
         $event->delete();
 
         return redirect()->route('events.archived')->with('success', 'Event permanently deleted.');
+    }
+
+    public function registrations(Event $event)
+    {
+        // Eager load registrations with alumni data
+        $event->load(['registrations.alumni', 'images', 'venue']);
+        
+        // Get registrations with alumni details
+        $registrations = $event->registrations()
+            ->with('alumni')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+        
+        // Get registration statistics
+        $totalRegistrations = $event->registrations()->count();
+        $confirmedRegistrations = $event->registrations()
+            ->where('registration_confirmation', true)
+            ->count();
+        $pendingRegistrations = $totalRegistrations - $confirmedRegistrations;
+        
+        // Calculate fill rate
+        $fillRate = $event->max_capacity > 0 
+            ? round(($totalRegistrations / $event->max_capacity) * 100, 1) 
+            : 0;
+        
+        return view('events.registrations', compact(
+            'event',
+            'registrations',
+            'totalRegistrations',
+            'confirmedRegistrations',
+            'pendingRegistrations',
+            'fillRate'
+        ));
     }
 
     protected function syncVenue(Request $request, ?int $existingVenueId = null): ?int

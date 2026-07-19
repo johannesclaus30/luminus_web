@@ -45,4 +45,10 @@ class Event extends Model
     {
         return $this->belongsTo(Venue::class, 'venue_id');
     }
+
+    // ADD THIS: Relationship to event registrations
+    public function registrations()
+    {
+        return $this->hasMany(EventRegistration::class, 'event_id', 'id');
+    }
 }

@@ -94,6 +94,9 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/events/{event}/permanent-delete', [EventController::class, 'permanentDelete'])
         ->name('events.permanent-delete');
+
+        Route::get('/events/{event}/registrations', [EventController::class, 'registrations'])
+        ->name('events.registrations');
         
         // Perks
         Route::get('/perks', [PerksController::class, 'index'])

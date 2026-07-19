@@ -60,4 +60,24 @@ class Alumni extends Model
     {
         return $this->hasMany(Message::class, 'receiver_id')->where('receiver_type', 'alumni');
     }
+
+    // ADD THIS: Relationship to event registrations
+    public function eventRegistrations()
+    {
+        return $this->hasMany(EventRegistration::class, 'alumni_id', 'id');
+    }
+
+    // ADD THIS: Accessor for alumni photo URL
+    public function getAlumniPhotoUrlAttribute()
+    {
+        if ($this->alumni_photo) {
+            // If it's already a full URL, return as is
+            if (filter_var($this->alumni_photo, FILTER_VALIDATE_URL)) {
+                return $this->alumni_photo;
+            }
+            // Otherwise, assume it's stored in storage
+            return asset('storage/' . $this->alumni_photo);
+        }
+        return null;
+    }
 }
