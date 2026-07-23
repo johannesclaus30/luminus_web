@@ -63,6 +63,13 @@ class AdminController extends Controller
             ]);
         }
 
+        // Check if account is restricted
+        if (($admin->account_status ?? 1) == 0) {
+            throw ValidationException::withMessages([
+                'admin_email' => 'Your account has been restricted. Please contact the administrator.',
+            ]);
+        }
+
         $request->session()->regenerate();
         $request->session()->put([
             'admin_id' => $admin->id,
@@ -436,8 +443,8 @@ class AdminController extends Controller
     {
         $adminId = $request->session()->get('admin_id');
 
-        if ($adminId) {
-            $admin = Admin::query()->where('id', $adminId)->first();
+        if ($adminId && is_numeric($adminId)) {
+            $admin = Admin::query()->where('id', (int) $adminId)->first();
 
             if ($admin) {
                 return $admin;
@@ -446,7 +453,7 @@ class AdminController extends Controller
 
         $adminEmail = $request->session()->get('admin_email');
 
-        if ($adminEmail) {
+        if ($adminEmail && is_string($adminEmail) && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
             return Admin::query()->where('admin_email', $adminEmail)->first();
         }
 
@@ -805,4 +812,82 @@ class AdminController extends Controller
             ->route('admin.settings', ['section' => 'security'])
             ->with('status', 'Your password has been changed successfully.');
     }
+
+    /**
+     * Reset an admin's password and return the temporary password.
+     */
+    public function resetAdminPassword(Request $request, $id)
+    {
+        $admin = Admin::findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+        // Prevent resetting your own password this way — use the Security tab instead
+        if ($currentAdmin && $currentAdmin->id == $admin->id) {
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('status', 'To change your own password, use the Security tab.');
+        }
+
+        $temporaryPassword = Str::random(12);
+        $admin->update([
+            'admin_password_hash' => Hash::make($temporaryPassword),
+        ]);
+
+        return redirect()
+            ->route('admin.settings', ['section' => 'roles'])
+            ->with('status', 'Password for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been reset.')
+            ->with('temporary_password', $temporaryPassword);
+    }
+
+    /**
+     * Toggle an admin's account restriction status.
+     */
+    public function toggleRestrictAdmin(Request $request, $id)
+    {
+        $admin = Admin::findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+        // Prevent restricting yourself
+        if ($currentAdmin && $currentAdmin->id == $admin->id) {
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('status', 'You cannot restrict your own account.');
+        }
+
+        $newStatus = $admin->account_status == 1 ? 0 : 1;
+        $admin->update(['account_status' => $newStatus]);
+
+        $action = $newStatus == 0 ? 'restricted' : 'unrestricted';
+        return redirect()
+            ->route('admin.settings', ['section' => 'roles'])
+            ->with('status', 'Account for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been ' . $action . '.');
+    }
+
+    /**
+     * Delete an admin account.
+     */
+    public function deleteAdmin(Request $request, $id)
+    {
+        $admin = Admin::findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+        // Prevent deleting yourself
+        if ($currentAdmin && $currentAdmin->id == $admin->id) {
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('status', 'You cannot delete your own account.');
+        }
+
+        // Delete photo if exists
+        $this->deleteAdminPhoto($admin->photo);
+
+        $adminName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
+        $admin->delete();
+
+        return redirect()
+            ->route('admin.settings', ['section' => 'roles'])
+            ->with('status', 'Admin account for ' . $adminName . ' has been deleted.');
+    }
+
+
 }

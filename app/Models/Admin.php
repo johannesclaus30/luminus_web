@@ -20,8 +20,9 @@ class Admin extends Model
         'admin_role',
         'phone_number',
         'photo',
-        'reset_token',              // ✅ ADD THIS
-        'reset_token_expires_at',   // ✅ ADD THIS
+        'reset_token',             
+        'reset_token_expires_at',   
+        'account_status',    
     ];
 
     protected $hidden = [

@@ -29,6 +29,16 @@ Route::prefix('admin')->group(function () {
 
     // 🔹 Protected Admin Routes
     Route::middleware('admin.auth')->group(function () {
+
+        // Admin Management (Reset Password, Restrict, Delete)
+        Route::post('/settings/admin/{id}/reset-password', [AdminController::class, 'resetAdminPassword'])
+            ->name('admin.settings.reset-password');
+
+        Route::patch('/settings/admin/{id}/toggle-restrict', [AdminController::class, 'toggleRestrictAdmin'])
+            ->name('admin.settings.toggle-restrict');
+
+        Route::delete('/settings/admin/{id}', [AdminController::class, 'deleteAdmin'])
+            ->name('admin.settings.delete-admin');
         
         // ✅ Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])

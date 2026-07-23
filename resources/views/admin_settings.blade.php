@@ -14,6 +14,8 @@
     <!-- Stylesheets -->
     <link rel="stylesheet" href="/css/settings_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <style>
         /* Photo Preview Styles */
@@ -23,67 +25,51 @@
             text-align: center;
             animation: fadeIn 0.3s ease-out;
         }
-        
-        .photo-preview-container.active {
-            display: block;
-        }
-        
-        .photo-preview-wrapper {
-            position: relative;
-            display: inline-block;
-        }
-        
+        .photo-preview-container.active { display: block; }
+        .photo-preview-wrapper { position: relative; display: inline-block; }
         .photo-preview-image {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid var(--white);
+            width: 150px; height: 150px; border-radius: 50%;
+            object-fit: cover; border: 4px solid var(--white);
             box-shadow: var(--shadow-md);
         }
-        
         .photo-preview-remove {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--danger);
-            color: var(--white);
-            border: 2px solid var(--white);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            transition: all var(--transition-bounce);
+            position: absolute; top: -5px; right: -5px;
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--danger); color: var(--white);
+            border: 2px solid var(--white); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.875rem; transition: all var(--transition-bounce);
             box-shadow: var(--shadow);
         }
-        
-        .photo-preview-remove:hover {
-            background: #dc2626;
-            transform: scale(1.1);
-        }
-        
+        .photo-preview-remove:hover { background: #dc2626; transform: scale(1.1); }
         .photo-preview-filename {
-            margin-top: 0.75rem;
-            font-size: 0.8125rem;
-            color: var(--gray-500);
-            font-weight: 500;
+            margin-top: 0.75rem; font-size: 0.8125rem;
+            color: var(--gray-500); font-weight: 500;
         }
-        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
-        /* Upload zone transition */
         .upload-zone.has-preview {
-            border-style: solid;
-            border-color: var(--success);
+            border-style: solid; border-color: var(--success);
             background: var(--success-light);
         }
+        
+        /* Section description text */
+        .section-desc {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        /* Status indicator dot */
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; margin-right: 0.5rem;
+        }
+        .status-dot.active { background: var(--success); }
+        .status-dot.restricted { background: var(--danger); }
     </style>
 </head>
 <body>
@@ -108,105 +94,83 @@
             <nav class="sidebar-nav">
                 <p class="nav-section-title">Admin Menu</p>
                 <a href="/admin/dashboard" class="nav-item">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>Dashboard</span>
+                    <i class="fa-solid fa-chart-line"></i><span>Dashboard</span>
                 </a>
                 <a href="/admin/directory" class="nav-item">
-                    <i class="fa-solid fa-users"></i>
-                    <span>Alumni Directory</span>
+                    <i class="fa-solid fa-users"></i><span>Alumni Directory</span>
                 </a>
                 <a href="{{ route('announcements.index') }}" class="nav-item">
-                    <i class="fa-solid fa-bullhorn"></i>
-                    <span>Announcements</span>
+                    <i class="fa-solid fa-bullhorn"></i><span>Announcements</span>
                 </a>
                 <a href="{{ route('events.index') }}" class="nav-item">
-                    <i class="fa-solid fa-calendar-check"></i>
-                    <span>Events</span>
+                    <i class="fa-solid fa-calendar-check"></i><span>Events</span>
                 </a>
                 <a href="{{ route('perks.index') }}" class="nav-item">
-                    <i class="fa-solid fa-gift"></i>
-                    <span>Perks & Discounts</span>
+                    <i class="fa-solid fa-gift"></i><span>Perks & Discounts</span>
                 </a>
                 <a href="/admin/alumni_tracer" class="nav-item">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <span>Alumni Tracer</span>
+                    <i class="fa-solid fa-location-dot"></i><span>Alumni Tracer</span>
                 </a>
                 <a href="/admin/messages" class="nav-item">
-                    <i class="fa-solid fa-envelope"></i>
-                    <span>Messages</span>
+                    <i class="fa-solid fa-envelope"></i><span>Messages</span>
                 </a>
                 <a href="{{ route('admin.settings') }}" class="nav-item active">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Settings</span>
+                    <i class="fa-solid fa-gear"></i><span>Settings</span>
                 </a>
             </nav>
-            
-            {{-- <div class="sidebar-footer">
-                <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Sign Out</span>
-                </a>
-            </div> --}}
         </aside>
 
         <!-- Main Content -->
         <main class="admin-main">
 
-                    <!-- Mobile Menu Toggle -->
-                    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
-                        <i class="fa-solid fa-bars"></i>
-                    </button>
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+                <i class="fa-solid fa-bars"></i>
+            </button>
 
-                    @php
-                        $section = request()->query('section', 'account');
+            @php
+                $section = request()->query('section', 'account');
+                $sectionMeta = [
+                    'account' => [
+                        'icon' => 'fa-user',
+                        'title' => 'Account Information',
+                        'description' => 'Manage your personal profile details and photo.',
+                    ],
+                    'security' => [
+                        'icon' => 'fa-shield-halved',
+                        'title' => 'Security',
+                        'description' => 'Protect your account with a strong password and two-factor authentication.',
+                    ],
+                    'roles' => [
+                        'icon' => 'fa-user-tag',
+                        'title' => 'Admin Roles & Permissions',
+                        'description' => 'Manage administrator accounts, roles, and access levels.',
+                    ],
+                    'add-admin' => [
+                        'icon' => 'fa-user-plus',
+                        'title' => 'Add New Admin',
+                        'description' => 'Invite a new administrator and assign their role.',
+                    ],
+                    'notifications' => [
+                        'icon' => 'fa-bell',
+                        'title' => 'Notification Preferences',
+                        'description' => 'Configure how you receive alerts and updates.',
+                    ],
+                    'download' => [
+                        'icon' => 'fa-download',
+                        'title' => 'Download Data',
+                        'description' => 'Export system records for reporting and archiving.',
+                    ],
+                ];
+                $activeMeta = $sectionMeta[$section] ?? $sectionMeta['account'];
+            @endphp
 
-                        $sectionMeta = [
-                            'account' => [
-                                'eyebrow' => 'Admin account',
-                                'title' => 'Account Information',
-                                'description' => 'Update the profile details shown across the admin workspace.',
-                                'status' => 'Profile ready',
-                            ],
-                            'security' => [
-                                'eyebrow' => 'Admin account',
-                                'title' => 'Security',
-                                'description' => 'Protect the dashboard with stronger credentials and multi-factor access.',
-                                'status' => 'Security controls',
-                            ],
-                            'roles' => [
-                                'eyebrow' => 'Admin control',
-                                'title' => 'Admin Roles',
-                                'description' => 'Review the people who can manage content, users, and system settings.',
-                                'status' => '2 active roles',
-                            ],
-                            'add-admin' => [
-                                'eyebrow' => 'Admin control',
-                                'title' => 'Add New Admin',
-                                'description' => 'Invite a new administrator and assign the appropriate access level.',
-                                'status' => 'Invitation flow',
-                            ],
-                            'notifications' => [
-                                'eyebrow' => 'System settings',
-                                'title' => 'Notification Settings',
-                                'description' => 'Choose how the team receives updates about platform activity.',
-                                'status' => 'Delivery preferences',
-                            ],
-                            'download' => [
-                                'eyebrow' => 'System settings',
-                                'title' => 'Download Data',
-                                'description' => 'Export records for reporting, archiving, or offline review.',
-                                'status' => 'Export tools',
-                            ],
-                        ];
-
-                        $activeMeta = $sectionMeta[$section] ?? $sectionMeta['account'];
-                    @endphp
-
-        <header class="page-header">
+            <!-- Page Header -->
+            <header class="page-header">
                 <div class="header-content">
                     <div class="header-title-section">
                         <h1 class="page-title">
-                            <i class="fa-solid fa-gear"></i>
+                            <i class="fa-solid {{ $activeMeta['icon'] }}"></i>
                             {{ $activeMeta['title'] }}
                         </h1>
                         <p class="page-subtitle">{{ $activeMeta['description'] }}</p>
@@ -214,6 +178,7 @@
                 </div>
             </header>
 
+            <!-- Alerts -->
             @if (session('status'))
                 <div class="settings-alert settings-alert-success">
                     <i class="fa-solid fa-circle-check"></i>
@@ -236,20 +201,21 @@
                 </div>
             @endif
 
+            <!-- Settings Layout -->
             <div class="settings-layout">
-                <!-- Settings Sub-Navigation -->
+                <!-- Sub-Navigation -->
                 <aside class="settings-sidebar">
                     <div class="settings-nav-group">
-                        <p class="nav-section-title">Admin Account</p>
+                        <p class="nav-section-title">Personal</p>
                         <a href="?section=account" class="settings-nav-item {{ $section == 'account' ? 'active' : '' }}">
-                            <i class="fa-solid fa-user"></i> Account Information
+                            <i class="fa-solid fa-user"></i> Account
                         </a>
                         <a href="?section=security" class="settings-nav-item {{ $section == 'security' ? 'active' : '' }}">
                             <i class="fa-solid fa-shield-halved"></i> Security
                         </a>
                     </div>
                     <div class="settings-nav-group">
-                        <p class="nav-section-title">Admin Control</p>
+                        <p class="nav-section-title">Administration</p>
                         <a href="?section=roles" class="settings-nav-item {{ $section == 'roles' ? 'active' : '' }}">
                             <i class="fa-solid fa-user-tag"></i> Admin Roles
                         </a>
@@ -258,7 +224,7 @@
                         </a>
                     </div>
                     <div class="settings-nav-group">
-                        <p class="nav-section-title">System Settings</p>
+                        <p class="nav-section-title">System</p>
                         <a href="?section=notifications" class="settings-nav-item {{ $section == 'notifications' ? 'active' : '' }}">
                             <i class="fa-solid fa-bell"></i> Notifications
                         </a>
@@ -268,407 +234,414 @@
                     </div>
                 </aside>
 
-                <!-- Settings Content -->
+                <!-- Content Area -->
                 <div class="settings-content">
-                    @switch($section)
-                        @case('security')
-                            <div class="form-card">
-                                <div class="form-card-header">
-                                    <div>
-                                        <h3>Change Password</h3>
-                                        <p>Keep the admin account protected with a strong, unique password.</p>
-                                    </div>
-                                </div>
-                                <form id="change-password-form" class="settings-form-grid" method="POST" action="{{ route('admin.password.update') }}">
-                                    @csrf
-                                    @method('PUT')
-                                    
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Current Password</label>
-                                        <div class="password-input-wrapper">
-                                            <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
-                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">New Password</label>
-                                        <div class="password-input-wrapper">
-                                            <input type="password" name="password" class="form-control" placeholder="Enter new password" required minlength="8">
-                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Confirm New Password</label>
-                                        <div class="password-input-wrapper">
-                                            <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat new password" required minlength="8">
-                                            <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
-                                                <i class="fa-solid fa-eye"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="forgot-password-row full-width">
-                                        <a href="{{ route('admin.forgot-password') }}" class="forgot-password-link">
-                                            <i class="fa-solid fa-key"></i> Forgot your password?
-                                        </a>
-                                    </div>
-                                    
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="resetForm('change-password-form')">Reset</button>
-                                        <button type="submit" class="btn btn-primary">Change Password</button>
-                                    </div>
-                                </form>
-                            </div>
+                    
+                    {{-- ============ ACCOUNT SECTION ============ --}}
+                    @if($section == 'account')
+                        @php
+                            $firstName = trim($currentAdmin->admin_first_name ?? '');
+                            $lastName = trim($currentAdmin->admin_last_name ?? '');
+                            $initials = '';
+                            if ($firstName !== '') $initials .= strtoupper(mb_substr($firstName, 0, 1));
+                            if ($lastName !== '') $initials .= strtoupper(mb_substr($lastName, 0, 1));
+                            if ($initials === '') $initials = 'AD';
+                        @endphp
 
-                            <div class="form-card">
-                                <div class="form-card-header">
-                                    <div>
-                                        <h3>Two-Factor Authentication</h3>
-                                        <p>Add a second layer of login verification for sensitive admin work.</p>
-                                    </div>
-                                    <span class="status-badge status-badge-warning">Recommended</span>
+                        <!-- Profile Card -->
+                        <div class="form-card settings-profile-card">
+                            <div class="profile-pic-section">
+                                <div class="profile-avatar-wrapper {{ $currentAdminPhotoUrl ? 'has-photo' : 'is-initials' }}">
+                                    @if ($currentAdminPhotoUrl)
+                                        <img src="{{ $currentAdminPhotoUrl }}" alt="Profile photo" id="current-profile-photo">
+                                    @else
+                                        <span class="profile-initials" id="current-profile-initials">{{ $initials }}</span>
+                                    @endif
                                 </div>
-                                <div class="settings-toggle-row">
+                                <div class="profile-pic-copy">
+                                    <h3>{{ trim($currentAdmin->admin_first_name . ' ' . $currentAdmin->admin_last_name) ?: 'Administrator' }}</h3>
+                                    <p class="text-muted">{{ $currentAdmin->admin_email ?? '' }}</p>
+                                    <div class="profile-action-row">
+                                        <label class="btn btn-primary upload-btn" for="account-photo-input">
+                                            <i class="fa-solid fa-camera"></i> Change Photo
+                                        </label>
+                                        <button type="button" id="remove-photo-btn" class="btn btn-secondary remove-btn">
+                                            <i class="fa-solid fa-trash-can"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Personal Details Form -->
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <h3>Personal Details</h3>
+                            </div>
+                            <form id="account-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="remove_photo" id="remove-photo-flag" value="">
+                                <input id="account-photo-input" type="file" name="photo" accept="image/*" style="display: none;" onchange="handleAccountPhotoUpload(this)">
+
+                                <div class="form-group">
+                                    <label class="form-label">First Name</label>
+                                    <input type="text" name="admin_first_name" class="form-control" value="{{ old('admin_first_name', $currentAdmin->admin_first_name ?? '') }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Middle Name</label>
+                                    <input type="text" name="admin_middle_name" class="form-control" value="{{ old('admin_middle_name', $currentAdmin->admin_middle_name ?? '') }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Last Name</label>
+                                    <input type="text" name="admin_last_name" class="form-control" value="{{ old('admin_last_name', $currentAdmin->admin_last_name ?? '') }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Mobile Number</label>
+                                    <input type="text" name="phone_number" class="form-control" value="{{ old('phone_number', $currentAdmin->phone_number ?? '') }}">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" name="admin_email" class="form-control" value="{{ old('admin_email', $currentAdmin->admin_email ?? '') }}">
+                                </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-secondary" onclick="resetForm('account-form')">Discard Changes</button>
+                                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                                </div>
+                            </form>
+                        </div>
+
+                    {{-- ============ SECURITY SECTION ============ --}}
+                    @elseif($section == 'security')
+                        <!-- Change Password -->
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <h3>Change Password</h3>
+                                <span class="status-badge status-badge-info">Required</span>
+                            </div>
+                            <form id="change-password-form" class="settings-form-grid" method="POST" action="{{ route('admin.password.update') }}">
+                                @csrf
+                                @method('PUT')
+                                <div class="form-group full-width">
+                                    <label class="form-label">Current Password</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" name="current_password" class="form-control" placeholder="Enter current password" required>
+                                        <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">New Password</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" name="password" class="form-control" placeholder="Min. 8 characters" required minlength="8">
+                                        <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Confirm Password</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat new password" required minlength="8">
+                                        <button type="button" class="password-toggle" onclick="togglePassword(this)" tabindex="-1">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="forgot-password-row full-width">
+                                    <a href="{{ route('admin.forgot-password') }}" class="forgot-password-link">
+                                        <i class="fa-solid fa-key"></i> Forgot your password?
+                                    </a>
+                                </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-secondary" onclick="resetForm('change-password-form')">Reset</button>
+                                    <button type="submit" class="btn btn-primary">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Two-Factor Authentication -->
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <h3>Two-Factor Authentication</h3>
+                                <span class="status-badge status-badge-warning">Recommended</span>
+                            </div>
+                            <p class="section-desc">Add an extra layer of security by requiring a verification code when signing in.</p>
+                            <div class="settings-toggle-row">
+                                <div>
+                                    <strong>Enable 2FA</strong>
+                                    <p>Require a verification code when signing in.</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-2fa">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            <div id="2fa-settings" class="settings-reveal-panel" style="display:none;">
+                                <div class="form-group full-width">
+                                    <label class="form-label">Authentication Method</label>
+                                    <select class="form-control">
+                                        <option>Authenticator App</option>
+                                        <option>Email</option>
+                                    </select>
+                                </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-secondary" onclick="fakeSave('2FA disabled')">Disable</button>
+                                    <button type="button" class="btn btn-primary" onclick="fakeSave('2FA enabled')">Enable</button>
+                                </div>
+                            </div>
+                        </div>
+
+                    {{-- ============ ADMIN ROLES SECTION ============ --}}
+                    @elseif($section == 'roles')
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <div>
+                                    <h3>Admin Accounts</h3>
+                                    <p class="section-desc" style="margin-bottom:0;">Manage administrator access and permissions.</p>
+                                </div>
+                                <a href="?section=add-admin" class="btn btn-primary">
+                                    <i class="fa-solid fa-plus"></i> Add Admin
+                                </a>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="settings-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Admin</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($admins as $admin)
+                                            @php
+                                                $firstName = $admin->admin_first_name ?? '';
+                                                $middleName = $admin->admin_middle_name ?? '';
+                                                $lastName = $admin->admin_last_name ?? '';
+                                                $email = $admin->admin_email ?? '';
+                                                $roleValue = $admin->admin_role ?? '';
+                                                $displayName = trim($firstName . ' ' . ($middleName ? $middleName . ' ' : '') . $lastName);
+                                                $accountStatus = $admin->account_status ?? 1;
+                                                
+                                                $roleLabels = [
+                                                    'Executive Director' => 'Executive Director',
+                                                    'Academic Director' => 'Academic Director',
+                                                    'Coordinator' => 'Coordinator',
+                                                    'Assistant Coordinator' => 'Assistant Coordinator',
+                                                ];
+                                                $roleLabel = $roleLabels[$roleValue] ?? ($roleValue ?: 'Unassigned');
+                                                
+                                                $roleChipClass = match($roleValue) {
+                                                    'Executive Director' => 'role-chip-primary',
+                                                    'Academic Director' => 'role-chip-secondary',
+                                                    'Coordinator' => 'role-chip-success',
+                                                    'Assistant Coordinator' => 'role-chip-muted',
+                                                    default => '',
+                                                };
+                                            @endphp
+                                            <tr class="{{ $accountStatus == 0 ? 'restricted-row' : '' }}">
+                                                <td>
+                                                    <div class="table-admin-info">
+                                                        <div class="table-admin-avatar">
+                                                            {{ strtoupper(mb_substr($firstName, 0, 1) . mb_substr($lastName, 0, 1)) }}
+                                                        </div>
+                                                        <span class="table-admin-name">{{ $displayName ?: 'Unnamed Admin' }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>{{ $email ?: '—' }}</td>
+                                                <td>
+                                                    <span class="role-chip {{ $roleChipClass }}">{{ $roleLabel }}</span>
+                                                </td>
+                                                <td>
+                                                    @if($accountStatus == 1)
+                                                        <span class="status-badge status-badge-success">Active</span>
+                                                    @else
+                                                        <span class="status-badge status-badge-danger">Restricted</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <div class="table-actions-group">
+                                                        <button type="button" class="btn-action btn-manage" title="Manage" 
+                                                            onclick="openManageModal(
+                                                                '{{ $admin->id }}',
+                                                                '{{ $displayName }}',
+                                                                '{{ $roleLabel }}',
+                                                                {{ $accountStatus }}
+                                                            )">
+                                                            <i class="fa-solid fa-ellipsis"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="empty-table-cell">
+                                                    <i class="fa-solid fa-user-slash" style="font-size:2rem; display:block; margin-bottom:0.5rem; color: var(--gray-300);"></i>
+                                                    No admin accounts found.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    {{-- ============ ADD ADMIN SECTION ============ --}}
+                    @elseif($section == 'add-admin')
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <div>
+                                    <h3>Invite New Admin</h3>
+                                    <p class="section-desc" style="margin-bottom:0;">Fill in the details below to create a new administrator account.</p>
+                                </div>
+                            </div>
+                            <form id="add-admin-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.store') }}" enctype="multipart/form-data">
+                                @csrf
+                                <div class="form-group">
+                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="admin_first_name" class="form-control" value="{{ old('admin_first_name') }}" placeholder="e.g. Juan" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Middle Name</label>
+                                    <input type="text" name="admin_middle_name" class="form-control" value="{{ old('admin_middle_name') }}" placeholder="e.g. Santos">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="admin_last_name" class="form-control" value="{{ old('admin_last_name') }}" placeholder="e.g. Dela Cruz" required>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                                    <input type="email" name="admin_email" class="form-control" value="{{ old('admin_email') }}" placeholder="admin@example.com" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" name="phone_number" class="form-control" value="{{ old('phone_number') }}" placeholder="09xx xxx xxxx">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Role <span class="text-danger">*</span></label>
+                                    <select name="admin_role" class="form-control" required>
+                                        <option value="">— Select Role —</option>
+                                        <option value="Executive Director" @selected(old('admin_role') === 'Executive Director')>Executive Director</option>
+                                        <option value="Academic Director" @selected(old('admin_role') === 'Academic Director')>Academic Director</option>
+                                        <option value="Coordinator" @selected(old('admin_role') === 'Coordinator')>Coordinator</option>
+                                        <option value="Assistant Coordinator" @selected(old('admin_role') === 'Assistant Coordinator')>Assistant Coordinator</option>
+                                    </select>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label class="form-label">Profile Photo</label>
+                                    <div class="upload-zone" id="add-admin-upload-zone">
+                                        <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                                        <p class="upload-title">Click to upload</p>
+                                        <p class="upload-desc">JPG, PNG, or WEBP (max 2MB)</p>
+                                        <input type="file" name="photo" accept="image/*" class="settings-file-input" onchange="previewPhoto(this, 'add-admin-photo-preview', 'add-admin-upload-zone')">
+                                    </div>
+                                    <div class="photo-preview-container" id="add-admin-photo-preview">
+                                        <div class="photo-preview-wrapper">
+                                            <img class="photo-preview-image" src="" alt="Photo preview">
+                                            <button type="button" class="photo-preview-remove" onclick="removePhoto(null, 'add-admin-photo-preview', 'add-admin-upload-zone')" title="Remove photo">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <p class="photo-preview-filename"></p>
+                                    </div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <div class="rule-alert">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                        <div>
+                                            <strong>Password</strong>
+                                            <p>A secure temporary password will be generated automatically and sent via email.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-secondary" onclick="resetForm('add-admin-form'); removePhoto(null, 'add-admin-photo-preview', 'add-admin-upload-zone')">Clear Form</button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fa-solid fa-paper-plane"></i> Send Invitation
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                    {{-- ============ NOTIFICATIONS SECTION ============ --}}
+                    @elseif($section == 'notifications')
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <h3>Notification Channels</h3>
+                            </div>
+                            <p class="section-desc">Choose which channels to receive alerts and updates through.</p>
+                            <form id="notifications-form" class="settings-form-grid">
+                                <div class="form-group full-width settings-option-row">
                                     <div>
-                                        <strong>Enable 2FA</strong>
-                                        <p>Require a verification code when signing in.</p>
+                                        <strong>Email Notifications</strong>
+                                        <p>Receive updates directly to your inbox.</p>
                                     </div>
                                     <label class="switch">
-                                        <input type="checkbox" id="toggle-2fa">
+                                        <input type="checkbox" name="email_notifications" checked>
                                         <span class="slider round"></span>
                                     </label>
                                 </div>
-                                <div id="2fa-settings" class="settings-reveal-panel" style="display:none;">
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Authentication Method</label>
-                                        <select class="form-control">
-                                            <option>Authenticator App</option>
-                                            <option>Email</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="fakeSave('2FA disabled')">Disable</button>
-                                        <button type="button" class="btn btn-primary" onclick="fakeSave('2FA enabled')">Enable</button>
-                                    </div>
-                                </div>
-                            </div>
-                        @break
-
-                        @case('roles')
-                            <div class="form-card">
-                                <div class="form-card-header">
+                                <div class="form-group full-width settings-option-row">
                                     <div>
-                                        <h3>Admin Accounts</h3>
-                                        <p>Track who has access to the admin tools and what they can change.</p>
+                                        <strong>SMS Notifications</strong>
+                                        <p>Get urgent alerts via text message.</p>
                                     </div>
-                                    <span class="status-badge status-badge-info">Live data</span>
+                                    <label class="switch">
+                                        <input type="checkbox" name="sms_notifications">
+                                        <span class="slider round"></span>
+                                    </label>
                                 </div>
-                                <div class="table-wrap">
-                                    <table class="settings-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Email</th>
-                                                <th>Role</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse ($admins as $admin)
-                                                @php
-                                                    $firstName = $admin->admin_first_name ?? $admin->AdminFirstName ?? '';
-                                                    $middleName = $admin->admin_middle_name ?? $admin->AdminMiddleName ?? '';
-                                                    $lastName = $admin->admin_last_name ?? $admin->AdminLastName ?? '';
-                                                    $email = $admin->admin_email ?? $admin->AdminEmail ?? '';
-                                                    $roleValue = $admin->admin_role ?? $admin->AdminRole ?? '';
-                                                    $displayName = trim($firstName . ' ' . ($middleName ? $middleName . ' ' : '') . $lastName);
-                                                    
-                                                    $roleLabels = [
-                                                        'Executive Director' => 'Executive Director',
-                                                        'Academic Director' => 'Academic Director',
-                                                        'Coordinator' => 'Coordinator',
-                                                        'Assistant Coordinator' => 'Assistant Coordinator',
-                                                    ];
-                                                    $roleLabel = $roleLabels[$roleValue] ?? ($roleValue !== '' ? ucwords(str_replace(['_', '-'], ' ', $roleValue)) : 'Unassigned');
-                                                    
-                                                    $roleChipClass = match($roleValue) {
-                                                        'Executive Director' => 'role-chip-primary',
-                                                        'Academic Director' => 'role-chip-secondary',
-                                                        'Coordinator' => 'role-chip-success',
-                                                        'Assistant Coordinator' => 'role-chip-muted',
-                                                        default => '',
-                                                    };
-                                                @endphp
-                                                <tr>
-                                                    <td>{{ $displayName ?: 'Unnamed Admin' }}</td>
-                                                    <td>{{ $email ?: 'No email provided' }}</td>
-                                                    <td>
-                                                        <span class="role-chip {{ $roleChipClass }}">{{ $roleLabel }}</span>
-                                                    </td>
-                                                    <td>
-                                                        <button type="button" class="btn-action btn-edit" title="Edit">
-                                                            <i class="fa-solid fa-pen-to-square"></i>
-                                                        </button>
-                                                        <button type="button" class="btn-action" style="background:#fee; color:#ef4444;" title="Remove">
-                                                            <i class="fa-solid fa-trash-can"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="4" class="empty-table-cell">No admin accounts have been created yet.</td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        @break
-
-                        @case('add-admin')
-                            <div class="form-card">
-                                <div class="form-card-header">
+                                <div class="form-group full-width settings-option-row">
                                     <div>
-                                        <h3>Invite Admin</h3>
-                                        <p>Fill in the contact details and assign an access level before sending the invitation.</p>
+                                        <strong>System Alerts</strong>
+                                        <p>Track maintenance events, warnings, and issues.</p>
                                     </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="system_alerts" checked>
+                                        <span class="slider round"></span>
+                                    </label>
                                 </div>
-                                <form id="add-admin-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.store') }}" enctype="multipart/form-data">
-                                    @csrf
-                                    <div class="form-group">
-                                        <label class="form-label">First Name</label>
-                                        <input type="text" name="admin_first_name" class="form-control" value="{{ old('admin_first_name') }}" placeholder="First name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Middle Name</label>
-                                        <input type="text" name="admin_middle_name" class="form-control" value="{{ old('admin_middle_name') }}" placeholder="Middle name">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Last Name</label>
-                                        <input type="text" name="admin_last_name" class="form-control" value="{{ old('admin_last_name') }}" placeholder="Last name">
-                                    </div>
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" name="admin_email" class="form-control" value="{{ old('admin_email') }}" placeholder="name@example.com">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Phone Number</label>
-                                        <input type="text" name="phone_number" class="form-control" value="{{ old('phone_number') }}" placeholder="09xx xxx xxxx">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Role</label>
-                                        <select name="admin_role" class="form-control">
-                                            <option value="">-- Select a role --</option>
-                                            <option value="Executive Director" @selected(old('admin_role') === 'Executive Director')>Executive Director</option>
-                                            <option value="Academic Director" @selected(old('admin_role') === 'Academic Director')>Academic Director</option>
-                                            <option value="Coordinator" @selected(old('admin_role') === 'Coordinator')>Coordinator</option>
-                                            <option value="Assistant Coordinator" @selected(old('admin_role') === 'Assistant Coordinator')>Assistant Coordinator</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group full-width">
-                                        <div class="rule-alert">
-                                            <i class="fa-solid fa-circle-info"></i>
-                                            <div>
-                                                <strong>Temporary password</strong>
-                                                <p>A secure password will be generated automatically after saving.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Photo</label>
-                                        <div class="upload-zone" id="add-admin-upload-zone">
-                                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                                            <p class="upload-title">Click to upload profile photo</p>
-                                            <p class="upload-desc">JPG, PNG, or WEBP format.</p>
-                                            <input type="file" name="photo" accept="image/*" class="settings-file-input" onchange="previewPhoto(this, 'add-admin-photo-preview', 'add-admin-upload-zone')">
-                                        </div>
-                                        <div class="photo-preview-container" id="add-admin-photo-preview">
-                                            <div class="photo-preview-wrapper">
-                                                <img class="photo-preview-image" src="" alt="Photo preview">
-                                                <button type="button" class="photo-preview-remove" onclick="removePhoto('add-admin-photo-input', 'add-admin-photo-preview', 'add-admin-upload-zone')" title="Remove photo">
-                                                    <i class="fa-solid fa-xmark"></i>
-                                                </button>
-                                            </div>
-                                            <p class="photo-preview-filename"></p>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="resetForm('add-admin-form'); removePhoto(null, 'add-admin-photo-preview', 'add-admin-upload-zone')">Clear</button>
-                                        <button type="submit" class="btn btn-primary">Add Admin</button>
-                                    </div>
-                                </form>
-                            </div>
-                        @break
-
-                        @case('notifications')
-                            <div class="form-card">
-                                <div class="form-card-header">
-                                    <div>
-                                        <h3>Notification Channels</h3>
-                                        <p>Select which alerts should reach the team in real time.</p>
-                                    </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-secondary" onclick="resetForm('notifications-form')">Reset</button>
+                                    <button type="button" class="btn btn-primary" onclick="fakeSave('Notification preferences saved')">Save Preferences</button>
                                 </div>
-                                <form id="notifications-form" class="settings-form-grid">
-                                    <div class="form-group full-width settings-option-row">
-                                        <div>
-                                            <label class="form-label">Email Notifications</label>
-                                            <p>Send important updates to the admin inbox.</p>
-                                        </div>
-                                        <label class="switch">
-                                            <input type="checkbox" name="email_notifications" checked>
-                                            <span class="slider round"></span>
-                                        </label>
-                                    </div>
-                                    <div class="form-group full-width settings-option-row">
-                                        <div>
-                                            <label class="form-label">SMS Notifications</label>
-                                            <p>Push urgent alerts to registered phone numbers.</p>
-                                        </div>
-                                        <label class="switch">
-                                            <input type="checkbox" name="sms_notifications">
-                                            <span class="slider round"></span>
-                                        </label>
-                                    </div>
-                                    <div class="form-group full-width settings-option-row">
-                                        <div>
-                                            <label class="form-label">System Alerts</label>
-                                            <p>Track issues, warnings, and maintenance events.</p>
-                                        </div>
-                                        <label class="switch">
-                                            <input type="checkbox" name="system_alerts" checked>
-                                            <span class="slider round"></span>
-                                        </label>
-                                    </div>
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="resetForm('notifications-form')">Reset</button>
-                                        <button type="button" class="btn btn-primary" onclick="fakeSave('Notification settings saved')">Save</button>
-                                    </div>
-                                </form>
-                            </div>
-                        @break
+                            </form>
+                        </div>
 
-                        @case('download')
-                            <div class="form-card">
-                                <div class="form-card-header">
-                                    <div>
-                                        <h3>Export Options</h3>
-                                        <p>Generate a file for reporting, audits, or offline review.</p>
-                                    </div>
+                    {{-- ============ DOWNLOAD SECTION ============ --}}
+                    @elseif($section == 'download')
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <h3>Export Data</h3>
+                            </div>
+                            <p class="section-desc">Download system records for offline analysis or reporting.</p>
+                            <form class="settings-form-grid">
+                                <div class="form-group full-width">
+                                    <label class="form-label">Data Type</label>
+                                    <select class="form-control">
+                                        <option>All Alumni Records (CSV)</option>
+                                        <option>Announcements (CSV)</option>
+                                        <option>Events & Registrations (CSV)</option>
+                                        <option>Tracer Form Responses (CSV)</option>
+                                    </select>
                                 </div>
-                                <form class="settings-form-grid">
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Export</label>
-                                        <select class="form-control">
-                                            <option>All Users (CSV)</option>
-                                            <option>Announcements</option>
-                                            <option>Events</option>
-                                        </select>
-                                    </div>
-                                    <div class="rule-alert full-width">
-                                        <i class="fa-solid fa-circle-info"></i>
-                                        <span>The export will be prepared using the latest available records.</span>
-                                    </div>
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-primary" onclick="fakeSave('Preparing download...')">
-                                            <i class="fa-solid fa-download"></i> Download
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        @break
-
-                        @default
-                            @php
-                                $firstName = trim($currentAdmin->admin_first_name ?? '');
-                                $lastName = trim($currentAdmin->admin_last_name ?? '');
-                                $initials = '';
-
-                                if ($firstName !== '') {
-                                    $initials .= strtoupper(mb_substr($firstName, 0, 1));
-                                }
-                                if ($lastName !== '') {
-                                    $initials .= strtoupper(mb_substr($lastName, 0, 1));
-                                }
-                                if ($initials === '') {
-                                    $nameParts = preg_split('/\s+/', trim($currentAdmin->admin_name ?? '')) ?: [];
-                                    if (count($nameParts) >= 2) {
-                                        $initials = strtoupper(mb_substr($nameParts[0], 0, 1) . mb_substr($nameParts[count($nameParts) - 1], 0, 1));
-                                    } else {
-                                        $initials = strtoupper(mb_substr($currentAdmin->admin_name ?? 'AD', 0, 2));
-                                    }
-                                }
-                            @endphp
-
-                            <div class="form-card settings-profile-card">
-                                <div class="profile-pic-section">
-                                    <div class="profile-avatar-wrapper {{ $currentAdminPhotoUrl ? 'has-photo' : 'is-initials' }}">
-                                        @if ($currentAdminPhotoUrl)
-                                            <img src="{{ $currentAdminPhotoUrl }}" alt="Profile photo" id="current-profile-photo">
-                                        @else
-                                            <span class="profile-initials" id="current-profile-initials">{{ $initials }}</span>
-                                        @endif
-                                    </div>
-                                    <div class="profile-pic-copy">
-                                        <h3>Profile Photo</h3>
-                                        <p>Use a clear headshot so the admin profile is recognizable across the system.</p>
-                                        <div class="profile-action-row">
-                                            <label class="btn btn-primary upload-btn" for="account-photo-input">
-                                                <i class="fa-solid fa-upload"></i> Upload New Photo
-                                            </label>
-                                            <button type="button" id="remove-photo-btn" class="btn btn-secondary remove-btn">Remove Photo</button>
-                                        </div>
-                                    </div>
+                                <div class="rule-alert full-width">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    <span>The export will be generated using the most recent data available.</span>
                                 </div>
-                            </div>
-
-                            <div class="form-card">
-                                <div class="form-card-header">
-                                    <div>
-                                        <h3>Personal Details</h3>
-                                        <p>These details appear in the admin profile and internal references.</p>
-                                    </div>
+                                <div class="form-actions full-width">
+                                    <button type="button" class="btn btn-primary" onclick="fakeSave('Preparing download...')">
+                                        <i class="fa-solid fa-download"></i> Download
+                                    </button>
                                 </div>
+                            </form>
+                        </div>
+                    @endif
 
-                                <form id="account-form" class="settings-form-grid" method="POST" action="{{ route('admin.settings.update') }}" enctype="multipart/form-data">
-                                    @csrf
-                                    @method('PUT')
-                                    <input type="hidden" name="remove_photo" id="remove-photo-flag" value="">
-
-                                    <div class="form-group">
-                                        <label class="form-label">Last Name</label>
-                                        <input type="text" name="admin_last_name" class="form-control" value="{{ old('admin_last_name', $currentAdmin->admin_last_name ?? '') }}">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">First Name</label>
-                                        <input type="text" name="admin_first_name" class="form-control" value="{{ old('admin_first_name', $currentAdmin->admin_first_name ?? '') }}">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Middle Name</label>
-                                        <input type="text" name="admin_middle_name" class="form-control" value="{{ old('admin_middle_name', $currentAdmin->admin_middle_name ?? '') }}">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Mobile Number</label>
-                                        <input type="text" name="phone_number" class="form-control" value="{{ old('phone_number', $currentAdmin->phone_number ?? '') }}">
-                                    </div>
-                                    <div class="form-group full-width">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" name="admin_email" class="form-control" value="{{ old('admin_email', $currentAdmin->admin_email ?? '') }}">
-                                    </div>
-                                    <!-- Hidden file input for the Upload New Photo button above -->
-                                    <input id="account-photo-input" type="file" name="photo" accept="image/*" class="settings-file-input" style="display: none;" onchange="handleAccountPhotoUpload(this)">
-                                    <div class="form-actions full-width">
-                                        <button type="button" class="btn btn-secondary" onclick="resetForm('account-form')">Discard Changes</button>
-                                        <button type="submit" class="btn btn-primary">Save Profile Information</button>
-                                    </div>
-                                </form>
-                            </div>
-                    @endswitch
                 </div>
             </div>
         </main>
@@ -695,6 +668,214 @@
         </div>
     </div>
 
+    <!-- Manage Admin Modal -->
+    <div id="manageModal" class="manage-modal-overlay">
+        <div class="manage-modal">
+            <div class="manage-modal-header">
+                <div class="manage-modal-admin-info">
+                    <div class="manage-modal-avatar">
+                        <i class="fa-solid fa-user-gear"></i>
+                    </div>
+                    <div>
+                        <h3 class="manage-modal-name" id="manageModalName">Admin Name</h3>
+                        <span class="manage-modal-role" id="manageModalRole">Role</span>
+                    </div>
+                </div>
+                <button class="manage-modal-close" onclick="closeManageModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="manage-modal-body">
+                <div class="manage-action-group">
+                    <div class="manage-action-item">
+                        <div class="manage-action-icon icon-info">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
+                        <div class="manage-action-content">
+                            <h4>Reset Password</h4>
+                            <p>Generate a new temporary password for this admin.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="executeResetPassword()">
+                            <i class="fa-solid fa-rotate"></i> Reset
+                        </button>
+                    </div>
+                    <div class="manage-action-item" id="restrictActionItem">
+                        <div class="manage-action-icon icon-warning">
+                            <i class="fa-solid fa-user-slash"></i>
+                        </div>
+                        <div class="manage-action-content">
+                            <h4 id="restrictTitle">Restrict Account</h4>
+                            <p id="restrictDesc">Temporarily suspend access for this admin.</p>
+                        </div>
+                        <button type="button" class="btn btn-warning btn-sm" id="manageRestrictBtn" onclick="executeToggleRestrict()">
+                            <i class="fa-solid fa-lock"></i> Restrict
+                        </button>
+                    </div>
+                    <div class="manage-action-item danger-zone">
+                        <div class="manage-action-icon icon-danger">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </div>
+                        <div class="manage-action-content">
+                            <h4>Delete Account</h4>
+                            <p>Permanently remove this admin from the system.</p>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="executeDeleteAdmin()">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+    // ========================================
+    // MANAGE MODAL LOGIC
+    // ========================================
+    let currentManageAdminId = null;
+    let currentManageAdminName = '';
+    let currentManageAccountStatus = 1;
+
+    function openManageModal(adminId, adminName, adminRole, accountStatus) {
+        currentManageAdminId = adminId;
+        currentManageAdminName = adminName;
+        currentManageAccountStatus = accountStatus;
+
+        document.getElementById('manageModalName').textContent = adminName;
+        document.getElementById('manageModalRole').textContent = adminRole;
+
+        const restrictTitle = document.getElementById('restrictTitle');
+        const restrictDesc = document.getElementById('restrictDesc');
+        const restrictBtn = document.getElementById('manageRestrictBtn');
+        const restrictIcon = document.getElementById('restrictActionItem').querySelector('.manage-action-icon');
+
+        if (accountStatus == 0) {
+            restrictTitle.textContent = 'Unrestrict Account';
+            restrictDesc.textContent = 'Restore access for this admin.';
+            restrictBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
+            restrictBtn.className = 'btn btn-success btn-sm';
+            restrictIcon.className = 'manage-action-icon icon-success';
+        } else {
+            restrictTitle.textContent = 'Restrict Account';
+            restrictDesc.textContent = 'Temporarily suspend access for this admin.';
+            restrictBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
+            restrictBtn.className = 'btn btn-warning btn-sm';
+            restrictIcon.className = 'manage-action-icon icon-warning';
+        }
+
+        document.getElementById('manageModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeManageModal() {
+        document.getElementById('manageModal').classList.remove('active');
+        document.body.style.overflow = '';
+        currentManageAdminId = null;
+    }
+
+    document.getElementById('manageModal').addEventListener('click', function(e) {
+        if (e.target === this) closeManageModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const warningModal = document.getElementById('warningModal');
+            if (!warningModal.classList.contains('active')) {
+                closeManageModal();
+            }
+        }
+    });
+
+    function executeResetPassword() {
+        if (!currentManageAdminId) { closeManageModal(); return; }
+        const adminId = currentManageAdminId;
+        const adminName = currentManageAdminName;
+        closeManageModal();
+        
+        window.showWarningModal({
+            title: 'Reset Password',
+            message: 'Are you sure you want to reset the password for <strong>' + adminName + '</strong>?<br><small>A new temporary password will be generated.</small>',
+            iconType: 'info',
+            confirmText: 'Reset Password',
+            confirmClass: 'btn-info',
+            onConfirm: function() {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/settings/admin/' + adminId + '/reset-password';
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden'; csrf.name = '_token';
+                csrf.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                form.appendChild(csrf);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+
+    function executeToggleRestrict() {
+        if (!currentManageAdminId) { closeManageModal(); return; }
+        const adminId = currentManageAdminId;
+        const adminName = currentManageAdminName;
+        const isCurrentlyRestricted = currentManageAccountStatus == 0;
+        closeManageModal();
+        
+        const title = isCurrentlyRestricted ? 'Unrestrict Account' : 'Restrict Account';
+        const message = isCurrentlyRestricted 
+            ? 'Are you sure you want to <strong>unrestrict</strong> ' + adminName + '\'s account?<br><small>They will be able to log in again.</small>'
+            : 'Are you sure you want to <strong>restrict</strong> ' + adminName + '\'s account?<br><small>They will not be able to log in until unrestricted.</small>';
+        
+        window.showWarningModal({
+            title: title, message: message, iconType: 'warning',
+            confirmText: isCurrentlyRestricted ? 'Unrestrict' : 'Restrict',
+            confirmClass: isCurrentlyRestricted ? 'btn-success' : 'btn-warning',
+            onConfirm: function() {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/settings/admin/' + adminId + '/toggle-restrict';
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden'; csrf.name = '_token';
+                csrf.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                form.appendChild(csrf);
+                const method = document.createElement('input');
+                method.type = 'hidden'; method.name = '_method'; method.value = 'PATCH';
+                form.appendChild(method);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+
+    function executeDeleteAdmin() {
+        if (!currentManageAdminId) { closeManageModal(); return; }
+        const adminId = currentManageAdminId;
+        const adminName = currentManageAdminName;
+        closeManageModal();
+        
+        window.showWarningModal({
+            title: 'Delete Admin Account',
+            message: 'Are you sure you want to <strong>permanently delete</strong> ' + adminName + '\'s account?<br><small>This action cannot be undone. All data associated with this admin will be removed.</small>',
+            iconType: 'danger',
+            confirmText: 'Delete',
+            confirmClass: 'btn-danger',
+            onConfirm: function() {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/settings/admin/' + adminId;
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden'; csrf.name = '_token';
+                csrf.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                form.appendChild(csrf);
+                const method = document.createElement('input');
+                method.type = 'hidden'; method.name = '_method'; method.value = 'DELETE';
+                form.appendChild(method);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+    </script>
+
     <script>
     // Mobile menu toggle
     function toggleMobileMenu() {
@@ -705,14 +886,12 @@
         document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
     }
 
-    // Close sidebar when clicking on a nav item (mobile)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', function() {
             if (window.innerWidth <= 1024) toggleMobileMenu();
         });
     });
 
-    // Handle window resize
     let resizeTimer;
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimer);
@@ -725,28 +904,20 @@
         }, 250);
     });
 
-    // Toggle password visibility
     function togglePassword(button) {
         const input = button.parentElement.querySelector('input');
         const icon = button.querySelector('i');
         if (input.type === 'password') {
             input.type = 'text';
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
+            icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash');
         } else {
             input.type = 'password';
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
+            icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye');
         }
     }
 
-    // Reset form
-    function resetForm(id) {
-        var f = document.getElementById(id);
-        if (f) f.reset();
-    }
+    function resetForm(id) { var f = document.getElementById(id); if (f) f.reset(); }
 
-    // Photo Preview Function
     function previewPhoto(input, previewContainerId, uploadZoneId) {
         const previewContainer = document.getElementById(previewContainerId);
         const uploadZone = document.getElementById(uploadZoneId);
@@ -754,10 +925,8 @@
             const file = input.files[0];
             const reader = new FileReader();
             reader.onload = function(e) {
-                const previewImage = previewContainer.querySelector('.photo-preview-image');
-                const filenameEl = previewContainer.querySelector('.photo-preview-filename');
-                previewImage.src = e.target.result;
-                filenameEl.textContent = file.name;
+                previewContainer.querySelector('.photo-preview-image').src = e.target.result;
+                previewContainer.querySelector('.photo-preview-filename').textContent = file.name;
                 previewContainer.classList.add('active');
                 if (uploadZone) uploadZone.classList.add('has-preview');
             };
@@ -765,67 +934,59 @@
         }
     }
 
-    // Remove Photo Function
     function removePhoto(inputId, previewContainerId, uploadZoneId) {
         const previewContainer = document.getElementById(previewContainerId);
         const uploadZone = document.getElementById(uploadZoneId);
-        if (inputId) {
-            const fileInput = document.getElementById(inputId);
-            if (fileInput) fileInput.value = '';
-        }
+        if (inputId) { const fi = document.getElementById(inputId); if (fi) fi.value = ''; }
         if (previewContainer) {
             previewContainer.classList.remove('active');
-            const previewImage = previewContainer.querySelector('.photo-preview-image');
-            if (previewImage) previewImage.src = '';
+            const img = previewContainer.querySelector('.photo-preview-image');
+            if (img) img.src = '';
         }
         if (uploadZone) uploadZone.classList.remove('has-preview');
     }
 
-    // Handle account photo upload
     function handleAccountPhotoUpload(input) {
         if (input.files && input.files[0]) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                const profileWrapper = document.querySelector('.profile-avatar-wrapper');
-                const initialsSpan = document.getElementById('current-profile-initials');
-                if (initialsSpan) initialsSpan.style.display = 'none';
-                const existingImg = profileWrapper.querySelector('img');
+                const wrapper = document.querySelector('.profile-avatar-wrapper');
+                const initials = document.getElementById('current-profile-initials');
+                if (initials) initials.style.display = 'none';
+                const existingImg = wrapper.querySelector('img');
                 if (existingImg) {
                     existingImg.src = e.target.result;
                 } else {
                     const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.alt = 'Profile photo';
-                    img.id = 'current-profile-photo';
-                    profileWrapper.innerHTML = '';
-                    profileWrapper.appendChild(img);
+                    img.src = e.target.result; img.alt = 'Profile photo'; img.id = 'current-profile-photo';
+                    wrapper.innerHTML = '';
+                    wrapper.appendChild(img);
                 }
-                profileWrapper.classList.add('has-photo');
-                profileWrapper.classList.remove('is-initials');
+                wrapper.classList.add('has-photo');
+                wrapper.classList.remove('is-initials');
             };
             reader.readAsDataURL(input.files[0]);
         }
     }
 
     // ========================================
-    // INITIALIZE EVERYTHING ON DOM LOAD
+    // INITIALIZE ON DOM LOAD
     // ========================================
     document.addEventListener('DOMContentLoaded', function() {
-        // ========================================
-        // WARNING MODAL SYSTEM
-        // ========================================
         const warningOverlay = document.getElementById('warningModal');
         const warningTitle = document.getElementById('warningModalTitle');
         const warningMessage = document.getElementById('warningModalMessage');
         const warningIcon = document.getElementById('warningModalIcon');
         const confirmBtn = document.getElementById('warningModalConfirm');
         const modalCancelBtn = document.getElementById('warningModalCancel');
-
         let pendingCallback = null;
 
         function closeWarningModal() {
             warningOverlay.classList.remove('active');
-            document.body.style.overflow = '';
+            const manageModal = document.getElementById('manageModal');
+            if (!manageModal || !manageModal.classList.contains('active')) {
+                document.body.style.overflow = '';
+            }
             pendingCallback = null;
         }
 
@@ -836,13 +997,9 @@
 
         window.showWarningModal = function(config) {
             const {
-                title = 'Confirm Action',
-                message = 'Are you sure?',
-                iconType = 'warning',
-                confirmText = 'Confirm',
-                confirmClass = 'btn-danger',
-                onConfirm = null,
-                hideCancel = false
+                title = 'Confirm Action', message = 'Are you sure?',
+                iconType = 'warning', confirmText = 'Confirm',
+                confirmClass = 'btn-danger', onConfirm = null, hideCancel = false
             } = config;
 
             warningTitle.textContent = title;
@@ -863,40 +1020,27 @@
             confirmBtn.focus();
         };
 
-        // ✅ Replace fakeSave with modal
         window.fakeSave = function(msg) {
             window.showWarningModal({
-                title: 'Settings Saved',
-                message: `<strong>${msg}</strong>`,
-                iconType: 'info',
-                confirmText: 'OK',
-                confirmClass: 'btn-info',
-                hideCancel: true
+                title: 'Settings Saved', message: `<strong>${msg}</strong>`,
+                iconType: 'info', confirmText: 'OK', confirmClass: 'btn-info', hideCancel: true
             });
         };
 
-        // ✅ Replace confirm() for remove photo with modal
         const removeBtn = document.getElementById('remove-photo-btn');
         const form = document.getElementById('account-form');
         const removeFlag = document.getElementById('remove-photo-flag');
-
         if (removeBtn && form && removeFlag) {
             removeBtn.addEventListener('click', function() {
                 window.showWarningModal({
                     title: 'Remove Profile Photo',
                     message: 'Are you sure you want to <strong>remove</strong> your profile photo?<br><small>This will revert to the default initials avatar.</small>',
-                    iconType: 'warning',
-                    confirmText: 'Remove',
-                    confirmClass: 'btn-warning',
-                    onConfirm: function() {
-                        removeFlag.value = '1';
-                        form.submit();
-                    }
+                    iconType: 'warning', confirmText: 'Remove', confirmClass: 'btn-warning',
+                    onConfirm: function() { removeFlag.value = '1'; form.submit(); }
                 });
             });
         }
 
-        // Toggle 2FA settings visibility
         var t2 = document.getElementById('toggle-2fa');
         if (t2) {
             t2.addEventListener('change', function(e) {
@@ -910,8 +1054,6 @@
             }
         }
     });
-</script>
-
-
+    </script>
 </body>
 </html>
