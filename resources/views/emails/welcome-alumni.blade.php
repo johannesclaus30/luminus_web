@@ -4,158 +4,340 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to LumiNUs!</title>
-    <!-- Importing Poppins Font -->
+    
+    <!-- Import Poppins from Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        body { 
-            font-family: 'Poppins', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #f4f6f9; 
-            margin: 0; 
-            padding: 40px 20px; 
+        /* Base Styles & Typography Reset */
+        body, table, td, p, h1, h2, h3, h4, h5, h6, span, div, a, strong {
+            font-family: 'Poppins', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
         }
+        
+        body { 
+            background-color: #f1f5f9; 
+            margin: 0; 
+            padding: 40px 15px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
         .container { 
             max-width: 600px; 
+            width: 100%;
             margin: 0 auto; 
             background: #ffffff; 
-            border-radius: 12px; 
+            border-radius: 16px; 
             overflow: hidden; 
-            box-shadow: 0 4px 15px rgba(50, 65, 140, 0.1); 
+            box-shadow: 0 10px 25px -5px rgba(50, 65, 140, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04); 
         }
-        /* NU Blue Header with THICKER Yellow Bottom Accent */
+
+        /* NU Blue Header with Gold Accent Line */
         .header { 
             background-color: #32418c; 
-            padding: 40px 24px; 
+            padding: 32px 20px; 
             text-align: center;
-            border-bottom: 8px solid #fbd117; /* Thickened yellow border */
+            border-bottom: 6px solid #fbd117;
         } 
+        
+        /* Header Logo Styling */
         .header img {
-            max-height: 85px; /* Slightly larger since it's the standalone star */
-            width: auto;
+            width: 100%;
+            max-width: 480px;
+            height: auto;
             display: inline-block;
         }
+
         .content { 
-            padding: 40px 30px; 
-            color: #333333; 
+            padding: 40px 32px; 
+            color: #1e293b; 
             line-height: 1.6; 
         }
-        /* Welcome Text Title Moved Outside Header */
+
+        /* Category Tag Line */
+        .category-tag {
+            display: inline-block;
+            background-color: #eef2ff;
+            color: #32418c;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+
+        /* Hero Title Emphasis */
         .welcome-title {
             color: #32418c;
-            font-size: 26px;
-            font-weight: 700;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.25;
             margin-top: 0;
-            margin-bottom: 25px;
+            margin-bottom: 24px;
+            letter-spacing: -0.5px;
         }
-        .content h2 { 
-            color: #32418c; 
-            margin-top: 0;
-            font-size: 20px;
+
+        .greeting { 
+            color: #334155; 
+            font-size: 18px;
             font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 12px;
         }
-        /* Highlighted Credentials Box */
-        .credentials-box { 
-            background-color: #f8fafc; 
-            border-left: 4px solid #32418c;
-            padding: 20px; 
-            border-radius: 6px; 
-            font-size: 15px; 
-            margin: 25px 0; 
+
+        .content p {
+            font-size: 15px;
+            color: #475569;
+            margin-bottom: 20px;
         }
-        .credentials-box table {
+
+        /* Credentials Container */
+        .credentials-card { 
+            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+            border: 1px solid #e2e8f0;
+            border-left: 5px solid #32418c;
+            padding: 24px; 
+            border-radius: 10px; 
+            margin: 28px 0; 
+        }
+
+        .credentials-card table {
             width: 100%;
+            border-collapse: collapse;
         }
-        .credentials-box td {
-            padding: 4px 0;
-            vertical-align: top;
+
+        .credentials-card td {
+            padding: 8px 0;
+            vertical-align: middle;
         }
+
         .label {
             color: #32418c;
-            font-weight: 600;
-            width: 150px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 140px;
         }
+
         .value {
-            color: #4a5568;
-            font-family: monospace;
+            color: #1e293b;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace !important;
             font-size: 15px;
-            font-weight: bold;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            word-break: break-all;
         }
-        /* Brand Button */
+
+        /* Feature Pillars / Benefits Section */
+        .benefits-section {
+            margin: 32px 0;
+            padding-top: 24px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .benefits-heading {
+            font-size: 14px;
+            font-weight: 700;
+            color: #32418c;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .benefit-item {
+            display: table;
+            width: 100%;
+            margin-bottom: 14px;
+        }
+
+        .benefit-icon {
+            display: table-cell;
+            width: 36px;
+            vertical-align: top;
+            font-size: 18px;
+        }
+
+        .benefit-text {
+            display: table-cell;
+            vertical-align: top;
+            font-size: 14px;
+            color: #475569;
+        }
+
+        .benefit-text strong {
+            color: #1e293b;
+        }
+
+        /* CTA Button */
         .btn-container {
             text-align: center;
-            margin: 30px 0;
+            margin: 36px 0;
         }
+
         .btn { 
             display: inline-block; 
             background-color: #32418c; 
             color: #ffffff !important; 
             text-decoration: none; 
-            padding: 14px 32px; 
-            border-radius: 6px; 
-            font-weight: 600; 
+            padding: 16px 36px; 
+            border-radius: 8px; 
+            font-weight: 700; 
             font-size: 16px;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 6px rgba(50, 65, 140, 0.2);
+            letter-spacing: 0.3px;
+            box-shadow: 0 6px 20px rgba(50, 65, 140, 0.25);
+            transition: all 0.2s ease;
         }
+
+        .security-notice {
+            font-size: 13px; 
+            color: #64748b; 
+            background-color: #f8fafc; 
+            padding: 14px 18px; 
+            border-radius: 8px;
+            text-align: center;
+            border: 1px dashed #cbd5e1;
+            margin-top: 20px;
+        }
+
+        .signoff {
+            margin-top: 36px; 
+            border-top: 1px solid #f1f5f9; 
+            padding-top: 24px; 
+            margin-bottom: 0;
+            font-size: 14px;
+            color: #64748b;
+        }
+
         .footer { 
             padding: 24px; 
             background-color: #f8fafc; 
             text-align: center; 
             font-size: 13px; 
-            color: #718096;
+            color: #94a3b8;
             border-top: 1px solid #e2e8f0;
         }
+
         .footer strong {
             color: #32418c;
+            font-weight: 600;
+        }
+
+        /* Mobile Adjustments */
+        @media only screen and (max-width: 600px) {
+            body {
+                padding: 12px 8px;
+            }
+            .content {
+                padding: 28px 20px;
+            }
+            .header {
+                padding: 24px 16px;
+            }
+            .header img {
+                max-width: 280px;
+            }
+            .welcome-title {
+                font-size: 23px;
+            }
+            .greeting {
+                font-size: 16px;
+            }
+            .credentials-card td {
+                display: block;
+                width: 100%;
+            }
+            .label {
+                width: 100%;
+                padding-bottom: 2px;
+            }
+            .btn {
+                width: 85%;
+                padding: 14px 16px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header: ONLY the Logo lives here -->
+        <!-- Header with Logo -->
         <div class="header">
-            <img src="{{ isset($message) ? $message->embed(public_path('assets/Email_LogoHeader.png')) : asset('assets/Email_LogoHeader.png') }}" alt="LumiNUs National University Lipa">
+            <img src="https://pmnirrvwibzqjlutbnwz.supabase.co/storage/v1/object/public/luminus_assets/Email_LogoHeader.png" alt="LumiNUs National University Lipa">
         </div>
         
         <!-- Body Content -->
         <div class="content">
-            <!-- Welcome title moved outside the header -->
+            <!-- Category Tag -->
+            <div class="category-tag">Account Created</div>
+
+            <!-- Highly Emphasized Title -->
             <h1 class="welcome-title">Welcome to LumiNUs!</h1>
 
-            <h2>Hello {{ $alumni->first_name }},</h2>
-            <p>Congratulations! Your official <strong>LumiNUs Alumni</strong> account has been successfully created. You are now officially connected to the National University Lipa alumni network.</p>
+            <p class="greeting">Hello {{ $alumnus->first_name }},</p>
             
-            <p>Here are your temporary login credentials:</p>
+            <p>Congratulations! Your official <strong>LumiNUs Alumni Account</strong> is active. You are now officially connected to the National University Lipa alumni network.</p>
             
-            <div class="credentials-box">
+            <!-- Credentials Card -->
+            <div class="credentials-card">
                 <table>
                     <tr>
-                        <td class="label">Login Email:</td>
-                        <td class="value">{{ $alumni->email }}</td>
+                        <td class="label">Login Email</td>
+                        <td class="value">{{ $alumnus->email }}</td>
                     </tr>
                     <tr>
-                        <td class="label">Temporary Password:</td>
-                        <td class="value">password123</td>
+                        <td class="label">Temp Password</td>
+                        <td class="value">{{ $temporaryPassword }}</td>
                     </tr>
                 </table>
             </div>
-            
-            <p>Please use these credentials to log in to the portal. For your account security, we highly recommend changing your password immediately after your first login.</p>
-            
+
+            <!-- What You Can Do Section -->
+            <div class="benefits-section">
+                <div class="benefits-heading">What You Can Do Next</div>
+                
+                <div class="benefit-item">
+                    <div class="benefit-icon">🪪</div>
+                    <div class="benefit-text">
+                        <strong>Virtual Alumni ID:</strong> Access your digital Alumni ID card for campus visits and official verification.
+                    </div>
+                </div>
+
+                <div class="benefit-item">
+                    <div class="benefit-icon">🌐</div>
+                    <div class="benefit-text">
+                        <strong>Network & Connect:</strong> Reconnect with fellow Bulldogs, track events, and discover alumni career opportunities.
+                    </div>
+                </div>
+
+                <div class="benefit-item">
+                    <div class="benefit-icon">📊</div>
+                    <div class="benefit-text">
+                        <strong>Alumni Tracer:</strong> Complete your tracer information to help us continuously enhance NU programs.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Call to Action -->
             <div class="btn-container">
-                <a href="{{ url('/login') }}" class="btn">Log in to LumiNUs</a>
+                <a href="{{ url('/login') }}" class="btn">Log in to LumiNUs &rarr;</a>
             </div>
             
-            <p style="margin-top: 35px; border-top: 1px solid #edf2f7; padding-top: 20px;">
-                If you have any questions or require assistance setting up your profile, please reach out to the Alumni Affairs Office.
-            </p>
+            <!-- Security Notice -->
+            <div class="security-notice">
+                🔒 <strong>Security Tip:</strong> Please log in and change your temporary password immediately to keep your account secure.
+            </div>
             
-            <p style="margin-bottom: 0;">
-                <br>Warm regards,<br><br>
-                <strong>LumiNUs</strong><br>
-                <span style="color: #32418c; font-weight: 600;">NU Lipa</span>
+            <!-- Sign-off -->
+            <p class="signoff">
+                Warm regards,<br><br>
+                <span style="color: #32418c; font-weight: 700; font-size: 15px;">
+                    Lumi<span style="color: #fbd117">NU</span>s Team
+                </span><br>
+                <span style="font-size: 13px; color: #64748b;">NU Lipa Alumni Affairs Office</span>
             </p>
         </div>
         

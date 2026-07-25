@@ -1005,16 +1005,13 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(17, 24, 39, 0.6);
     z-index: 1000;
     padding: 1rem;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
     overflow-y: auto;
 }
 
-/*  This is the reliable way to center modals */
 .modal-overlay.active {
     display: flex !important;
     align-items: center;
@@ -1023,26 +1020,27 @@ body {
 
 .modal-content-wrapper {
     width: 100%;
-    max-width: 700px;
-    max-height: 90vh;
+    max-width: 720px;
+    max-height: 85vh;
     overflow-y: auto;
-    /* Remove margin: auto - it's not needed with flex centering */
+    border-radius: var(--radius-2xl);
 }
 
 .modal-card {
     background: var(--white);
     border-radius: var(--radius-2xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     overflow: hidden;
+    border: 1px solid var(--gray-200);
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-    background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+    padding: 1.75rem 2rem;
+    border-bottom: 2px solid var(--gray-100);
+    background: linear-gradient(135deg, var(--nu-blue-soft) 0%, var(--white) 50%, var(--gray-50) 100%);
     gap: 1rem;
 }
 
@@ -1053,52 +1051,65 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin: 0;
+    margin: 0 0 0.375rem 0;
 }
 
 .modal-title i {
     color: var(--nu-gold);
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, var(--nu-blue), var(--nu-blue-dark));
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .modal-subtitle {
     font-size: 0.875rem;
     color: var(--gray-500);
-    margin: 0.25rem 0 0;
+    margin: 0;
+    padding-left: 3.5rem;
+    line-height: 1.4;
 }
 
 .modal-close {
-    width: 36px;
-    height: 36px;
-    border: none;
-    background: var(--gray-100);
+    width: 38px;
+    height: 38px;
+    border: 2px solid var(--gray-200);
+    background: var(--white);
     border-radius: var(--radius-lg);
-    color: var(--gray-600);
+    color: var(--gray-500);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     transition: all var(--transition);
+    flex-shrink: 0;
 }
 
 .modal-close:hover {
     background: var(--danger);
     color: var(--white);
+    border-color: var(--danger);
+    transform: rotate(90deg);
 }
 
 .modal-tabbar {
     display: flex;
-    padding: 0.75rem;
+    padding: 1rem 2rem;
     background: var(--gray-50);
-    border-bottom: 1px solid var(--gray-200);
-    gap: 0.5rem;
+    border-bottom: 2px solid var(--gray-100);
+    gap: 0.75rem;
 }
 
 .modal-tab {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
+    gap: 0.625rem;
+    padding: 0.75rem 1.5rem;
     background: var(--white);
     border: 2px solid var(--gray-200);
     border-radius: var(--radius-lg);
@@ -1107,29 +1118,33 @@ body {
     font-size: 0.9375rem;
     cursor: pointer;
     transition: all var(--transition);
+    font-family: inherit;
 }
 
 .modal-tab:hover {
     border-color: var(--nu-blue-light);
     color: var(--nu-blue);
+    background: var(--nu-blue-soft);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
 }
 
 .modal-tab.active {
     background: var(--nu-blue);
     border-color: var(--nu-blue);
     color: var(--white);
-}
-
-.modal-tab i {
-    font-size: 1rem;
+    box-shadow: var(--shadow-blue);
+    font-weight: 600;
 }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 2rem;
+    background: var(--white);
 }
 
 .modal-section {
     display: none;
+    animation: fadeIn 0.3s ease-out;
 }
 
 .modal-section.modal-section-active {
@@ -1140,14 +1155,14 @@ body {
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.5rem;
 }
 
 .form-group.full-width {
@@ -1156,31 +1171,40 @@ body {
 
 .form-group label {
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--gray-700);
 }
 
 .form-group input,
 .form-group select {
-    padding: 0.75rem 1rem;
+    padding: 0.875rem 1rem;
     font-size: 0.9375rem;
     font-family: inherit;
     border: 2px solid var(--gray-200);
     border-radius: var(--radius-lg);
-    background: var(--white);
-    color: var(--gray-700);
+    background: var(--gray-50);
+    color: var(--gray-800);
     transition: all var(--transition);
+    width: 100%;
+}
+
+.form-group input:hover,
+.form-group select:hover {
+    border-color: var(--gray-300);
+    background: var(--white);
 }
 
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
     border-color: var(--nu-blue);
-    box-shadow: 0 0 0 3px var(--nu-blue-soft);
+    background: var(--white);
+    box-shadow: 0 0 0 4px var(--nu-blue-soft);
 }
 
 .form-group input::placeholder {
     color: var(--gray-400);
+    font-size: 0.875rem;
 }
 
 /* File Upload */
@@ -1194,19 +1218,32 @@ body {
     height: 100%;
     opacity: 0;
     cursor: pointer;
+    z-index: 2;
 }
 
 .file-upload-label {
-    display: block;
-    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
     font-size: 0.9375rem;
-    color: var(--gray-500);
+    color: var(--gray-600);
     background: var(--gray-50);
     border: 2px dashed var(--gray-300);
     border-radius: var(--radius-lg);
     text-align: center;
     cursor: pointer;
     transition: all var(--transition);
+    min-height: 48px;
+}
+
+.file-upload-label::before {
+    content: '\f093';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 1.125rem;
+    color: var(--nu-blue);
 }
 
 .file-upload-wrapper:hover .file-upload-label {
@@ -1231,43 +1268,55 @@ body {
 
 .form-note {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.875rem 1rem;
-    background: var(--warning-light);
-    border-left: 4px solid var(--warning);
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--info-light);
+    border-left: 4px solid var(--info);
     border-radius: 0 var(--radius) var(--radius) 0;
     font-size: 0.875rem;
     color: var(--gray-700);
-    margin: 1rem 0;
+    margin: 1.5rem 0;
+    line-height: 1.5;
 }
 
 .form-note i {
-    color: var(--warning);
+    color: var(--info);
+    font-size: 1.125rem;
+    margin-top: 2px;
 }
 
 .password-hint {
-    background: var(--gray-200);
-    padding: 0.125rem 0.5rem;
+    background: var(--nu-blue-soft);
+    color: var(--nu-blue);
+    padding: 0.25rem 0.625rem;
     border-radius: var(--radius-sm);
-    font-family: monospace;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
     font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
 }
 
 .modal-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.75rem;
+    gap: 0.875rem;
     margin-top: 1.5rem;
     padding-top: 1.5rem;
-    border-top: 1px solid var(--gray-200);
+    border-top: 2px solid var(--gray-100);
+}
+
+.modal-actions .btn {
+    min-width: 140px;
+    justify-content: center;
 }
 
 /* Bulk Import Panel */
 .bulk-import-panel {
     background: var(--gray-50);
     border-radius: var(--radius-xl);
-    padding: 1.5rem;
+    padding: 2rem;
+    border: 2px solid var(--gray-100);
 }
 
 .bulk-import-header {
@@ -1276,46 +1325,54 @@ body {
     align-items: flex-start;
     gap: 1rem;
     margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--gray-200);
 }
 
 .bulk-import-header h3 {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--nu-blue);
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+}
+
+.bulk-import-header h3 i {
+    color: var(--nu-gold);
 }
 
 .bulk-import-header p {
     font-size: 0.875rem;
     color: var(--gray-600);
-    margin: 0.25rem 0 0;
+    margin: 0.375rem 0 0 2.5rem;
+    line-height: 1.5;
 }
 
 .bulk-badge {
-    padding: 0.375rem 0.875rem;
-    background: var(--nu-blue);
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--nu-blue), var(--nu-blue-dark));
     color: var(--white);
     border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.025em;
+    letter-spacing: 0.05em;
+    box-shadow: var(--shadow-blue);
 }
 
 .bulk-import-body {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
     margin-bottom: 1rem;
 }
 
 .file-drop-zone {
-    padding: 2rem;
+    padding: 2.5rem 2rem;
     border: 2px dashed var(--gray-300);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     background: var(--white);
     text-align: center;
     cursor: pointer;
@@ -1327,23 +1384,30 @@ body {
 .file-drop-zone.drag-over {
     border-color: var(--nu-blue);
     background: var(--nu-blue-soft);
+    transform: scale(1.01);
 }
 
 .file-drop-zone i {
-    font-size: 2rem;
+    font-size: 2.5rem;
     color: var(--nu-blue);
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
 }
 
 .file-drop-zone p {
-    font-size: 0.9375rem;
+    font-size: 1rem;
     color: var(--gray-700);
-    margin: 0 0 0.25rem;
+    margin: 0 0 0.5rem;
+    font-weight: 500;
 }
 
 .file-types {
     font-size: 0.8125rem;
     color: var(--gray-500);
+    background: var(--gray-100);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    display: inline-block;
 }
 
 .file-input {
@@ -1357,40 +1421,48 @@ body {
 }
 
 .bulk-import-status {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     color: var(--gray-600);
     margin: 0;
     min-height: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-200);
 }
 
 .bulk-import-help {
-    margin-top: 1.5rem;
+    margin-top: 2rem;
     padding-top: 1.5rem;
-    border-top: 1px solid var(--gray-200);
+    border-top: 2px solid var(--gray-200);
 }
 
 .bulk-import-help h4 {
-    font-size: 0.9375rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--nu-blue);
-    margin: 0 0 0.75rem;
+    margin: 0 0 1rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
+.bulk-import-help h4 i {
+    color: var(--nu-gold);
+}
+
 .bulk-import-help ul {
     list-style: none;
     padding: 0;
-    margin: 0 0 0.75rem;
+    margin: 0 0 1rem;
 }
 
 .bulk-import-help li {
     font-size: 0.875rem;
     color: var(--gray-600);
-    padding: 0.25rem 0;
-    padding-left: 1.25rem;
+    padding: 0.5rem 0 0.5rem 1.75rem;
     position: relative;
+    line-height: 1.5;
 }
 
 .bulk-import-help li::before {
@@ -1399,13 +1471,18 @@ body {
     left: 0;
     color: var(--success);
     font-weight: 700;
+    font-size: 0.875rem;
 }
 
 .help-note {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     color: var(--gray-500);
     margin: 0;
     font-style: italic;
+    padding: 0.75rem 1rem;
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-200);
 }
 
 /* Alert Toast */
@@ -1523,32 +1600,55 @@ body {
     .alumni-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
 }
 
-/* Scrollbar */
-.admin-sidebar::-webkit-scrollbar,
-.admin-main::-webkit-scrollbar,
+/* ========================================
+   MINIMALIST SCROLLBARS
+   ======================================== */
+
 .modal-content-wrapper::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
+}
+
+.modal-content-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+}
+
+.modal-content-wrapper::-webkit-scrollbar-thumb {
+    background: var(--gray-200);
+    border-radius: var(--radius-full);
+}
+
+.modal-content-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300);
+}
+
+.admin-sidebar::-webkit-scrollbar,
+.admin-main::-webkit-scrollbar {
+    width: 6px;
 }
 
 .admin-sidebar::-webkit-scrollbar-track,
-.admin-main::-webkit-scrollbar-track,
-.modal-content-wrapper::-webkit-scrollbar-track {
-    background: var(--gray-100);
-    border-radius: var(--radius-full);
+.admin-main::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .admin-sidebar::-webkit-scrollbar-thumb,
-.admin-main::-webkit-scrollbar-thumb,
-.modal-content-wrapper::-webkit-scrollbar-thumb {
-    background: var(--gray-300);
+.admin-main::-webkit-scrollbar-thumb {
+    background: var(--gray-200);
     border-radius: var(--radius-full);
-    transition: background var(--transition);
 }
 
 .admin-sidebar::-webkit-scrollbar-thumb:hover,
-.admin-main::-webkit-scrollbar-thumb:hover,
-.modal-content-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--gray-400);
+.admin-main::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300);
+}
+
+/* Firefox */
+.modal-content-wrapper,
+.admin-sidebar,
+.admin-main {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-200) transparent;
 }
 
 /* Animations */
@@ -1565,6 +1665,25 @@ body {
 .alumni-card:nth-child(2) { animation-delay: 0.1s; }
 .alumni-card:nth-child(3) { animation-delay: 0.15s; }
 .alumni-card:nth-child(4) { animation-delay: 0.2s; }
+
+/* ========================================
+   MODAL ANIMATION
+   ======================================== */
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-overlay.active .modal-card {
+    animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
 /* ========================================
    OVERRIDE admin.css for Directory Page

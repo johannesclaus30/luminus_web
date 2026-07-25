@@ -266,37 +266,31 @@ class AdminController extends Controller
             'last_name' => ['required', 'string', 'max:255'],
             'student_id_number' => ['required', 'string', 'max:255', Rule::unique('alumnis', 'student_id_number')],
             'email' => ['required', 'email', 'max:255', Rule::unique('alumnis', 'email')],
-            
-            // These two are missing from the Excel file, so they MUST be nullable
             'date_of_birth' => ['nullable', 'date'],
             'sex' => ['nullable', 'string', 'max:50'],
-            
-            // This is provided in the Excel file as "Graduation Period"
-            'year_graduated' => ['required', 'date'], 
-            
-            // Made these nullable as a safety net in case a student's row is missing them in the Excel file
+            'year_graduated' => ['required', 'date'],
             'phone_number' => ['nullable', 'string', 'max:50'],
             'program' => ['nullable', 'string', 'max:255'],
-            
             'card_photo' => ['nullable', 'image', 'max:4096'],
         ]);
 
+        // Handle card photo upload to S3
         $cardPhotoPath = null;
-
         if ($request->hasFile('card_photo')) {
             $storedPath = $request->file('card_photo')->store('card_photo', 's3');
-
             if (! $storedPath) {
                 throw ValidationException::withMessages([
                     'card_photo' => 'The card photo could not be uploaded to Supabase.',
                 ]);
             }
-
             $cardPhotoPath = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
         }
 
-        // 1. Assign the created record to a variable
-        $alumni = Alumni::create([
+        // Generate a random 10-character temporary password
+        $temporaryPassword = Str::random(10);
+
+        // Create the alumni record
+        $alumnus = Alumni::create([
             'first_name' => $validated['first_name'],
             'middle_name' => $validated['middle_name'] ?? null,
             'last_name' => $validated['last_name'],
@@ -306,33 +300,47 @@ class AdminController extends Controller
             'student_id_number' => $validated['student_id_number'],
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
-            'password_hash' => Hash::make('password123'), // 🔐 Hashed!
+            'password_hash' => Hash::make($temporaryPassword),
             'verification_status' => 'verified',
+            'needs_password_change' => true,
             'program' => $validated['program'] ?? null,
             'card_photo' => $cardPhotoPath,
         ]);
 
-        // 📧 2. Send the Welcome Email using Brevo API
+        // Send welcome email with the temporary password
         try {
             $service = new BrevoMailService();
             $htmlContent = view('emails.welcome-alumni', [
-                'alumnus' => $alumni
+                'alumnus' => $alumnus,
+                'temporaryPassword' => $temporaryPassword,
             ])->render();
             
             $service->sendEmail(
-                $alumni->email,
-                'Welcome to LumiNUs Alumni Network',
+                $alumnus->email,
+                'Welcome to LumiNUs',
                 $htmlContent
             );
         } catch (\Throwable $e) {
-            // If the email fails, log the error but DO NOT stop the account creation process.
-            \Log::error('Failed to send welcome email to ' . $alumni->email . ': ' . $e->getMessage());
+            \Log::error('Failed to send welcome email to ' . $alumnus->email . ': ' . $e->getMessage());
         }
 
+        // If this is an AJAX request (from bulk import), return JSON
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Alumni account created successfully.',
+                'alumnus' => [
+                    'id' => $alumnus->id,
+                    'name' => trim($alumnus->first_name . ' ' . $alumnus->last_name),
+                    'email' => $alumnus->email,
+                ]
+            ], 201);
+        }
+
+        // Regular form submission redirect
         return redirect()
             ->route('admin.directory')
-            ->with('status', 'Alumni account created successfully.');
-
+            ->with('status', 'Alumni account created successfully. Temporary password has been emailed.');
     }
 
     /**

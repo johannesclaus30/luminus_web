@@ -361,7 +361,7 @@
                             <i class="fa-solid fa-user-plus"></i>
                             Create Alumni Account
                         </h2>
-                        <p class="modal-subtitle">Add an alumni record. Initial password: <strong>password123</strong></p>
+                        <p class="modal-subtitle">Add an alumni record. A random temporary password will be emailed to the alumni.</p>
                     </div>
                     <button class="modal-close" onclick="hideModal()" title="Close">
                         <i class="fa-solid fa-xmark"></i>
@@ -426,7 +426,7 @@
                                     <input id="date_of_birth" name="date_of_birth" value="{{ old('date_of_birth') }}" type="date">
                                 </div>
                                 <div class="form-group">
-                                    <label for="year_graduated">Year Graduated</label>
+                                    <label for="year_graduated">Year Graduated *</label>
                                     <input id="year_graduated" name="year_graduated" value="{{ old('year_graduated') }}" type="date">
                                 </div>
                             </div>
@@ -469,7 +469,7 @@
 
                             <div class="form-note">
                                 <i class="fa-solid fa-circle-info"></i>
-                                <strong>Testing password:</strong> All new accounts use <span class="password-hint">password123</span>
+                                <strong>Note:</strong> A random temporary password will be generated and sent to the alumni's email address.
                             </div>
 
                             <div class="modal-actions">
@@ -774,7 +774,9 @@
             formData.append('_token', '{{ csrf_token() }}');
             
             Object.keys(record).forEach(key => {
-                formData.append(key, record[key]);
+                if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
+                    formData.append(key, record[key]);
+                }
             });
 
             const response = await fetch('{{ route('admin.alumni.store') }}', {
@@ -786,11 +788,24 @@
                 body: formData,
             });
 
+            const payload = await response.json().catch(() => null);
+
             if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                const message = payload?.message || 'Unable to import one or more alumni records.';
-                throw new Error(message);
+                // Extract validation errors
+                let errorMessage = 'Unable to import record.';
+                if (payload?.errors) {
+                    const errorList = [];
+                    Object.entries(payload.errors).forEach(([field, messages]) => {
+                        errorList.push(`${field}: ${messages.join(', ')}`);
+                    });
+                    errorMessage = errorList.join(' | ');
+                } else if (payload?.message) {
+                    errorMessage = payload.message;
+                }
+                throw new Error(errorMessage);
             }
+
+            return payload;
         }
 
         async function handleBulkImport() {
@@ -851,8 +866,9 @@
                     return;
                 }
 
-                let created = 0;
+                                let created = 0;
                 let failed = 0;
+                const errors = [];
 
                 status.textContent = `Importing ${records.length} record(s)...`;
 
@@ -862,16 +878,24 @@
                         created += 1;
                     } catch (error) {
                         failed += 1;
+                        errors.push(`${record.first_name} ${record.last_name} (${record.student_id_number}): ${error.message}`);
                         console.error("Failed to import:", record.student_id_number, error.message);
                     }
                 }
 
-                status.textContent = `✓ Import complete: ${created} created${failed ? `, ${failed} failed` : ''}.`;
-                status.style.color = created > 0 ? 'var(--success)' : 'var(--danger)';
+                // Show detailed results
+                if (errors.length > 0) {
+                    status.innerHTML = `✓ Import complete: ${created} created, ${failed} failed.<br><small style="color: var(--danger); font-size: 0.8rem;">${errors.slice(0, 3).join('<br>')}${errors.length > 3 ? '<br>...and ' + (errors.length - 3) + ' more errors' : ''}</small>`;
+                    status.style.color = failed > created ? 'var(--danger)' : 'var(--warning)';
+                } else {
+                    status.textContent = `✓ Import complete: ${created} created successfully.`;
+                    status.style.color = 'var(--success)';
+                }
 
                 if (created > 0) {
                     setTimeout(() => window.location.reload(), 1500);
                 }
+
             } catch (error) {
                 console.error('Import error:', error);
                 status.textContent = 'Error: ' + error.message;

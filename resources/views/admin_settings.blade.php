@@ -649,8 +649,31 @@
                                             <tr class="{{ $accountStatus == 0 ? 'restricted-row' : '' }}">
                                                 <td>
                                                     <div class="table-admin-info">
+                                                        @php
+                                                            // Resolve admin photo URL (same logic as resolveAdminPhotoUrl in controller)
+                                                            $adminPhotoUrl = null;
+                                                            $photoPath = trim((string)($admin->photo ?? ''));
+                                                            if ($photoPath !== '') {
+                                                                if (preg_match('/^https?:\/\//i', $photoPath)) {
+                                                                    $adminPhotoUrl = $photoPath;
+                                                                } elseif (str_starts_with($photoPath, '/storage/')) {
+                                                                    $adminPhotoUrl = $photoPath;
+                                                                } elseif (str_starts_with($photoPath, 'storage/')) {
+                                                                    $adminPhotoUrl = '/' . $photoPath;
+                                                                } elseif (str_starts_with($photoPath, '/')) {
+                                                                    $adminPhotoUrl = $photoPath;
+                                                                } else {
+                                                                    $adminPhotoUrl = Storage::disk('supabase_admin')->url($photoPath);
+                                                                }
+                                                            }
+                                                        @endphp
+
                                                         <div class="table-admin-avatar">
-                                                            {{ strtoupper(mb_substr($firstName, 0, 1) . mb_substr($lastName, 0, 1)) }}
+                                                            @if($adminPhotoUrl)
+                                                                <img src="{{ $adminPhotoUrl }}" alt="{{ $displayName }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                                                            @else
+                                                                {{ strtoupper(mb_substr($firstName, 0, 1) . mb_substr($lastName, 0, 1)) }}
+                                                            @endif
                                                         </div>
                                                         <span class="table-admin-name">{{ $displayName ?: 'Unnamed Admin' }}</span>
                                                     </div>
@@ -1301,7 +1324,7 @@
         }
     });
 
-    // ========================================
+   // ========================================
     // PERMISSIONS MODAL LOGIC
     // ========================================
     let currentPermissionsAdminId = null;
@@ -1317,7 +1340,14 @@
             const data = await response.json();
             
             if (data.error) {
-                alert(data.error);
+                window.showWarningModal({
+                    title: 'Error',
+                    message: '<strong>' + data.error + '</strong>',
+                    iconType: 'danger',
+                    confirmText: 'OK',
+                    confirmClass: 'btn-danger',
+                    hideCancel: true
+                });
                 return;
             }
             
@@ -1329,7 +1359,14 @@
             
         } catch (error) {
             console.error('Error fetching permissions:', error);
-            alert('Failed to load permissions');
+            window.showWarningModal({
+                title: 'Error',
+                message: '<strong>Failed to load permissions. Please try again.</strong>',
+                iconType: 'danger',
+                confirmText: 'OK',
+                confirmClass: 'btn-danger',
+                hideCancel: true
+            });
         }
     }
 
@@ -1402,15 +1439,38 @@
             
             if (data.success) {
                 closePermissionsModal();
-                alert(data.message);
-                location.reload();
+                window.showWarningModal({
+                    title: 'Permissions Updated',
+                    message: '<strong>' + data.message + '</strong>',
+                    iconType: 'success',
+                    confirmText: 'OK',
+                    confirmClass: 'btn-success',
+                    hideCancel: true,
+                    onConfirm: function() {
+                        location.reload();
+                    }
+                });
             } else {
-                alert(data.error || 'Failed to save permissions');
+                window.showWarningModal({
+                    title: 'Error',
+                    message: '<strong>' + (data.error || 'Failed to save permissions') + '</strong>',
+                    iconType: 'danger',
+                    confirmText: 'OK',
+                    confirmClass: 'btn-danger',
+                    hideCancel: true
+                });
             }
             
         } catch (error) {
             console.error('Error saving permissions:', error);
-            alert('Failed to save permissions');
+            window.showWarningModal({
+                title: 'Error',
+                message: '<strong>Failed to save permissions. Please try again.</strong>',
+                iconType: 'danger',
+                confirmText: 'OK',
+                confirmClass: 'btn-danger',
+                hideCancel: true
+            });
         }
     }
 
