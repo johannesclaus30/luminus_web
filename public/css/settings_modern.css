@@ -1807,3 +1807,26 @@ input:checked + .slider:before {
 .table-wrap::-webkit-scrollbar-thumb:hover {
     background: var(--gray-300);
 }
+
+.btn-permissions {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe) !important;
+    color: #3b82f6 !important;
+    border: 1px solid #bfdbfe !important;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.btn-permissions:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    color: white !important;
+    border-color: transparent !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}

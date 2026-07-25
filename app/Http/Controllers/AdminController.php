@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Admin;
 use App\Models\Alumni;
+use App\Models\AdminPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -65,9 +66,9 @@ class AdminController extends Controller
 
         // Check if account is restricted
         if (($admin->account_status ?? 1) == 0) {
-            throw ValidationException::withMessages([
-                'admin_email' => 'Your account has been restricted. Please contact the administrator.',
-            ]);
+            return redirect()
+                ->route('admin.restricted')
+                ->with('restricted_email', $admin->admin_email);
         }
 
         $request->session()->regenerate();
@@ -179,6 +180,8 @@ class AdminController extends Controller
             $admin->photo = $this->storeAdminPhoto($request, 'photo', $admin, null);
             $admin->save();
         }
+
+        $admin->setupDefaultPermissions();
 
         // Send invitation email using Brevo API
         try {
@@ -814,14 +817,13 @@ class AdminController extends Controller
     }
 
     /**
-     * Reset an admin's password and return the temporary password.
+     * Reset an admin's password and send notification email.
      */
     public function resetAdminPassword(Request $request, $id)
     {
         $admin = Admin::findOrFail($id);
         $currentAdmin = $this->getAuthenticatedAdmin($request);
 
-        // Prevent resetting your own password this way — use the Security tab instead
         if ($currentAdmin && $currentAdmin->id == $admin->id) {
             return redirect()
                 ->route('admin.settings', ['section' => 'roles'])
@@ -833,60 +835,412 @@ class AdminController extends Controller
             'admin_password_hash' => Hash::make($temporaryPassword),
         ]);
 
-        return redirect()
-            ->route('admin.settings', ['section' => 'roles'])
-            ->with('status', 'Password for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been reset.')
-            ->with('temporary_password', $temporaryPassword);
+        // Send email notification
+        try {
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.admin_password_reset_notify', [
+                'admin' => $admin,
+                'temporaryPassword' => $temporaryPassword,
+                'resetBy' => trim($currentAdmin->admin_first_name . ' ' . $currentAdmin->admin_last_name)
+            ])->render();
+            
+            $service->sendEmail(
+                $admin->admin_email,
+                'Your LumiNUs Admin Password Has Been Reset',
+                $htmlContent
+            );
+            
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('status', 'Password for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been reset and emailed.')
+                ->with('temporary_password', $temporaryPassword);
+                
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send password reset email to ' . $admin->admin_email . ': ' . $e->getMessage());
+            
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('status', 'Password reset, but email could not be sent.')
+                ->with('temporary_password', $temporaryPassword);
+        }
     }
 
-    /**
-     * Toggle an admin's account restriction status.
-     */
     public function toggleRestrictAdmin(Request $request, $id)
     {
         $admin = Admin::findOrFail($id);
         $currentAdmin = $this->getAuthenticatedAdmin($request);
 
-        // Prevent restricting yourself
+        // Prevent self-restriction
         if ($currentAdmin && $currentAdmin->id == $admin->id) {
             return redirect()
                 ->route('admin.settings', ['section' => 'roles'])
-                ->with('status', 'You cannot restrict your own account.');
+                ->with('error', 'You cannot restrict your own account.');
         }
 
-        $newStatus = $admin->account_status == 1 ? 0 : 1;
+        // Check if account_status exists and has valid value
+        $currentStatus = $admin->account_status ?? 1; // Default to active if null
+        
+        // Toggle the status
+        $newStatus = $currentStatus == 1 ? 0 : 1;
+        
+        // Update the admin status
         $admin->update(['account_status' => $newStatus]);
 
-        $action = $newStatus == 0 ? 'restricted' : 'unrestricted';
-        return redirect()
-            ->route('admin.settings', ['section' => 'roles'])
-            ->with('status', 'Account for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been ' . $action . '.');
+        $isRestricted = $newStatus == 0;
+        $action = $isRestricted ? 'restricted' : 'unrestricted';
+
+        // ✅ FORCE LOGOUT: If restricting and the admin is currently logged in
+        if ($isRestricted) {
+            $this->forceLogoutAdmin($admin->id);
+        }
+
+        // Log the action for audit
+        \Log::info('Admin account ' . $action, [
+            'admin_id' => $admin->id,
+            'admin_email' => $admin->admin_email,
+            'performed_by' => $currentAdmin->id,
+            'new_status' => $newStatus,
+            'ip' => $request->ip(),
+            'forced_logout' => $isRestricted
+        ]);
+
+        // Send email notification
+        try {
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.admin_account_restricted', [
+                'admin' => $admin,
+                'isRestricted' => $isRestricted,
+                'updatedBy' => trim($currentAdmin->admin_first_name . ' ' . $currentAdmin->admin_last_name)
+            ])->render();
+            
+            $subject = $isRestricted 
+                ? 'Your LumiNUs Admin Account Has Been Restricted' 
+                : 'Your LumiNUs Admin Account Has Been Restored';
+            
+            $service->sendEmail($admin->admin_email, $subject, $htmlContent);
+            
+            $message = $isRestricted 
+                ? 'Account for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been restricted and they have been logged out.'
+                : 'Account for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been unrestricted.';
+            
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('success', $message);
+                
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send restriction email to ' . $admin->admin_email . ': ' . $e->getMessage());
+            
+            return redirect()
+                ->route('admin.settings', ['section' => 'roles'])
+                ->with('warning', 'Account for ' . $admin->admin_first_name . ' ' . $admin->admin_last_name . ' has been ' . $action . ', but email could not be sent.');
+        }
     }
 
     /**
-     * Delete an admin account.
+     * Delete an admin account and send notification email.
      */
     public function deleteAdmin(Request $request, $id)
     {
         $admin = Admin::findOrFail($id);
         $currentAdmin = $this->getAuthenticatedAdmin($request);
 
-        // Prevent deleting yourself
         if ($currentAdmin && $currentAdmin->id == $admin->id) {
             return redirect()
                 ->route('admin.settings', ['section' => 'roles'])
                 ->with('status', 'You cannot delete your own account.');
         }
 
+        $adminName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
+        $adminEmail = $admin->admin_email;
+        $deletedBy = trim($currentAdmin->admin_first_name . ' ' . $currentAdmin->admin_last_name);
+
         // Delete photo if exists
         $this->deleteAdminPhoto($admin->photo);
 
-        $adminName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
+        // Send email BEFORE deleting (so we still have the data)
+        try {
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.admin_account_deleted', [
+                'adminName' => $adminName,
+                'adminEmail' => $adminEmail,
+                'deletedBy' => $deletedBy
+            ])->render();
+            
+            $service->sendEmail(
+                $adminEmail,
+                'Your LumiNUs Admin Account Has Been Removed',
+                $htmlContent
+            );
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send deletion email to ' . $adminEmail . ': ' . $e->getMessage());
+        }
+
+        // Now delete the admin
         $admin->delete();
 
         return redirect()
             ->route('admin.settings', ['section' => 'roles'])
-            ->with('status', 'Admin account for ' . $adminName . ' has been deleted.');
+            ->with('status', 'Admin account for ' . $adminName . ' has been deleted and notified.');
+    }
+
+protected function forceLogoutAdmin($adminId)
+{
+    try {
+        \Log::info('=== FORCE LOGOUT STARTED ===', [
+            'admin_id' => $adminId,
+            'session_driver' => config('session.driver'),
+            'timestamp' => now()
+        ]);
+        
+        if (config('session.driver') !== 'database') {
+            \Log::error('Session driver is NOT database! Current: ' . config('session.driver'));
+            return;
+        }
+        
+        // Count sessions before
+        $before = \DB::table('sessions')->count();
+        \Log::info("Sessions before deletion: {$before}");
+        
+        // Delete by admin_id in payload
+        $deleted = \DB::table('sessions')
+            ->where('payload', 'LIKE', '%"admin_id";i:' . $adminId . '%')
+            ->orWhere('payload', 'LIKE', '%"admin_id";s:' . $adminId . '%')
+            ->orWhere('payload', 'LIKE', '%"admin_id":' . $adminId . '%')
+            ->delete();
+        
+        // Count sessions after
+        $after = \DB::table('sessions')->count();
+        
+        \Log::info('=== FORCE LOGOUT COMPLETED ===', [
+            'admin_id' => $adminId,
+            'sessions_deleted' => $deleted,
+            'sessions_before' => $before,
+            'sessions_after' => $after
+        ]);
+        
+    } catch (\Exception $e) {
+        \Log::error('Force logout ERROR: ' . $e->getMessage());
+        \Log::error($e->getTraceAsString());
+    }
+}
+
+    protected function forceLogoutAdminFallback($adminId)
+    {
+        try {
+            $table = config('session.table', 'sessions');
+            $sessions = \DB::table($table)->get(['id', 'payload']);
+            $deletedCount = 0;
+            
+            foreach ($sessions as $session) {
+                $payload = json_decode($session->payload ?? '{}', true);
+                if (isset($payload['admin_id']) && (int)$payload['admin_id'] === (int)$adminId) {
+                    \DB::table($table)->where('id', $session->id)->delete();
+                    $deletedCount++;
+                }
+            }
+            
+            if ($deletedCount > 0) {
+                \Log::info("Admin {$adminId} logged out forcefully (fallback). {$deletedCount} session(s) cleared.");
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error("Failed to force logout admin {$adminId} (fallback): " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Alternative: Clear sessions for a specific admin using Laravel's session handler
+     */
+    protected function clearAdminSessions($adminId)
+    {
+        // Get all session IDs (if using database)
+        if (config('session.driver') === 'database') {
+            $sessionIds = \DB::table('sessions')
+                ->where('user_id', $adminId)
+                ->pluck('id');
+            
+            foreach ($sessionIds as $sessionId) {
+                // Delete the session from storage
+                \DB::table('sessions')->where('id', $sessionId)->delete();
+            }
+        }
+        
+        // If using Redis or other drivers, you might need different approaches
+        // For file-based sessions, you could delete session files
+        if (config('session.driver') === 'file') {
+            $sessionPath = config('session.files');
+            $files = glob($sessionPath . '/*');
+            
+            foreach ($files as $file) {
+                $content = file_get_contents($file);
+                // Check if the session contains the admin ID
+                if (strpos($content, '"user_id";i:' . $adminId) !== false) {
+                    unlink($file);
+                }
+            }
+        }
+    }
+
+    public function debugForceLogout(Request $request)
+    {
+        $adminId = $request->input('admin_id');
+        
+        if (!$adminId) {
+            return response()->json(['error' => 'Please provide admin_id parameter']);
+        }
+        
+        // 1. Check if admin exists
+        $admin = Admin::find($adminId);
+        if (!$admin) {
+            return response()->json(['error' => 'Admin not found']);
+        }
+        
+        // 2. Get all sessions
+        $sessions = \DB::table('sessions')->get();
+        
+        $result = [
+            'admin_id' => $adminId,
+            'admin_email' => $admin->admin_email,
+            'session_driver' => config('session.driver'),
+            'session_table' => config('session.table'),
+            'total_sessions' => $sessions->count(),
+            'matching_sessions' => [],
+            'all_sessions' => []
+        ];
+        
+        foreach ($sessions as $session) {
+            $payload = json_decode($session->payload ?? '{}', true);
+            
+            $sessionInfo = [
+                'id' => $session->id,
+                'user_id' => $session->user_id,
+                'has_admin_id' => isset($payload['admin_id']),
+                'admin_id_value' => $payload['admin_id'] ?? null,
+                'has_user_id' => isset($payload['user_id']),
+                'user_id_value' => $payload['user_id'] ?? null,
+                'payload_keys' => array_keys($payload),
+                'full_payload' => $payload
+            ];
+            
+            $result['all_sessions'][] = $sessionInfo;
+            
+            // Check if this session matches the admin
+            if (
+                (isset($payload['admin_id']) && $payload['admin_id'] == $adminId) ||
+                (isset($payload['user_id']) && $payload['user_id'] == $adminId) ||
+                $session->user_id == $adminId ||
+                str_contains($session->payload, '"admin_id";i:' . $adminId) ||
+                str_contains($session->payload, '"admin_id";s:' . $adminId)
+            ) {
+                $result['matching_sessions'][] = $sessionInfo;
+            }
+        }
+        
+        // 3. Attempt to force logout
+        $deleted = 0;
+        foreach ($result['matching_sessions'] as $match) {
+            \DB::table('sessions')->where('id', $match['id'])->delete();
+            $deleted++;
+        }
+        
+        $result['attempted_delete_count'] = $deleted;
+        $result['remaining_sessions'] = \DB::table('sessions')->count();
+        
+        return response()->json($result);
+    }
+
+    /**
+     * Show admin permissions for editing
+     */
+    public function showAdminPermissions(Request $request, $id)
+    {
+        $admin = Admin::with('permissions')->findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
+        
+        // Only Coordinator can manage permissions
+        if (!$currentAdmin || $currentAdmin->admin_role !== 'Coordinator') {
+            return response()->json(['error' => 'Unauthorized. Only Coordinators can manage permissions.'], 403);
+        }
+        
+        // Cannot modify own permissions
+        if ($currentAdmin->id == $admin->id) {
+            return response()->json(['error' => 'You cannot modify your own permissions.'], 400);
+        }
+        
+        $allModules = AdminPermission::getAvailableModules();
+        $existingPermissions = $admin->permissions()->pluck('can_view', 'module')->toArray();
+        
+        $permissionsData = [];
+        foreach ($allModules as $moduleKey => $moduleData) {
+            if (array_key_exists($moduleKey, $existingPermissions)) {
+                $canView = (bool) $existingPermissions[$moduleKey];
+            } else {
+                $defaults = AdminPermission::getDefaultPermissionsForRole($admin->admin_role);
+                $canView = $defaults[$moduleKey] ?? false;
+            }
+            
+            $permissionsData[$moduleKey] = [
+                'name' => $moduleData['name'],
+                'icon' => $moduleData['icon'],
+                'description' => $moduleData['description'],
+                'can_view' => $canView,
+                'is_default' => !array_key_exists($moduleKey, $existingPermissions),
+            ];
+        }
+        
+        return response()->json([
+            'admin' => [
+                'id' => $admin->id,
+                'name' => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
+                'role' => $admin->admin_role,
+            ],
+            'permissions' => $permissionsData,
+        ]);
+    }
+
+    /**
+     * Update admin permissions
+     */
+    public function updateAdminPermissions(Request $request, $id)
+    {
+        $admin = Admin::findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
+        
+        // Only Coordinator can manage permissions
+        if (!$currentAdmin || $currentAdmin->admin_role !== 'Coordinator') {
+            return response()->json(['error' => 'Unauthorized. Only Coordinators can manage permissions.'], 403);
+        }
+        
+        // Cannot modify own permissions
+        if ($currentAdmin->id == $admin->id) {
+            return response()->json(['error' => 'You cannot modify your own permissions.'], 400);
+        }
+        
+        $validated = $request->validate([
+            'permissions' => 'required|array',
+            'permissions.*.module' => 'required|string',
+            'permissions.*.can_view' => 'required|boolean',
+            'permissions.*.can_manage' => 'required|boolean',
+        ]);
+        
+        $permissionsToSync = [];
+        foreach ($validated['permissions'] as $perm) {
+            $permissionsToSync[$perm['module']] = $perm['can_view'];
+        }
+        
+        $admin->syncPermissions($permissionsToSync);
+        
+        \Log::info('Admin permissions updated', [
+            'admin_id' => $admin->id,
+            'admin_name' => trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
+            'updated_by' => $currentAdmin->id,
+            'permissions' => $validated['permissions'],
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Permissions updated for ' . trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? '')),
+        ]);
     }
 
 

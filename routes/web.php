@@ -21,6 +21,13 @@ Route::prefix('admin')->group(function () {
     Route::get('/logout', [AdminController::class, 'logout'])
         ->name('admin.logout');
 
+    Route::get('/restricted', function () {
+        return view('admin_restricted');
+    })->name('admin.restricted');
+
+    Route::get('/admin/debug-force-logout', [AdminController::class, 'debugForceLogout']);
+
+
     // Forgot Password Routes (Public)
     Route::get('/forgot-password', [AdminController::class, 'showForgotPassword'])->name('admin.forgot-password');
     Route::post('/forgot-password', [AdminController::class, 'sendResetLink'])->name('admin.send-reset-link');
@@ -76,6 +83,10 @@ Route::prefix('admin')->group(function () {
 
         // Change Password (Authenticated)
         Route::put('/settings/password', [AdminController::class, 'changePassword'])->name('admin.password.update');
+
+        //Permission Management routes
+        Route::get('/settings/admin/{id}/permissions', [AdminController::class, 'showAdminPermissions']);
+        Route::put('/settings/admin/{id}/permissions', [AdminController::class, 'updateAdminPermissions']);
 
         // Events
         Route::get('/events', [EventController::class, 'index'])

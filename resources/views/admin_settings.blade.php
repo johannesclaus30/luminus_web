@@ -70,6 +70,176 @@
         }
         .status-dot.active { background: var(--success); }
         .status-dot.restricted { background: var(--danger); }
+
+        .permissions-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1100;
+            align-items: center;
+            justify-content: center;
+        }
+        .permissions-modal-overlay.active {
+            display: flex;
+        }
+
+        .permissions-modal {
+            background: var(--white);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .permissions-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .permissions-modal-title {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .permissions-modal-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+        }
+
+        .permissions-modal-title h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin: 0;
+        }
+
+        .permissions-modal-title p {
+            font-size: 0.8125rem;
+            color: var(--gray-500);
+            margin: 0.125rem 0 0 0;
+        }
+
+        .permissions-modal-close {
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+
+        .permissions-modal-close:hover {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        .permissions-modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .permissions-info-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            font-size: 0.8125rem;
+            color: #1e40af;
+        }
+
+        .permissions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.875rem 1rem;
+            background: var(--gray-50);
+            border-radius: 10px;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .permission-item:hover {
+            background: var(--white);
+            border-color: var(--gray-200);
+        }
+
+        .permission-item-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .permission-item-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            background: #dbeafe;
+            color: #3b82f6;
+            transition: all 0.2s ease;
+        }
+
+        .permission-item-icon.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .permission-item-info h4 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin: 0;
+        }
+
+        .permission-item-info span {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+
+        .permissions-modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
     </style>
 </head>
 <body>
@@ -91,32 +261,65 @@
                 </button>
             </div>
             
+            @php
+                $currentAdmin = null;
+                $adminId = session('admin_id');
+                if ($adminId) {
+                    $currentAdmin = \App\Models\Admin::find($adminId);
+                }
+                $accessibleModules = $currentAdmin ? $currentAdmin->getAccessibleModules() : [];
+            @endphp
+
             <nav class="sidebar-nav">
                 <p class="nav-section-title">Admin Menu</p>
-                <a href="/admin/dashboard" class="nav-item">
+                
+                @if(isset($accessibleModules['dashboard']))
+                <a href="/admin/dashboard" class="nav-item {{ request()->is('admin/dashboard') ? 'active' : '' }}">
                     <i class="fa-solid fa-chart-line"></i><span>Dashboard</span>
                 </a>
-                <a href="/admin/directory" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['directory']))
+                <a href="/admin/directory" class="nav-item {{ request()->is('admin/directory*') ? 'active' : '' }}">
                     <i class="fa-solid fa-users"></i><span>Alumni Directory</span>
                 </a>
-                <a href="{{ route('announcements.index') }}" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['announcements']))
+                <a href="{{ route('announcements.index') }}" class="nav-item {{ request()->is('admin/announcements*') ? 'active' : '' }}">
                     <i class="fa-solid fa-bullhorn"></i><span>Announcements</span>
                 </a>
-                <a href="{{ route('events.index') }}" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['events']))
+                <a href="{{ route('events.index') }}" class="nav-item {{ request()->is('admin/events*') ? 'active' : '' }}">
                     <i class="fa-solid fa-calendar-check"></i><span>Events</span>
                 </a>
-                <a href="{{ route('perks.index') }}" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['perks']))
+                <a href="{{ route('perks.index') }}" class="nav-item {{ request()->is('admin/perks*') ? 'active' : '' }}">
                     <i class="fa-solid fa-gift"></i><span>Perks & Discounts</span>
                 </a>
-                <a href="/admin/alumni_tracer" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['tracer']))
+                <a href="/admin/alumni_tracer" class="nav-item {{ request()->is('admin/alumni_tracer*') ? 'active' : '' }}">
                     <i class="fa-solid fa-location-dot"></i><span>Alumni Tracer</span>
                 </a>
-                <a href="/admin/messages" class="nav-item">
+                @endif
+                
+                @if(isset($accessibleModules['messages']))
+                <a href="/admin/messages" class="nav-item {{ request()->is('admin/messages*') ? 'active' : '' }}">
                     <i class="fa-solid fa-envelope"></i><span>Messages</span>
                 </a>
-                <a href="{{ route('admin.settings') }}" class="nav-item active">
+                @endif
+                
+                @if(isset($accessibleModules['settings']))
+                <a href="{{ route('admin.settings') }}" class="nav-item {{ request()->is('admin/settings*') ? 'active' : '' }}">
                     <i class="fa-solid fa-gear"></i><span>Settings</span>
                 </a>
+                @endif
             </nav>
         </aside>
 
@@ -465,13 +668,21 @@
                                                 </td>
                                                 <td>
                                                     <div class="table-actions-group">
+                                                        @if($currentAdmin && $currentAdmin->admin_role === 'Coordinator' && $currentAdmin->id != $admin->id)
+                                                        <button type="button" 
+                                                                class="btn-action btn-permissions" 
+                                                                onclick="openPermissionsModal('{{ $admin->id }}', '{{ addslashes($displayName) }}')"
+                                                                title="Manage Module Permissions">
+                                                            <i class="fa-solid fa-shield-halved"></i>
+                                                        </button>
+                                                        @endif
                                                         <button type="button" class="btn-action btn-manage" title="Manage" 
-                                                            onclick="openManageModal(
-                                                                '{{ $admin->id }}',
-                                                                '{{ $displayName }}',
-                                                                '{{ $roleLabel }}',
-                                                                {{ $accountStatus }}
-                                                            )">
+                                                                onclick="openManageModal(
+                                                                    '{{ $admin->id }}',
+                                                                    '{{ addslashes($displayName) }}',
+                                                                    '{{ addslashes($roleLabel) }}',
+                                                                    {{ $accountStatus }}
+                                                                )">
                                                             <i class="fa-solid fa-ellipsis"></i>
                                                         </button>
                                                     </div>
@@ -724,6 +935,41 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permissions Modal -->
+    <div id="permissionsModal" class="permissions-modal-overlay">
+        <div class="permissions-modal">
+            <div class="permissions-modal-header">
+                <div class="permissions-modal-title">
+                    <div class="permissions-modal-icon">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h3>Module Permissions</h3>
+                        <p id="permissionsAdminName">Manage what this admin can access</p>
+                    </div>
+                </div>
+                <button class="permissions-modal-close" onclick="closePermissionsModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="permissions-modal-body">
+                <div class="permissions-info-banner">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Coordinator has full access by default. These settings apply to other roles.</span>
+                </div>
+                <div id="permissionsList" class="permissions-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+            <div class="permissions-modal-footer">
+                <button class="btn btn-secondary" onclick="closePermissionsModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="savePermissions()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Permissions
+                </button>
             </div>
         </div>
     </div>
@@ -1053,6 +1299,129 @@
                 if (s) s.style.display = 'block';
             }
         }
+    });
+
+    // ========================================
+    // PERMISSIONS MODAL LOGIC
+    // ========================================
+    let currentPermissionsAdminId = null;
+    let currentPermissionsData = {};
+
+    async function openPermissionsModal(adminId, adminName) {
+        currentPermissionsAdminId = adminId;
+        document.getElementById('permissionsAdminName').textContent = 
+            'Manage what ' + adminName + ' can access';
+        
+        try {
+            const response = await fetch(`/admin/settings/admin/${adminId}/permissions`);
+            const data = await response.json();
+            
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            currentPermissionsData = data.permissions;
+            renderPermissionsList(data.permissions);
+            
+            document.getElementById('permissionsModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            
+        } catch (error) {
+            console.error('Error fetching permissions:', error);
+            alert('Failed to load permissions');
+        }
+    }
+
+    function renderPermissionsList(permissions) {
+        const container = document.getElementById('permissionsList');
+        container.innerHTML = '';
+        
+        Object.entries(permissions).forEach(([moduleKey, moduleData]) => {
+            const item = document.createElement('div');
+            item.className = 'permission-item';
+            item.innerHTML = `
+                <div class="permission-item-left">
+                    <div class="permission-item-icon ${moduleData.can_view ? 'active' : ''}">
+                        <i class="fa-solid ${moduleData.icon}"></i>
+                    </div>
+                    <div class="permission-item-info">
+                        <h4>${moduleData.name}</h4>
+                        <span>${moduleData.description || ''}</span>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" 
+                        data-module="${moduleKey}" 
+                        ${moduleData.can_view ? 'checked' : ''}
+                        onchange="togglePermission('${moduleKey}', this.checked)">
+                    <span class="slider round"></span>
+                </label>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function togglePermission(moduleKey, enabled) {
+        if (currentPermissionsData[moduleKey]) {
+            currentPermissionsData[moduleKey].can_view = enabled;
+            
+            const item = document.querySelector(`.permission-item input[data-module="${moduleKey}"]`);
+            if (item) {
+                const icon = item.closest('.permission-item').querySelector('.permission-item-icon');
+                if (enabled) {
+                    icon.classList.add('active');
+                } else {
+                    icon.classList.remove('active');
+                }
+            }
+        }
+    }
+
+    async function savePermissions() {
+        if (!currentPermissionsAdminId) return;
+        
+        const permissions = Object.entries(currentPermissionsData).map(([module, data]) => ({
+            module: module,
+            can_view: data.can_view,
+            can_manage: data.can_view,
+        }));
+        
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const response = await fetch(`/admin/settings/admin/${currentPermissionsAdminId}/permissions`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ permissions }),
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                closePermissionsModal();
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to save permissions');
+            }
+            
+        } catch (error) {
+            console.error('Error saving permissions:', error);
+            alert('Failed to save permissions');
+        }
+    }
+
+    function closePermissionsModal() {
+        document.getElementById('permissionsModal').classList.remove('active');
+        document.body.style.overflow = '';
+        currentPermissionsAdminId = null;
+    }
+
+    document.getElementById('permissionsModal')?.addEventListener('click', function(e) {
+        if (e.target === this) closePermissionsModal();
     });
     </script>
 </body>

@@ -39,49 +39,68 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            
+
+            @php
+                $currentAdmin = null;
+                $adminId = session('admin_id');
+                if ($adminId) {
+                    $currentAdmin = \App\Models\Admin::find($adminId);
+                }
+                $accessibleModules = $currentAdmin ? $currentAdmin->getAccessibleModules() : [];
+            @endphp
+
             <nav class="sidebar-nav">
                 <p class="nav-section-title">Admin Menu</p>
-                <a href="/admin/dashboard" class="nav-item active">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>Dashboard</span>
+                
+                @if(isset($accessibleModules['dashboard']))
+                <a href="/admin/dashboard" class="nav-item {{ request()->is('admin/dashboard') ? 'active' : '' }}">
+                    <i class="fa-solid fa-chart-line"></i><span>Dashboard</span>
                 </a>
-                <a href="{{ route('admin.directory') }}" class="nav-item">
-                    <i class="fa-solid fa-users"></i>
-                    <span>Alumni Directory</span>
+                @endif
+                
+                @if(isset($accessibleModules['directory']))
+                <a href="/admin/directory" class="nav-item {{ request()->is('admin/directory*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-users"></i><span>Alumni Directory</span>
                 </a>
-                <a href="{{ route('announcements.index') }}" class="nav-item">
-                    <i class="fa-solid fa-bullhorn"></i>
-                    <span>Announcements</span>
+                @endif
+                
+                @if(isset($accessibleModules['announcements']))
+                <a href="{{ route('announcements.index') }}" class="nav-item {{ request()->is('admin/announcements*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-bullhorn"></i><span>Announcements</span>
                 </a>
-                <a href="{{ route('events.index') }}" class="nav-item">
-                    <i class="fa-solid fa-calendar-check"></i>
-                    <span>Events</span>
+                @endif
+                
+                @if(isset($accessibleModules['events']))
+                <a href="{{ route('events.index') }}" class="nav-item {{ request()->is('admin/events*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-calendar-check"></i><span>Events</span>
                 </a>
-                <a href="{{ route('perks.index') }}" class="nav-item">
-                    <i class="fa-solid fa-gift"></i>
-                    <span>Perks & Discounts</span>
+                @endif
+                
+                @if(isset($accessibleModules['perks']))
+                <a href="{{ route('perks.index') }}" class="nav-item {{ request()->is('admin/perks*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-gift"></i><span>Perks & Discounts</span>
                 </a>
-                <a href="/admin/alumni_tracer" class="nav-item">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <span>Alumni Tracer</span>
+                @endif
+                
+                @if(isset($accessibleModules['tracer']))
+                <a href="/admin/alumni_tracer" class="nav-item {{ request()->is('admin/alumni_tracer*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-location-dot"></i><span>Alumni Tracer</span>
                 </a>
-                <a href="/admin/messages" class="nav-item">
-                    <i class="fa-solid fa-envelope"></i>
-                    <span>Messages</span>
+                @endif
+                
+                @if(isset($accessibleModules['messages']))
+                <a href="/admin/messages" class="nav-item {{ request()->is('admin/messages*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-envelope"></i><span>Messages</span>
                 </a>
-                <a href="{{ route('admin.settings') }}" class="nav-item">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Settings</span>
+                @endif
+                
+                @if(isset($accessibleModules['settings']))
+                <a href="{{ route('admin.settings') }}" class="nav-item {{ request()->is('admin/settings*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-gear"></i><span>Settings</span>
                 </a>
+                @endif
             </nav>
             
-            {{-- <div class="sidebar-footer">
-                <a href="{{ route('admin.logout') }}" class="nav-item logout-btn">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Sign Out</span>
-                </a>
-            </div> --}}
         </aside>
 
         <!-- Main Content -->
