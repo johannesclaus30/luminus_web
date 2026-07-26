@@ -14,17 +14,19 @@ class AnnouncementController extends Controller
     private const MAX_IMAGE_SIZE_MB = 3;
     private const MAX_VIDEO_SIZE_MB = 30;
 
-   public function index(Request $request)
+    public function index(Request $request)
     {
-        $filter = $request->get('filter', 'all'); // all, active, scheduled
+        $filter = $request->get('filter', 'all');
         
-        // Get counts - Total NOW includes scheduled
+        // Get counts using UTC for consistency
+        $nowUtc = now()->utc();
+        
         $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
         
         $activeAnnouncements = \App\Models\Announcement::where('status', 1)
-            ->where(function($q) {
+            ->where(function($q) use ($nowUtc) {
                 $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', now());
+                ->orWhere('scheduled_post_at', '<=', $nowUtc);
             })
             ->count();
             
@@ -32,23 +34,22 @@ class AnnouncementController extends Controller
         
         $scheduledAnnouncements = \App\Models\Announcement::where('status', 1)
             ->whereNotNull('scheduled_post_at')
-            ->where('scheduled_post_at', '>', now())
+            ->where('scheduled_post_at', '>', $nowUtc)
             ->count();
         
         // Build query based on filter
         $query = \App\Models\Announcement::where('status', 1);
         
         if ($filter === 'active') {
-            $query->where(function($q) {
+            $query->where(function($q) use ($nowUtc) {
                 $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', now());
+                ->orWhere('scheduled_post_at', '<=', $nowUtc);
             });
         } elseif ($filter === 'scheduled') {
             $query->whereNotNull('scheduled_post_at')
-                ->where('scheduled_post_at', '>', now());
+                ->where('scheduled_post_at', '>', $nowUtc);
         }
         
-        // Sort: Published first (newest), then Scheduled (soonest)
         $announcements = $query->orderByRaw('
             CASE 
                 WHEN scheduled_post_at IS NULL OR scheduled_post_at <= NOW() THEN 0
@@ -72,20 +73,20 @@ class AnnouncementController extends Controller
 
     public function archived()
     {
-        // Define filter as null for archived page
         $filter = null;
         
-        // Same counts from FULL database
+        $nowUtc = now()->utc();
+        
         $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
         $activeAnnouncements = \App\Models\Announcement::where('status', 1)
-            ->where(function($q) {
+            ->where(function($q) use ($nowUtc) {
                 $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', now());
+                ->orWhere('scheduled_post_at', '<=', $nowUtc);
             })
             ->count();
         $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
         $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
-            ->where('scheduled_post_at', '>', now())
+            ->where('scheduled_post_at', '>', $nowUtc)
             ->where('status', 1)
             ->count();
         
@@ -99,7 +100,7 @@ class AnnouncementController extends Controller
             'activeAnnouncements',
             'archivedAnnouncements',
             'scheduledAnnouncements',
-            'filter'  // Now this won't error
+            'filter'
         ));
     }
 
@@ -136,7 +137,9 @@ class AnnouncementController extends Controller
             'title' => $request->title,
             'announcement_description' => $request->announcement_description,
             'date_posted' => now(),
-            'scheduled_post_at' => $request->scheduled_post_at,
+            'scheduled_post_at' => $request->scheduled_post_at 
+            ? \Carbon\Carbon::parse($request->scheduled_post_at, 'Asia/Manila')->setTimezone('UTC')
+            : null,
             'status' => 1,
         ]);
 
@@ -230,7 +233,9 @@ class AnnouncementController extends Controller
         $announcement->update([
             'title' => $request->title,
             'announcement_description' => $request->announcement_description,
-            'scheduled_post_at' => $request->scheduled_post_at,
+            'scheduled_post_at' => $request->scheduled_post_at 
+            ? \Carbon\Carbon::parse($request->scheduled_post_at, 'Asia/Manila')->setTimezone('UTC')
+            : null,
         ]);
 
         return redirect()->route('announcements.index')->with('success', 'Announcement updated successfully!');

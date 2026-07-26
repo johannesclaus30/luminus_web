@@ -212,7 +212,7 @@
                                     <span>{{ (int) $announcement->status === 0 ? 'Archived' : 'Active' }}</span>
                                 </div>
                                 
-                                @if ($announcement->scheduled_post_at && $announcement->scheduled_post_at->isFuture() && (int) $announcement->status !== 0)
+                                @if ($announcement->scheduled_post_at && $announcement->scheduled_post_at->timestamp > now()->timestamp && (int) $announcement->status !== 0)
                                     <div class="announcement-scheduled-badge">
                                         <i class="fa-regular fa-clock"></i>
                                         <span>Scheduled</span>
@@ -231,7 +231,7 @@
                                 <div class="announcement-dates">
                                     @php
                                         $hasScheduled = $announcement->scheduled_post_at !== null;
-                                        $isScheduledFuture = $hasScheduled && $announcement->scheduled_post_at->isFuture();
+                                        $isScheduledFuture = $hasScheduled && $announcement->scheduled_post_at->timestamp > now()->timestamp;
                                         $isPublished = $hasScheduled && !$isScheduledFuture;
                                         
                                         // Determine which date to show
@@ -259,8 +259,8 @@
                                     @if ($isScheduledFuture)
                                         <div class="date-item scheduled" 
                                             id="countdown-{{ $announcement->id }}" 
-                                            data-target="{{ $announcement->scheduled_post_at->timestamp * 1000 }}"
-                                            data-published-date="{{ $announcement->scheduled_post_at->format('M d, Y') }}">
+                                            data-target-utc="{{ $announcement->scheduled_post_at->toIso8601String() }}"
+                                            data-published-date="{{ $announcement->scheduled_post_at->format('M d, Y \a\t h:i A') }}">
                                             <i class="fa-solid fa-hourglass-half"></i>
                                             <span>Posts in: <span class="countdown-text" style="font-weight: 600;">Loading...</span></span>
                                         </div>
@@ -415,79 +415,209 @@
     </div>
 
     <script>
-    // Mobile menu toggle
-    function toggleMobileMenu() {
-        const sidebar = document.getElementById('adminSidebar');
-        const overlay = document.getElementById('mobileOverlay');
-        sidebar.classList.toggle('mobile-open');
-        overlay.classList.toggle('active');
-        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-    }
+// Mobile menu toggle
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('adminSidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    if (sidebar) sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('active');
+    document.body.style.overflow = sidebar && sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+}
 
-    // ========================================
-    // WARNING MODAL SYSTEM
-    // ========================================
+// ========================================
+// COUNTDOWN TIMER SYSTEM (UTC-Aware)
+// ========================================
+
+let countdownIntervals = {};
+
+/**
+ * Ensures a timestamp string is treated as UTC
+ * Same pattern used in the messages module
+ */
+function ensureUTCTimestamp(timestamp) {
+    if (!timestamp) return new Date().toISOString();
     
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get modal elements
-        const warningOverlay = document.getElementById('warningModal');
-        const warningTitle = document.getElementById('warningModalTitle');
-        const warningMessage = document.getElementById('warningModalMessage');
-        const warningIcon = document.getElementById('warningModalIcon');
-        const confirmBtn = document.getElementById('warningModalConfirm');
-        const cancelBtn = document.getElementById('warningModalCancel');
-        
-        let pendingForm = null;
-        
-        // Close modal function
-        function closeWarningModal() {
-            warningOverlay.classList.remove('active');
-            document.body.style.overflow = '';
-            pendingForm = null;
+    if (typeof timestamp === 'string') {
+        // Already has timezone indicator (Z, +08:00, etc.)
+        if (timestamp.endsWith('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
+            return timestamp;
         }
         
-        // Cancel button
-        cancelBtn.addEventListener('click', closeWarningModal);
+        // Missing timezone - assume UTC by appending Z
+        if (timestamp.includes('T')) {
+            return timestamp + 'Z';
+        }
         
-        // Close on overlay click
+        // Force UTC interpretation
+        const date = new Date(timestamp + 'Z');
+        return date.toISOString();
+    }
+    
+    return new Date(timestamp).toISOString();
+}
+
+function startCountdown(element) {
+    const targetUtc = element.getAttribute('data-target-utc');
+    const publishedDate = element.getAttribute('data-published-date');
+    const countdownText = element.querySelector('.countdown-text');
+    
+    if (!targetUtc || !countdownText) {
+        console.log('Countdown skipped - missing data:', element.id, {targetUtc, countdownText});
+        return;
+    }
+    
+    // Use the same UTC pattern as messages module
+    const utcTimestamp = ensureUTCTimestamp(targetUtc);
+    const targetDate = new Date(utcTimestamp);
+    const targetTimeMs = targetDate.getTime();
+    
+    console.log('Starting countdown for:', element.id);
+    console.log('  UTC timestamp:', utcTimestamp);
+    console.log('  Local target:', targetDate.toString());
+    console.log('  Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+    
+    // Clear any existing interval
+    if (countdownIntervals[element.id]) {
+        clearInterval(countdownIntervals[element.id]);
+    }
+    
+    function updateCountdown() {
+        const now = Date.now();
+        const distance = targetTimeMs - now;
+        
+        if (distance < 0) {
+            clearInterval(countdownIntervals[element.id]);
+            delete countdownIntervals[element.id];
+            
+            const parentSpan = countdownText.parentElement;
+            parentSpan.innerHTML = 'Published: ' + publishedDate;
+            
+            const icon = element.querySelector('.fa-hourglass-half');
+            if (icon) {
+                icon.className = 'fa-solid fa-check-circle';
+                icon.style.color = '#10b981';
+            }
+            
+            element.classList.remove('scheduled');
+            element.classList.add('published');
+            
+            const card = element.closest('.announcement-card');
+            if (card) {
+                const scheduledBadge = card.querySelector('.announcement-scheduled-badge');
+                if (scheduledBadge) {
+                    scheduledBadge.style.display = 'none';
+                }
+            }
+            
+            console.log('Countdown finished for:', element.id);
+            return;
+        }
+        
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        
+        let displayText = '';
+        if (days > 0) {
+            displayText = days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's';
+        } else if (hours > 0) {
+            displayText = hours + 'h ' + minutes + 'm ' + seconds + 's';
+        } else if (minutes > 0) {
+            displayText = minutes + 'm ' + seconds + 's';
+        } else {
+            displayText = seconds + 's';
+        }
+        
+        countdownText.textContent = displayText;
+    }
+    
+    updateCountdown();
+    countdownIntervals[element.id] = setInterval(updateCountdown, 1000);
+}
+
+function initializeCountdowns() {
+    const countdownElements = document.querySelectorAll('[id^="countdown-"]');
+    console.log('Found countdown elements:', countdownElements.length);
+    
+    countdownElements.forEach(element => {
+        const targetUtc = element.getAttribute('data-target-utc');
+        console.log('Element:', element.id, 'UTC:', targetUtc);
+        if (targetUtc) {
+            startCountdown(element);
+        }
+    });
+}
+
+window.addEventListener('beforeunload', function() {
+    Object.keys(countdownIntervals).forEach(key => {
+        clearInterval(countdownIntervals[key]);
+    });
+    countdownIntervals = {};
+});
+
+// ========================================
+// WARNING MODAL SYSTEM
+// ========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize countdowns
+    initializeCountdowns();
+    
+    // Modal elements
+    const warningOverlay = document.getElementById('warningModal');
+    const warningTitle = document.getElementById('warningModalTitle');
+    const warningMessage = document.getElementById('warningModalMessage');
+    const warningIcon = document.getElementById('warningModalIcon');
+    const confirmBtn = document.getElementById('warningModalConfirm');
+    const cancelBtn = document.getElementById('warningModalCancel');
+    
+    let pendingForm = null;
+    
+    function closeWarningModal() {
+        if (warningOverlay) warningOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+        pendingForm = null;
+    }
+    
+    if (cancelBtn) cancelBtn.addEventListener('click', closeWarningModal);
+    
+    if (warningOverlay) {
         warningOverlay.addEventListener('click', function(e) {
-            if (e.target === warningOverlay) {
-                closeWarningModal();
-            }
+            if (e.target === warningOverlay) closeWarningModal();
         });
-        
-        // Close on Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && warningOverlay.classList.contains('active')) {
-                closeWarningModal();
-            }
-        });
-        
-        // Confirm button - submit the pending form
+    }
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && warningOverlay && warningOverlay.classList.contains('active')) {
+            closeWarningModal();
+        }
+    });
+    
+    if (confirmBtn) {
         confirmBtn.addEventListener('click', function() {
-            if (pendingForm) {
-                pendingForm.submit();
-            }
+            if (pendingForm) pendingForm.submit();
             closeWarningModal();
         });
+    }
+    
+    function showWarningModal(config) {
+        const {
+            title = 'Confirm Action',
+            message = 'Are you sure?',
+            iconType = 'warning',
+            confirmText = 'Confirm',
+            confirmClass = 'btn-danger'
+        } = config;
         
-        // Show modal function
-        function showWarningModal(config) {
-            const {
-                title = 'Confirm Action',
-                message = 'Are you sure?',
-                iconType = 'warning', // warning, danger, success
-                confirmText = 'Confirm',
-                confirmClass = 'btn-danger'
-            } = config;
-            
-            // Set title and message
-            warningTitle.textContent = title;
-            warningMessage.innerHTML = message;
-            
-            // Set icon
-            warningIcon.className = 'warning-modal-icon ' + iconType;
-            const iconElement = warningIcon.querySelector('i');
+        if (!warningOverlay || !warningTitle || !warningMessage || !warningIcon || !confirmBtn) return;
+        
+        warningTitle.textContent = title;
+        warningMessage.innerHTML = message;
+        warningIcon.className = 'warning-modal-icon ' + iconType;
+        
+        const iconElement = warningIcon.querySelector('i');
+        if (iconElement) {
             if (iconType === 'danger') {
                 iconElement.className = 'fa-solid fa-triangle-exclamation';
             } else if (iconType === 'success') {
@@ -495,141 +625,139 @@
             } else {
                 iconElement.className = 'fa-solid fa-triangle-exclamation';
             }
-            
-            // Set confirm button
-            confirmBtn.className = 'btn ' + confirmClass;
-            confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
-            
-            // Show modal
-            warningOverlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            confirmBtn.focus();
         }
         
-        // Attach event listeners to all inline forms
-        document.querySelectorAll('.inline-form').forEach(function(form) {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const submitButton = form.querySelector('button[type="submit"]');
-                const isArchive = submitButton.classList.contains('btn-archive');
-                const isRestore = submitButton.classList.contains('btn-restore');
-                const hasTrashIcon = submitButton.querySelector('.fa-trash-can') !== null;
-                
-                // Store the form to submit later
-                pendingForm = form;
-                
-                // Show appropriate modal
-                if (isArchive) {
-                    showWarningModal({
-                        title: 'Archive Announcement',
-                        message: 'Are you sure you want to <strong>archive</strong> this announcement?<br><small>It will be moved to the archived section and hidden from alumni.</small>',
-                        iconType: 'warning',
-                        confirmText: 'Archive',
-                        confirmClass: 'btn-warning'
-                    });
-                } else if (isRestore) {
-                    showWarningModal({
-                        title: 'Restore Announcement',
-                        message: 'Are you sure you want to <strong>restore</strong> this announcement?<br><small>It will be moved back to active announcements and visible to alumni.</small>',
-                        iconType: 'success',
-                        confirmText: 'Restore',
-                        confirmClass: 'btn-success'
-                    });
-                } else if (hasTrashIcon) {
-                    showWarningModal({
-                        title: 'Delete Permanently',
-                        message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you absolutely sure you want to <strong>permanently delete</strong> this announcement?<br><small>All associated data, images, and attachments will be permanently removed.</small>',
-                        iconType: 'danger',
-                        confirmText: 'Delete Permanently',
-                        confirmClass: 'btn-danger'
-                    });
-                }
-            });
-        });
+        confirmBtn.className = 'btn ' + confirmClass;
+        confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
         
-        console.log('Warning modal initialized. Forms found:', document.querySelectorAll('.inline-form').length);
-        
-        // Archive toggle button logic
-        const btn = document.getElementById('archiveToggleBtn');
-        if (btn) {
-            const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
-            const currentPath = window.location.pathname.replace(/\/$/, '');
-
-            if (currentPath === archivedPath) {
-                btn.classList.add('active');
-                btn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Announcements</span>';
-                btn.href = '{{ route('announcements.index') }}';
-            }
-        }
-        
-        // Make attachment thumbnails clickable
-        document.querySelectorAll(".attachment-thumb").forEach(function(img) {
-            if (!img.classList.contains('placeholder')) {
-                img.style.cursor = "zoom-in";
-                img.addEventListener('click', function() {
-                    openModal(this.src);
+        warningOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        confirmBtn.focus();
+    }
+    
+    document.querySelectorAll('.inline-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (!submitButton) return;
+            
+            const isArchive = submitButton.classList.contains('btn-archive');
+            const isRestore = submitButton.classList.contains('btn-restore');
+            const hasTrashIcon = submitButton.querySelector('.fa-trash-can') !== null;
+            
+            pendingForm = form;
+            
+            if (isArchive) {
+                showWarningModal({
+                    title: 'Archive Announcement',
+                    message: 'Are you sure you want to <strong>archive</strong> this announcement?<br><small>It will be moved to the archived section and hidden from alumni.</small>',
+                    iconType: 'warning',
+                    confirmText: 'Archive',
+                    confirmClass: 'btn-warning'
+                });
+            } else if (isRestore) {
+                showWarningModal({
+                    title: 'Restore Announcement',
+                    message: 'Are you sure you want to <strong>restore</strong> this announcement?<br><small>It will be moved back to active announcements and visible to alumni.</small>',
+                    iconType: 'success',
+                    confirmText: 'Restore',
+                    confirmClass: 'btn-success'
+                });
+            } else if (hasTrashIcon) {
+                showWarningModal({
+                    title: 'Delete Permanently',
+                    message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you absolutely sure you want to <strong>permanently delete</strong> this announcement?<br><small>All associated data, images, and attachments will be permanently removed.</small>',
+                    iconType: 'danger',
+                    confirmText: 'Delete Permanently',
+                    confirmClass: 'btn-danger'
                 });
             }
         });
-        
-        // Close sidebar when clicking on a nav item (mobile)
-        document.querySelectorAll('.nav-item').forEach(function(item) {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
-                }
+    });
+    
+    // Archive toggle button logic
+    const btn = document.getElementById('archiveToggleBtn');
+    if (btn) {
+        const archivedPath = new URL(btn.href).pathname.replace(/\/$/, '');
+        const currentPath = window.location.pathname.replace(/\/$/, '');
+        if (currentPath === archivedPath) {
+            btn.classList.add('active');
+            btn.innerHTML = '<i class="fa-solid fa-list"></i> <span class="btn-text">Active Announcements</span>';
+            btn.href = '{{ route('announcements.index') }}';
+        }
+    }
+    
+    // Make attachment thumbnails clickable
+    document.querySelectorAll(".attachment-thumb").forEach(function(img) {
+        if (!img.classList.contains('placeholder')) {
+            img.style.cursor = "zoom-in";
+            img.addEventListener('click', function() {
+                openModal(this.src);
             });
+        }
+    });
+    
+    // Close sidebar on nav item click (mobile)
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) {
+                toggleMobileMenu();
+            }
         });
     });
+});
 
-    // ========================================
-    // IMAGE MODAL FUNCTIONS
-    // ========================================
-    
-    function openModal(src) {
-        if (!src) return;
-        const modal = document.getElementById("imageModal");
-        const modalImg = document.getElementById("enlargedImage");
+// ========================================
+// IMAGE MODAL FUNCTIONS
+// ========================================
+
+function openModal(src) {
+    if (!src) return;
+    const modal = document.getElementById("imageModal");
+    const modalImg = document.getElementById("enlargedImage");
+    if (modal && modalImg) {
         modal.style.display = "flex";
         modalImg.src = src;
         document.body.style.overflow = 'hidden';
     }
+}
 
-    function closeModal() {
-        const modal = document.getElementById("imageModal");
+function closeModal() {
+    const modal = document.getElementById("imageModal");
+    if (modal) {
         modal.style.display = "none";
         document.body.style.overflow = '';
     }
+}
 
-    // Image modal keyboard and click handlers
-    document.addEventListener('keydown', function(event) {
-        if (event.key === "Escape") { 
-            closeModal(); 
-        }
-    });
-
-    const imageModal = document.getElementById('imageModal');
-    if (imageModal) {
-        imageModal.addEventListener('click', function(e) {
-            if (e.target === this) closeModal();
-        });
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") { 
+        closeModal(); 
     }
+});
 
-    // Handle window resize
-    let resizeTimer;
-    window.addEventListener('resize', function() {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(function() {
-            if (window.innerWidth > 1024) {
-                const sidebar = document.getElementById('adminSidebar');
-                const overlay = document.getElementById('mobileOverlay');
-                if (sidebar) sidebar.classList.remove('mobile-open');
-                if (overlay) overlay.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        }, 250);
+const imageModal = document.getElementById('imageModal');
+if (imageModal) {
+    imageModal.addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
     });
+}
+
+// Handle window resize
+let resizeTimer;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+        if (window.innerWidth > 1024) {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            if (sidebar) sidebar.classList.remove('mobile-open');
+            if (overlay) overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }, 250);
+});
 </script>
 
 </body>
