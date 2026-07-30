@@ -348,7 +348,19 @@ class AdminController extends Controller
      */
     public function show(string $id)
     {
-        $alumnus = Alumni::findOrFail($id);
+        $alumnus = Alumni::with([
+            'addresses',
+            'employments',  // Add this
+            'skills',       // Add this
+            'tracerResponses', // Add this
+            'eventRegistrations.event', // Add this (eager load the event data)
+            'followers',    // Add this
+            'following',    // Add this
+            'posts.images', // Add this (posts with their images)
+            'posts.comments', // Add this (post comments)
+            'posts.reactions' // Add this (post reactions)
+        ])->findOrFail($id);
+        
         return view('directory.show', compact('alumnus'));
     }
 
