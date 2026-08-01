@@ -8,23 +8,85 @@ use App\Models\PerkImage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class PerksController extends Controller
 {
+    const PH_TIMEZONE = 'Asia/Manila';
+
     public function index()
     {
+        // Auto-archive expired perks
+        $this->autoArchiveExpiredPerks();
+
+        // Get TOTAL counts from the ENTIRE database
+        $totalPerks = Perks::count();
+        $activePerks = Perks::active()->count();
+        $archivedPerks = Perks::archived()->count();
+
+        // Get paginated perks for display (only active)
         $perks = Perks::with('images')
-            ->where(function ($q) {
-                $q->where('status', 1)->orWhereNull('status');
-            })
+            ->active()
             ->orderBy('created_at', 'desc')
-            ->paginate(5);
-        return view('admin_perks', compact('perks'));
+            ->paginate(6);
+            
+        return view('admin_perks', compact(
+            'perks', 
+            'totalPerks', 
+            'activePerks', 
+            'archivedPerks'
+        ));
+    }
+
+    protected function autoArchiveExpiredPerks()
+    {
+        $now = Carbon::now(self::PH_TIMEZONE)->startOfDay();
+        
+        $expiredPerks = Perks::where(function($query) {
+                $query->where('status', 1)
+                      ->orWhereNull('status');
+            })
+            ->where('valid_until', '<', $now)
+            ->get();
+        
+        if ($expiredPerks->isNotEmpty()) {
+            foreach ($expiredPerks as $perk) {
+                $perk->update(['status' => 0]);
+                Log::info("Perk auto-archived (Philippines time)", [
+                    'perk_id' => $perk->id,
+                    'title' => $perk->title,
+                    'valid_until_utc' => $perk->valid_until->toDateString(),
+                    'current_ph_date' => $now->toDateString()
+                ]);
+            }
+        }
+    }
+
+    public function archived()
+    {
+        // Get TOTAL counts from the ENTIRE database
+        $totalPerks = Perks::count();
+        $activePerks = Perks::active()->count();
+        $archivedPerks = Perks::archived()->count();
+
+        // Get paginated perks for display (only archived)
+        $perks = Perks::with('images')
+            ->archived()
+            ->orderBy('created_at', 'desc')
+            ->paginate(6);
+
+        return view('admin_perks', compact(
+            'perks', 
+            'totalPerks', 
+            'activePerks', 
+            'archivedPerks'
+        ));
     }
 
     public function create()
     {
-        return view('perks.create'); 
+        return view('perks.create');
     }
 
     public function store(Request $request)
@@ -42,10 +104,12 @@ class PerksController extends Controller
             'images.*.mimes' => 'Images must be JPG, PNG, or WEBP format.',
         ]);
 
+        $validUntil = Carbon::parse($request->valid_until, self::PH_TIMEZONE)->utc();
+
         $perk = Perks::create([
             'title'       => $request->title,
             'description' => $request->description,
-            'valid_until' => $request->valid_until,
+            'valid_until' => $validUntil,
             'status'      => $this->normalizeStatus($request->input('status'), 1),
             'admin_id'    => Auth::id() ?? 1,
         ]);
@@ -104,10 +168,12 @@ class PerksController extends Controller
             }
         }
 
+        $validUntil = Carbon::parse($request->valid_until, self::PH_TIMEZONE)->utc();
+
         $perk->update([
             'title'       => $request->title,
             'description' => $request->description,
-            'valid_until' => $request->valid_until,
+            'valid_until' => $validUntil,
             'status'      => $request->filled('status')
                 ? $this->normalizeStatus($request->input('status'), $perk->status ?? 1)
                 : $perk->status,
@@ -131,16 +197,6 @@ class PerksController extends Controller
         return redirect()->route('perks.index')->with('success', 'Perk archived.');
     }
 
-    public function archived()
-    {
-        $perks = Perks::with('images')
-            ->where('status', 0)
-            ->orderBy('created_at', 'desc')
-            ->paginate(5);
-
-        return view('admin_perks', compact('perks'));
-    }
-
     public function restore(Perks $perk)
     {
         $perk->update(['status' => 1]);
@@ -149,18 +205,15 @@ class PerksController extends Controller
 
     public function permanentDelete(Perks $perk)
     {
-        // Only allow permanent deletion of archived perks
         if ((int) $perk->status !== 0) {
             return redirect()->back()->with('error', 'Only archived perks can be permanently deleted.');
         }
 
-        // Delete all associated image files from storage
         foreach ($perk->images as $media) {
             $this->deleteStoredImage($media->image_path);
             $media->delete();
         }
 
-        // Hard delete the perk
         $perk->delete();
 
         return redirect()->route('perks.archived')->with('success', 'Perk permanently deleted.');

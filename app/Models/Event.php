@@ -4,9 +4,13 @@ namespace App\Models;
 
 use App\Models\Admin;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon; 
 
 class Event extends Model
 {
+    // Add this constant
+    const PH_TIMEZONE = 'Asia/Manila';
+
     protected $table = 'events';
 
     protected $fillable = [
@@ -24,8 +28,8 @@ class Event extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
         'max_capacity' => 'integer',
         'venue_id' => 'integer',
         'status' => 'integer',
@@ -46,9 +50,69 @@ class Event extends Model
         return $this->belongsTo(Venue::class, 'venue_id');
     }
 
-    // ADD THIS: Relationship to event registrations
     public function registrations()
     {
         return $this->hasMany(EventRegistration::class, 'event_id', 'id');
+    }
+
+    // ========== SCOPES ==========
+    
+    public function scopeActive($query)
+    {
+        return $query->where(function($q) {
+            $q->where('status', 1)
+              ->orWhereNull('status');
+        });
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->where('status', 0);
+    }
+
+    /**
+     * Scope to only include expired events (end_date < current Philippines time).
+     */
+    public function scopeExpired($query)
+    {
+        $now = Carbon::now(self::PH_TIMEZONE);
+        return $query->where('end_date', '<', $now);
+    }
+
+    /**
+     * Scope to only include upcoming events (end_date >= current Philippines time).
+     */
+    public function scopeUpcoming($query)
+    {
+        $now = Carbon::now(self::PH_TIMEZONE);
+        return $query->where('end_date', '>=', $now);
+    }
+
+    // ========== HELPER METHODS ==========
+    
+    public function isExpired()
+    {
+        $now = Carbon::now(self::PH_TIMEZONE);
+        return $this->end_date < $now;
+    }
+
+    public function isActive()
+    {
+        return ($this->status == 1 || is_null($this->status)) && !$this->isExpired();
+    }
+
+    public function isArchived()
+    {
+        return $this->status == 0;
+    }
+
+    public function getStartDateInTimezone($timezone = 'Asia/Manila')
+    {
+        return $this->start_date->setTimezone($timezone);
+    }
+
+    public function getEndDateInTimezone($timezone = 'Asia/Manila')
+    {
+        return $this->end_date->setTimezone($timezone);
     }
 }

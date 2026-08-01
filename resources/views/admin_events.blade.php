@@ -224,13 +224,11 @@
                                 <div class="event-meta">
                                     <div class="meta-item">
                                         <i class="fa-regular fa-calendar"></i>
-                                        <span>
-                                            @if($event->start_date)
-                                                {{ $event->start_date->format('M d, Y') }}
-                                                @if($event->end_date) – {{ $event->end_date->format('M d, Y') }}@endif
-                                            @else
-                                                N/A
-                                            @endif
+                                        <span class="event-date-display" 
+                                            data-start-utc="{{ $event->start_date ? $event->start_date->toIso8601String() : '' }}"
+                                            data-end-utc="{{ $event->end_date ? $event->end_date->toIso8601String() : '' }}">
+                                            {{ $event->start_date ? $event->start_date->format('M d, Y') : 'N/A' }}
+                                            @if($event->end_date) – {{ $event->end_date->format('M d, Y') }}@endif
                                         </span>
                                     </div>
                                     @if(in_array($event->event_type, ['Online','Hybrid']))
@@ -263,8 +261,7 @@
                                                             <img src="{{ $image->image_url }}" 
                                                                 alt="Event image" 
                                                                 class="gallery-thumb"
-                                                                onclick="openModal(this.src)"
-                                                                onerror="this.src='/assets/FINAL-NULIPA.jpg'">
+                                                                onclick="openModal(this.src)">
                                                         </div>
                                                     @endforeach
                                                     @if ($event->images->count() > 3)
@@ -274,9 +271,9 @@
                                                     @endif
                                                 @else
                                                     <div class="gallery-thumb-wrapper">
-                                                        <img src="{{ asset('assets/FINAL-NULIPA.jpg') }}" 
-                                                            alt="No image" 
-                                                            class="gallery-thumb placeholder">
+                                                        <div class="gallery-thumb placeholder">
+                                                            <i class="fa-regular fa-image"></i>
+                                                        </div>
                                                     </div>
                                                 @endif
                                             </div>
@@ -316,8 +313,7 @@
                                                         <img src="{{ $image->image_url }}" 
                                                             alt="Event image" 
                                                             class="gallery-thumb"
-                                                            onclick="openModal(this.src)"
-                                                            onerror="this.src='/assets/FINAL-NULIPA.jpg'">
+                                                            onclick="openModal(this.src)">
                                                     </div>
                                                 @endforeach
                                                 @if ($event->images->count() > 3)
@@ -327,9 +323,9 @@
                                                 @endif
                                             @else
                                                 <div class="gallery-thumb-wrapper">
-                                                    <img src="{{ asset('assets/FINAL-NULIPA.jpg') }}" 
-                                                        alt="No image" 
-                                                        class="gallery-thumb placeholder">
+                                                    <div class="gallery-thumb placeholder">
+                                                        <i class="fa-regular fa-image"></i>
+                                                    </div>
                                                 </div>
                                             @endif
                                         </div>
@@ -843,6 +839,42 @@
             }
         }, 250);
     });
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get user's timezone
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Convert all UTC dates to local time
+    document.querySelectorAll('.event-date-display').forEach(function(el) {
+        const startUtc = el.dataset.startUtc;
+        const endUtc = el.dataset.endUtc;
+        
+        if (startUtc) {
+            const startDate = new Date(startUtc);
+            let displayText = startDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            
+            if (endUtc) {
+                const endDate = new Date(endUtc);
+                const endFormatted = endDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+                displayText += ' – ' + endFormatted;
+            }
+            
+            el.textContent = displayText;
+        }
+    });
+    
+    console.log('🌍 Timezone detected:', userTimezone);
+});
 </script>
 
 </body>

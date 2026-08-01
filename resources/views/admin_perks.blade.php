@@ -133,52 +133,41 @@
             </header>
 
             <!-- Stats Overview -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon-wrapper">
-                        <div class="stat-icon">
-                            <i class="fa-solid fa-gift"></i>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper">
+                            <div class="stat-icon">
+                                <i class="fa-solid fa-gift"></i>
+                            </div>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">{{ $totalPerks ?? 0 }}</span>
+                            <span class="stat-label">Total Perks</span>
                         </div>
                     </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $perks->total() }}</span>
-                        <span class="stat-label">Total Perks</span>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper">
+                            <div class="stat-icon active">
+                                <i class="fa-solid fa-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">{{ $activePerks ?? 0 }}</span>
+                            <span class="stat-label">Active Perks</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper">
+                            <div class="stat-icon archived">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </div>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value">{{ $archivedPerks ?? 0 }}</span>
+                            <span class="stat-label">Archived</span>
+                        </div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon-wrapper">
-                        <div class="stat-icon active">
-                            <i class="fa-solid fa-check-circle"></i>
-                        </div>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $perks->where('status', 1)->count() }}</span>
-                        <span class="stat-label">Active Perks</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon-wrapper">
-                        <div class="stat-icon archived">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                        </div>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $perks->where('status', 0)->count() }}</span>
-                        <span class="stat-label">Archived</span>
-                    </div>
-                </div>
-                {{-- <div class="stat-card">
-                    <div class="stat-icon-wrapper">
-                        <div class="stat-icon views">
-                            <i class="fa-regular fa-eye"></i>
-                        </div>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">{{ $perks->sum('views') ?? 0 }}</span>
-                        <span class="stat-label">Total Views</span>
-                    </div>
-                </div> --}}
-            </div>
 
             <!-- Perks Card Grid -->
             <div class="perks-grid">

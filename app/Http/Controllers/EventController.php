@@ -9,55 +9,81 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
+    // Define Philippines timezone constant
+    const PH_TIMEZONE = 'Asia/Manila';
+
     public function index(Request $request)
     {
+        // Auto-archive expired events using Philippines time
+        $this->autoArchiveExpiredEvents();
+        
         $filter = $request->get('filter', 'all');
         
-        // Get counts from the FULL database (not filtered)
+        // Get counts
         $totalEvents = Event::count();
-        $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
-        $archivedEvents = Event::where('status', 0)->count();
+        $activeEvents = Event::active()->count();
+        $archivedEvents = Event::archived()->count();
         
-        // Build query for active events with optional type filter
-        $query = Event::where(function($query) {
-            $query->where('status', 1)->orWhereNull('status');
-        });
+        // Build query - use upcoming() which now uses Philippines time
+        $query = Event::active()->upcoming();
         
-        // Apply event type filter if not 'all'
         if ($filter !== 'all') {
             $query->where('event_type', $filter);
         }
         
-        // ADD withCount here
         $events = $query->withCount('registrations')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('start_date', 'asc')
             ->paginate(6);
         
         return view('admin_events', compact(
-            'events',
-            'totalEvents',
-            'activeEvents',
-            'archivedEvents',
-            'filter'
+            'events', 'totalEvents', 'activeEvents', 'archivedEvents', 'filter'
         ));
+    }
+
+    protected function autoArchiveExpiredEvents()
+    {
+        // Get current time in Philippines
+        $now = Carbon::now(self::PH_TIMEZONE);
+        
+        // Find events that are active and have end_date in the past (Philippines time)
+        $expiredEvents = Event::where(function($query) {
+                $query->where('status', 1)
+                      ->orWhereNull('status');
+            })
+            ->where('end_date', '<', $now) // Compare against Philippines time
+            ->get();
+        
+        if ($expiredEvents->isNotEmpty()) {
+            foreach ($expiredEvents as $event) {
+                $event->update(['status' => 0]);
+                Log::info("Event auto-archived (Philippines time)", [
+                    'event_id' => $event->id,
+                    'title' => $event->title,
+                    'end_date_utc' => $event->end_date->toDateTimeString(),
+                    'current_ph_time' => $now->toDateTimeString()
+                ]);
+            }
+        }
     }
 
     public function archived()
     {
         $filter = null;
         
-        // Get counts from the FULL database (not filtered)
+        // Get counts
         $totalEvents = Event::count();
-        $activeEvents = Event::where('status', 1)->orWhereNull('status')->count();
-        $archivedEvents = Event::where('status', 0)->count();
+        $activeEvents = Event::active()->upcoming()->count();
+        $archivedEvents = Event::archived()->count();
         
-        // ADD withCount here
-        $events = Event::where('status', 0)
+        // Show only archived events (status = 0)
+        $events = Event::archived()
             ->withCount('registrations')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('end_date', 'desc')
             ->paginate(6);
         
         return view('admin_events', compact(
@@ -69,10 +95,10 @@ class EventController extends Controller
         ));
     }
 
+    // ✅ ADD THIS METHOD
     public function create()
     {
         $event = new Event();
-
         return view('events.create', compact('event'));
     }
 
@@ -102,17 +128,20 @@ class EventController extends Controller
         ]);
 
         $adminId = $request->session()->get('admin_id');
-
         abort_unless($adminId, 403);
 
         $venueId = $this->syncVenue($request);
+
+        // Parse dates in Philippines time, convert to UTC for storage
+        $startDate = Carbon::parse($request->start_date, self::PH_TIMEZONE)->utc();
+        $endDate = Carbon::parse($request->end_date, self::PH_TIMEZONE)->utc();
 
         $event = Event::create([
             'admin_id' => $adminId,
             'title' => $request->title,
             'description' => $request->description,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'max_capacity' => $request->max_capacity,
             'event_type' => $request->event_type,
             'platform' => $request->platform,
@@ -124,7 +153,6 @@ class EventController extends Controller
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $file) {
                 $path = $this->storeEventImage($event, $file);
-
                 $event->images()->create([
                     'image_path' => $path,
                 ]);
@@ -137,7 +165,6 @@ class EventController extends Controller
     public function edit(Event $event)
     {
         $event->load(['images', 'admin', 'venue']);
-
         return view('events.edit', compact('event'));
     }
 
@@ -193,11 +220,15 @@ class EventController extends Controller
 
         $venueId = $this->syncVenue($request, $event->venue_id);
 
+        // Parse dates in Philippines time, convert to UTC for storage
+        $startDate = Carbon::parse($request->start_date, self::PH_TIMEZONE)->utc();
+        $endDate = Carbon::parse($request->end_date, self::PH_TIMEZONE)->utc();
+
         $event->update([
             'title' => $request->title,
             'description' => $request->description,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'max_capacity' => $request->max_capacity,
             'event_type' => $request->event_type,
             'platform' => $request->platform,
@@ -222,14 +253,12 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $event->update(['status' => 0]);
-
         return redirect()->route('events.index')->with('success', 'Event successfully archived!');
     }
 
     public function restore(Event $event)
     {
         $event->update(['status' => 1]);
-
         return redirect()->route('events.archived')->with('success', 'Event restored.');
     }
 
@@ -316,7 +345,6 @@ class EventController extends Controller
 
         if ($venue) {
             $venue->update($venueData);
-
             return $venue->getKey();
         }
 
@@ -334,7 +362,6 @@ class EventController extends Controller
                 'venue_latitude' => null,
                 'venue_longitude' => null,
             ]);
-
             return;
         }
 

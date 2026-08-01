@@ -2192,3 +2192,17 @@ textarea.form-control {
     color: var(--warning) !important;
     font-size: 0.75rem;
 }
+
+/* Gallery Thumbnail Placeholder - Icon Display */
+.gallery-thumb.placeholder {
+    background: var(--gray-200);
+    opacity: 0.6;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.gallery-thumb.placeholder i {
+    font-size: 1.75rem;
+    color: var(--gray-400);
+}
