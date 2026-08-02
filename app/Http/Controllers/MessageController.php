@@ -627,19 +627,20 @@ private function deriveKeyMethod3($password, $salt)
                         );
                         
                         $avatar = $this->resolveAdminPhotoUrl($admin->photo ?? null);
-                        
+                        $adminRole = $admin->admin_role ?? 'Admin';
+
                         return [
                             'id' => $admin->id,
                             'type' => 'admin',
                             'full_name' => $fullName ?: 'Unknown Admin',
                             'initials' => $initials ?: 'AD',
-                            'program' => 'Admin Staff',
+                            'program' => $adminRole,
                             'batch' => '-',
                             'student_id' => 'N/A',
                             'email' => $admin->admin_email ?? 'N/A',
                             'is_online' => true,
                             'avatar' => $avatar,
-                            'admin_role' => $admin->admin_role ?? 'Admin', // Add admin role
+                            'admin_role' => $adminRole,
                         ];
                     });
             }
@@ -876,11 +877,10 @@ private function deriveKeyMethod3($password, $salt)
                     substr($user->admin_last_name ?? 'A', 0, 1)
                 );
                 $batch = '-';
-                $program = 'Admin Staff';
+                $adminRole = strtoupper($user->admin_role ?? 'ADMIN');
+                $program = $adminRole;
                 $isOnline = true;
                 $photo = $user->photo ?? null;
-                $adminRole = strtoupper($user->admin_role ?? 'ADMIN');
-
             }
             
             // Resolve avatar URL

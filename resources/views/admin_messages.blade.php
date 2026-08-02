@@ -190,6 +190,7 @@
         
         .alumni-info {
             flex: 1;
+            margin-left: 13px;
         }
         
         .alumni-info .name {
@@ -1225,6 +1226,20 @@
                 // 🔧 Fix UTC timestamp
                 const utcTimestamp = ensureUTCTimestamp(timestamp);
                 
+                // ✅ Also fetch DM settings to get archive status
+                let isArchived = false;
+                let isMuted = false;
+                try {
+                    const settingsResponse = await fetch(`/admin/messages/dm-settings?contact_id=${contactId}&contact_type=${contactType}`);
+                    if (settingsResponse.ok) {
+                        const settingsData = await settingsResponse.json();
+                        isArchived = settingsData.is_archived || false;
+                        isMuted = settingsData.is_muted || false;
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch DM settings:', e);
+                }
+                
                 const newContact = {
                     id: data.id,
                     type: data.type,
@@ -1238,7 +1253,9 @@
                     last_message_timestamp: utcTimestamp,
                     last_message_from_me: !isUnread,
                     unread_count: isUnread ? 1 : 0,
-                    avatar: data.avatar || null
+                    avatar: data.avatar || null,
+                    is_archived: isArchived,  // ✅ Add archive status
+                    is_muted: isMuted
                 };
                 
                 allContacts.unshift(newContact);
@@ -1260,7 +1277,9 @@
                     last_message_timestamp: utcTimestamp,
                     last_message_from_me: !isUnread,
                     unread_count: isUnread ? 1 : 0,
-                    avatar: null
+                    avatar: null,
+                    is_archived: false,
+                    is_muted: false
                 };
                 
                 allContacts.unshift(newContact);
@@ -1638,7 +1657,7 @@
                     return;
                 }
                 
-                // Convert search results to contact format
+                // In applyFilter(), update the search results mapping:
                 const searchResults = data.map(result => ({
                     id: result.id,
                     type: result.type,
@@ -1650,7 +1669,10 @@
                     last_message: null,
                     last_message_time: null,
                     unread_count: 0,
-                    avatar: result.avatar
+                    avatar: result.avatar,
+                    admin_role: (result.admin_role || 'Admin').toUpperCase(),
+                    is_archived: false,  // ✅ Search results are not archived by default
+                    is_muted: false
                 }));
                 
                 // Apply tab filters to search results
@@ -1750,152 +1772,198 @@ async function toggleArchiveView() {
         }
     }
     
-    // ============================================
-    // CHAT FUNCTIONALITY
-    // ============================================
-    async function openChat(contactId, type = 'alumni') {
-        lastMessageId = 0;
-        currentChat = { id: contactId, type: type };
-        
-        // Hide typing indicator from previous chat
-        hideTypingIndicator();
-        clearTimeout(typingTimeout);
-        clearTimeout(typingIndicatorTimeout);
-        
-        // Update contact list active state
-        document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
-        const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
-        if (activeCard) activeCard.classList.add('active');
-        
-        // Show chat panel, hide empty state
-        document.getElementById('noChatSelected').style.display = 'none';
-        document.getElementById('chatHeader').style.display = 'flex';
-        document.getElementById('chatMessages').style.display = 'block';
-        document.getElementById('chatInput').style.display = 'flex';
-        
-        // Update header
-        let contact = allContacts.find(c => c.id == contactId && c.type === type);
-        
-        if (!contact) {
-            const cardElement = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
-            if (cardElement) {
-                const nameEl = cardElement.querySelector('.contact-name');
-                const batchEl = cardElement.querySelector('.contact-batch');
-                const avatarEl = cardElement.querySelector('.contact-avatar');
-                const avatarImgEl = cardElement.querySelector('.contact-avatar-img');
-                
-                contact = {
-                    id: contactId,
-                    type: type,
-                    full_name: nameEl ? nameEl.textContent.trim() : (type === 'admin' ? 'Admin' : 'Alumni'),
-                    initials: avatarEl ? avatarEl.textContent.trim() : '??',
-                    program: '',
-                    batch: batchEl ? batchEl.textContent.trim().replace('Batch ', '') : '-',
-                    is_online: false,
-                    avatar: avatarImgEl ? avatarImgEl.src : null,
-                    admin_role: type === 'admin' ? 'Admin' : null,
-                    is_archived: false  // Add this
-                };
-            }
+async function openChat(contactId, type = 'alumni') {
+    lastMessageId = 0;
+    currentChat = { id: contactId, type: type };
+    
+    // Hide typing indicator from previous chat
+    hideTypingIndicator();
+    clearTimeout(typingTimeout);
+    clearTimeout(typingIndicatorTimeout);
+    
+    // Update contact list active state
+    document.querySelectorAll('.contact-card').forEach(card => card.classList.remove('active'));
+    const activeCard = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
+    if (activeCard) activeCard.classList.add('active');
+    
+    // Show chat panel, hide empty state
+    document.getElementById('noChatSelected').style.display = 'none';
+    document.getElementById('chatHeader').style.display = 'flex';
+    document.getElementById('chatMessages').style.display = 'block';
+    document.getElementById('chatInput').style.display = 'flex';
+    
+    // 🔥 IMPORTANT: Initially disable input while loading
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.querySelector('.btn-send');
+    const attachBtn = document.querySelector('.btn-attach');
+    const emojiBtn = document.querySelector('.btn-emoji');
+    
+    input.disabled = true;
+    input.placeholder = 'Loading conversation...';
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = '0.5';
+    sendBtn.style.cursor = 'not-allowed';
+    attachBtn.disabled = true;
+    attachBtn.style.opacity = '0.5';
+    attachBtn.style.cursor = 'not-allowed';
+    emojiBtn.disabled = true;
+    emojiBtn.style.opacity = '0.5';
+    emojiBtn.style.cursor = 'not-allowed';
+    
+    // Update header
+    let contact = allContacts.find(c => c.id == contactId && c.type === type);
+    
+    if (!contact) {
+        const cardElement = document.querySelector(`.contact-card[onclick="openChat(${contactId}, '${type}')"]`);
+        if (cardElement) {
+            const nameEl = cardElement.querySelector('.contact-name');
+            const batchEl = cardElement.querySelector('.contact-batch');
+            const avatarEl = cardElement.querySelector('.contact-avatar');
+            const avatarImgEl = cardElement.querySelector('.contact-avatar-img');
+            const adminBadgeEl = cardElement.querySelector('.admin-role-badge');
+            const adminRole = adminBadgeEl ? adminBadgeEl.textContent.trim() : (type === 'admin' ? 'Admin' : null);
+            
+            contact = {
+                id: contactId,
+                type: type,
+                full_name: nameEl ? nameEl.textContent.trim() : (type === 'admin' ? 'Admin' : 'Alumni'),
+                initials: avatarEl ? avatarEl.textContent.trim() : '??',
+                program: '',
+                batch: batchEl ? batchEl.textContent.trim().replace('Batch ', '') : '-',
+                is_online: false,
+                avatar: avatarImgEl ? avatarImgEl.src : null,
+                admin_role: adminRole,
+                is_archived: false
+            };
         }
-        
-        if (contact) {
-            const chatAvatar = document.getElementById('chatAvatar');
-            
-            if (contact.avatar) {
-                chatAvatar.innerHTML = `<img src="${contact.avatar}" alt="${escapeHtml(contact.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
-            } else {
-                chatAvatar.textContent = contact.initials;
-                chatAvatar.style.background = 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))';
-                chatAvatar.style.color = 'var(--nu-gold)';
-            }
-            
-            document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? `<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">${escapeHtml(contact.admin_role || 'Admin')}</span>` : ''}`;
-            
-            // Check real-time presence for admin contacts
-            let isOnline = contact.is_online;
-            if (contact.type === 'admin' && presenceChannel) {
-                const state = presenceChannel.presenceState();
-                let found = false;
-                Object.values(state).forEach(presences => {
-                    presences.forEach(presence => {
-                        if (presence.admin_id == contactId) {
-                            found = true;
-                        }
-                    });
-                });
-                isOnline = found;
-            }
-            
-            document.getElementById('chatStatus').innerHTML = `
-                <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
-                ${isOnline ? 'Online' : 'Offline'}
-            `;
-        }
-        
-        // ✅ CHECK IF CHAT IS ARCHIVED AND DISABLE INPUT
-        checkAndDisableArchivedChat(contactId, type);
-        
-        // Load messages
-        await loadMessages(contactId, type);
-        await markMessagesAsRead(contactId, type);
-        
-        // Focus input (only if not archived)
-        const contactCheck = allContacts.find(c => c.id == contactId && c.type === type);
-        if (!contactCheck || !contactCheck.is_archived) {
-            document.getElementById('messageInput').focus();
-        }
-        
-        showChatOnMobile();
     }
+    
+    // ✅ Fetch archive status from server
+    let isArchived = false;
+    try {
+        const response = await fetch(`/admin/messages/dm-settings?contact_id=${contactId}&contact_type=${type}`);
+        if (response.ok) {
+            const data = await response.json();
+            isArchived = data.is_archived || false;
+            
+            // Update contact with archive status
+            if (contact) {
+                contact.is_archived = isArchived;
+            }
+            
+            // Update in allContacts too
+            const existingContact = allContacts.find(c => c.id == contactId && c.type === type);
+            if (existingContact) {
+                existingContact.is_archived = isArchived;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching archive status:', error);
+        isArchived = false;
+    }
+    
+    // ✅ Now check archive status and update UI
+    if (contact) {
+        const chatAvatar = document.getElementById('chatAvatar');
+        
+        if (contact.avatar) {
+            chatAvatar.innerHTML = `<img src="${contact.avatar}" alt="${escapeHtml(contact.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        } else {
+            chatAvatar.textContent = contact.initials;
+            chatAvatar.style.background = 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))';
+            chatAvatar.style.color = 'var(--nu-gold)';
+        }
+        
+        const displayRole = contact.admin_role || (type === 'admin' ? 'Admin' : '');
+        document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? `<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">${escapeHtml(displayRole)}</span>` : ''}`;
+        
+        // Check real-time presence for admin contacts
+        let isOnline = contact.is_online;
+        if (contact.type === 'admin' && presenceChannel) {
+            const state = presenceChannel.presenceState();
+            let found = false;
+            Object.values(state).forEach(presences => {
+                presences.forEach(presence => {
+                    if (presence.admin_id == contactId) {
+                        found = true;
+                    }
+                });
+            });
+            isOnline = found;
+        }
+        
+        document.getElementById('chatStatus').innerHTML = `
+            <span class="status-dot ${isOnline ? 'online' : ''}"></span> 
+            ${isOnline ? 'Online' : 'Offline'}
+        `;
+    }
+    
+    // Load messages
+    await loadMessages(contactId, type);
+    await markMessagesAsRead(contactId, type);
+    
+    // ✅ CHECK IF CHAT IS ARCHIVED AND UPDATE INPUT
+    // This will either enable or disable input based on archive status
+    checkAndDisableArchivedChat(contactId, type);
+    
+    // Focus input (only if not archived)
+    if (!isArchived) {
+        document.getElementById('messageInput').focus();
+    }
+    
+    showChatOnMobile();
+}
 
     // ============================================
     // CHECK IF CHAT IS ARCHIVED AND DISABLE INPUT
     // ============================================
-    function checkAndDisableArchivedChat(contactId, contactType) {
-        // Find the contact in allContacts
-        const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+function checkAndDisableArchivedChat(contactId, contactType) {
+    // Find the contact in allContacts
+    const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+    
+    const input = document.getElementById('messageInput');
+    const sendBtn = document.querySelector('.btn-send');
+    const attachBtn = document.querySelector('.btn-attach');
+    const emojiBtn = document.querySelector('.btn-emoji');
+    
+    // Ensure we have a valid contact with is_archived property
+    const isArchived = contact ? contact.is_archived : false;
+    
+    if (isArchived) {
+        // Disable input and buttons
+        input.disabled = true;
+        input.placeholder = 'This conversation is archived. Unarchive to send messages.';
+        sendBtn.disabled = true;
+        sendBtn.style.opacity = '0.5';
+        sendBtn.style.cursor = 'not-allowed';
+        attachBtn.disabled = true;
+        attachBtn.style.opacity = '0.5';
+        attachBtn.style.cursor = 'not-allowed';
+        emojiBtn.disabled = true;
+        emojiBtn.style.opacity = '0.5';
+        emojiBtn.style.cursor = 'not-allowed';
         
-        const input = document.getElementById('messageInput');
-        const sendBtn = document.querySelector('.btn-send');
-        const attachBtn = document.querySelector('.btn-attach');
-        const emojiBtn = document.querySelector('.btn-emoji');
+        // Show a message in the chat area
+        showArchivedWarning();
+    } else {
+        // Enable input and buttons
+        input.disabled = false;
+        input.placeholder = 'Type a message here...';
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = '1';
+        sendBtn.style.cursor = 'pointer';
+        attachBtn.disabled = false;
+        attachBtn.style.opacity = '1';
+        attachBtn.style.cursor = 'pointer';
+        emojiBtn.disabled = false;
+        emojiBtn.style.opacity = '1';
+        emojiBtn.style.cursor = 'pointer';
         
-        if (contact && contact.is_archived) {
-            // Disable input and buttons
-            input.disabled = true;
-            input.placeholder = 'This conversation is archived. Unarchive to send messages.';
-            sendBtn.disabled = true;
-            sendBtn.style.opacity = '0.5';
-            sendBtn.style.cursor = 'not-allowed';
-            attachBtn.disabled = true;
-            attachBtn.style.opacity = '0.5';
-            attachBtn.style.cursor = 'not-allowed';
-            emojiBtn.disabled = true;
-            emojiBtn.style.opacity = '0.5';
-            emojiBtn.style.cursor = 'not-allowed';
-            
-            // Show a message in the chat area
-            showArchivedWarning();
-        } else {
-            // Enable input and buttons
-            input.disabled = false;
-            input.placeholder = 'Type a message here...';
-            sendBtn.disabled = false;
-            sendBtn.style.opacity = '1';
-            sendBtn.style.cursor = 'pointer';
-            attachBtn.disabled = false;
-            attachBtn.style.opacity = '1';
-            attachBtn.style.cursor = 'pointer';
-            emojiBtn.disabled = false;
-            emojiBtn.style.opacity = '1';
-            emojiBtn.style.cursor = 'pointer';
-            
-            // Remove archived warning if exists
-            const warning = document.querySelector('.archived-warning');
-            if (warning) warning.remove();
-        }
+        // Remove archived warning if exists
+        const warning = document.querySelector('.archived-warning');
+        if (warning) warning.remove();
     }
+}
 
     function showArchivedWarning() {
         const container = document.getElementById('chatMessages');
@@ -2410,7 +2478,7 @@ async function toggleArchiveView() {
                         }
                         <div class="alumni-info">
                             <div class="name">${escapeHtml(a.full_name)}</div>
-                            <div class="details">${a.type === 'admin' ? 'Admin Staff' : `Batch ${a.batch} | ${a.program || 'N/A'}`}</div>
+                            <div class="details">${a.type === 'admin' ? a.program || 'Admin' : `Batch ${a.batch} | ${a.program || 'N/A'}`}</div>
                         </div>
                         ${a.is_online ? '<span class="online-dot" title="Online"></span>' : ''}
                     </div>
