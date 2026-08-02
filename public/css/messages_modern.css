@@ -387,7 +387,9 @@ body {
     border-radius: var(--radius-xl); 
     margin-bottom: 0.25rem;
     border: 2px solid transparent;
-    position: relative;
+    position: relative !important;
+    overflow: visible !important;
+    z-index: 1;
 }
 .contact-card:hover { 
     background: var(--gray-50); 
@@ -401,6 +403,23 @@ body {
 }
 .contact-card.unread { 
     background: var(--gray-50);
+}
+
+/* When a contact card has an active dropdown, bring it to the front */
+.contact-card:has(.contact-dropdown.active) {
+    z-index: 1000 !important;
+    position: relative !important;
+}
+
+/* Also target via parent to be extra sure */
+.contact-card:has(.contact-dropdown.active) .contact-dropdown {
+    display: block !important;
+    pointer-events: auto !important;
+}
+
+/* Also style for when the dropdown is inside the card */
+.contact-card .contact-dropdown.active {
+    z-index: 9999;
 }
 
 /* Avatar Styles */
@@ -1612,4 +1631,201 @@ body {
         max-width: 200px;
         max-height: 150px;
     }
+}
+
+/* ============================================
+   CONTACT CARD ACTIONS & DROPDOWN - FIXED
+   ============================================ */
+
+/* IMPORTANT: Make the contacts list allow overflow */
+.contacts-list {
+    overflow: visible !important;
+    position: relative;
+}
+
+/* Each contact card needs to allow overflow */
+.contact-card {
+    position: relative !important;
+    overflow: visible !important;
+    z-index: 1;
+}
+
+/* The actions container */
+.contact-card .contact-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity var(--transition);
+    z-index: 10;
+}
+
+.contact-card:hover .contact-actions,
+.contact-card:focus-within .contact-actions {
+    opacity: 1;
+}
+
+.contact-card .contact-actions .btn-more {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    font-size: 1.1rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.contact-card .contact-actions .btn-more:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+/* Fix for contact details when actions are visible */
+.contact-card .contact-details {
+    padding-right: 32px;
+}
+
+/* Dropdown styling */
+.contact-dropdown {
+    position: absolute;
+    right: 8px;
+    /* top will be set by JS */
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    padding: 6px 0;
+    z-index: 9999 !important;
+    display: none;
+    border: 1px solid var(--gray-200);
+    pointer-events: auto !important;
+}
+
+
+.contact-dropdown.active {
+    display: block;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.contact-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    cursor: pointer !important; /* Force cursor */
+    transition: all var(--transition);
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    pointer-events: auto !important; /* Ensure clicks work */
+    position: relative;
+    z-index: 10001 !important; /* Higher than parent */
+}
+
+.contact-dropdown .dropdown-item * {
+    pointer-events: none; /* Icons shouldn't intercept clicks */
+}
+
+.contact-dropdown .dropdown-item:hover {
+    background: var(--gray-50);
+}
+
+.contact-dropdown .dropdown-item i {
+    width: 18px;
+    color: var(--gray-500);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    pointer-events: none; /* Prevent icon from blocking clicks */
+}
+
+.contact-dropdown .dropdown-item.danger {
+    color: var(--danger);
+}
+
+.contact-dropdown .dropdown-item.danger i {
+    color: var(--danger);
+}
+
+.contact-dropdown hr {
+    margin: 4px 12px;
+    border: none;
+    border-top: 1px solid var(--gray-200);
+    pointer-events: none;
+}
+
+/* Archived chat style */
+.contact-card.archived {
+    opacity: 0.6;
+}
+
+.contact-card.archived .contact-name {
+    color: var(--gray-500);
+}
+
+.contact-card.archived .contact-preview {
+    color: var(--gray-400);
+}
+
+/* Muted chat style */
+.contact-card.muted .muted-indicator {
+    display: inline-block !important;
+}
+
+.muted-indicator {
+    display: none;
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    margin-left: 4px;
+}
+
+/* Mobile touch improvements */
+@media (hover: none) and (pointer: coarse) {
+    .contact-card .contact-actions {
+        opacity: 1;
+    }
+    
+    .contact-dropdown .dropdown-item {
+        padding: 12px 16px;
+        min-height: 44px;
+    }
+}
+
+/* ============================================
+   DROPDOWN BACKDROP
+   ============================================ */
+.dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9998;
+    display: none;
+    background: transparent;
+    pointer-events: auto; /* Capture clicks on backdrop only */
+}
+
+.dropdown-backdrop.active {
+    display: block;
 }

@@ -708,8 +708,10 @@
             </div>
         </div>
     </div>
+    <!-- Dropdown Backdrop -->
+    <div class="dropdown-backdrop" id="dropdownBackdrop" onclick="closeAllDropdowns()"></div>
 
-     <script>
+<script>
     // ============================================
     // GLOBAL STATE
     // ============================================
@@ -1405,6 +1407,7 @@
         }
     }
     
+    // In the renderContacts function, replace the contact card HTML
     function renderContacts(contacts) {
         const contactsList = document.getElementById('contactsList');
         
@@ -1428,24 +1431,30 @@
                     : escapeHtml(truncateText(contact.last_message, 30)))
                 : '<span class="no-message">Start a conversation</span>';
             
-            // 🔧 Format the timestamp using JavaScript's local timezone
             const displayTime = contact.last_message_timestamp 
                 ? formatTime(new Date(contact.last_message_timestamp))
                 : '';
             
             const adminRole = contact.admin_role || 'Admin';
+            const isArchived = contact.is_archived || false;
+            const isMuted = contact.is_muted || false;
+            const contactId = contact.id;
+            const contactType = contact.type || 'alumni';
             
             return `
-                <div class="contact-card ${currentChat?.id == contact.id && currentChat?.type === contact.type ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''}" 
-                    onclick="openChat(${contact.id}, '${contact.type || 'alumni'}')">
+                <div class="contact-card ${currentChat?.id == contactId && currentChat?.type === contactType ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''} ${isArchived ? 'archived' : ''} ${isMuted ? 'muted' : ''}" 
+                    onclick="openChat(${contactId}, '${contactType}')">
                     ${contact.avatar 
                         ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${escapeHtml(contact.full_name)}">`
                         : `<div class="contact-avatar">${contact.initials || '??'}</div>`
                     }
                     <div class="contact-details">
                         <div class="contact-row-1">
-                            <span class="contact-name" title="${escapeHtml(contact.full_name)}">${escapeHtml(contact.full_name)}</span>
-                            <span class="contact-time">${displayTime}</span> <!-- 🔧 Local time -->
+                            <span class="contact-name" title="${escapeHtml(contact.full_name)}">
+                                ${escapeHtml(contact.full_name)}
+                                ${isMuted ? '<span class="muted-indicator"><i class="fa-solid fa-bell-slash"></i></span>' : ''}
+                            </span>
+                            <span class="contact-time">${displayTime}</span>
                         </div>
                         <div class="contact-row-2">
                             ${contact.type === 'admin' 
@@ -1461,6 +1470,29 @@
                             }
                         </div>
                     </div>
+                    <div class="contact-actions">
+                        <button class="btn-more" 
+                            data-contact-id="${contactId}" 
+                            data-contact-type="${contactType}"
+                            onclick="event.stopPropagation(); toggleContactDropdown(${contactId}, '${contactType}', this)">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="contact-dropdown" id="dropdown-${contactId}-${contactType}" data-contact-id="${contactId}" data-contact-type="${contactType}">
+                    <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isArchived ? 'unarchive' : 'archive'}')">
+                        <i class="fa-solid ${isArchived ? 'fa-box-open' : 'fa-box-archive'}"></i>
+                        ${isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+                    </button>
+                    <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isMuted ? 'unmute' : 'mute'}')">
+                        <i class="fa-solid ${isMuted ? 'fa-bell' : 'fa-bell-slash'}"></i>
+                        ${isMuted ? 'Unmute Chat' : 'Mute Chat'}
+                    </button>
+                    <hr>
+                    <button type="button" class="dropdown-item danger" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', 'delete')">
+                        <i class="fa-solid fa-trash-can"></i>
+                        Delete Chat
+                    </button>
                 </div>
             `;
         }).join('');
@@ -2809,6 +2841,397 @@ function renderAttachments(attachments, isSent) {
         originalSendMessageFn();
     };
 
+// ============================================
+// CONTACT DROPDOWN TOGGLE - SIMPLEST FIX
+// ============================================
+function toggleContactDropdown(contactId, contactType, button) {
+    event.stopPropagation();
+    const dropdownId = `dropdown-${contactId}-${contactType}`;
+    const dropdown = document.getElementById(dropdownId);
+    const backdrop = document.getElementById('dropdownBackdrop');
+    
+    // Close all other dropdowns
+    document.querySelectorAll('.contact-dropdown.active').forEach(d => {
+        if (d.id !== dropdownId) d.classList.remove('active');
+    });
+    
+    if (dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+        backdrop.classList.remove('active');
+        return;
+    }
+    
+    // Position the dropdown near the button
+    const buttonRect = button.getBoundingClientRect();
+    const listRect = document.querySelector('.contacts-list').getBoundingClientRect();
+    
+    dropdown.style.top = (buttonRect.bottom - listRect.top + 4) + 'px';
+    dropdown.style.right = (listRect.right - buttonRect.right) + 'px';
+    
+    dropdown.classList.add('active');
+    backdrop.classList.add('active');
+}
+
+// Single handler for all dropdown actions
+function handleDropdownAction(event, contactId, contactType, action) {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    // Close dropdown
+    const dropdown = document.getElementById(`dropdown-${contactId}-${contactType}`);
+    if (dropdown) dropdown.classList.remove('active');
+    document.getElementById('dropdownBackdrop').classList.remove('active');
+    
+    // Execute action
+    switch(action) {
+        case 'archive':
+        case 'unarchive':
+            toggleArchiveChat(contactId, contactType);
+            break;
+        case 'mute':
+        case 'unmute':
+            toggleMuteChat(contactId, contactType);
+            break;
+        case 'delete':
+            confirmDeleteChat(contactId, contactType);
+            break;
+    }
+}
+
+// Close dropdown when clicking backdrop
+document.getElementById('dropdownBackdrop').addEventListener('click', function() {
+    closeAllDropdowns();
+});
+
+// Close dropdown on Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeAllDropdowns();
+});
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.contact-dropdown.active').forEach(d => d.classList.remove('active'));
+    document.getElementById('dropdownBackdrop').classList.remove('active');
+}
+
+// ============================================
+// HELPER: Find contact card by ID and type
+// ============================================
+function findContactCard(contactId, contactType) {
+    // Try finding the dropdown first, then get its parent card
+    const dropdown = document.getElementById(`dropdown-${contactId}-${contactType}`);
+    if (dropdown) return dropdown.closest('.contact-card');
+    
+    // Fallback: find by onclick attribute
+    return document.querySelector(`.contact-card[onclick*="openChat(${contactId}, '${contactType}')"]`);
+}
+
+// ============================================
+// ARCHIVE CHAT
+// ============================================
+async function toggleArchiveChat(contactId, contactType) {
+    const card = findContactCard(contactId, contactType);
+    if (!card) return;
+    
+    const isCurrentlyArchived = card.classList.contains('archived');
+    const newArchivedState = !isCurrentlyArchived;
+    
+    try {
+        const response = await fetch('/admin/messages/archive', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                contact_id: contactId,
+                contact_type: contactType,
+                archived: newArchivedState
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to archive chat');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update card class
+            if (newArchivedState) {
+                card.classList.add('archived');
+            } else {
+                card.classList.remove('archived');
+            }
+            
+            // Update the dropdown button text
+            const dropdown = card.querySelector('.contact-dropdown');
+            if (dropdown) {
+                const archiveBtn = dropdown.querySelector('.dropdown-item:first-child');
+                if (archiveBtn) {
+                    archiveBtn.innerHTML = `
+                        <i class="fa-solid ${newArchivedState ? 'fa-box-open' : 'fa-box-archive'}"></i>
+                        ${newArchivedState ? 'Unarchive Chat' : 'Archive Chat'}
+                    `;
+                    // Update onclick
+                    archiveBtn.setAttribute('onclick', 
+                        `handleDropdownAction(event, ${contactId}, '${contactType}', '${newArchivedState ? 'unarchive' : 'archive'}')`
+                    );
+                }
+            }
+            
+            showToast(`Chat ${newArchivedState ? 'archived' : 'unarchived'} successfully`);
+            
+            // Update allContacts data
+            const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+            if (contact) {
+                contact.is_archived = newArchivedState;
+            }
+        }
+    } catch (error) {
+        console.error('Error archiving chat:', error);
+        showToast('Failed to archive chat', 'error');
+    }
+}
+
+// ============================================
+// MUTE CHAT
+// ============================================
+async function toggleMuteChat(contactId, contactType) {
+    const card = findContactCard(contactId, contactType);
+    if (!card) return;
+    
+    const isCurrentlyMuted = card.classList.contains('muted');
+    const newMutedState = !isCurrentlyMuted;
+    
+    try {
+        const response = await fetch('/admin/messages/mute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                contact_id: contactId,
+                contact_type: contactType,
+                muted: newMutedState
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to mute chat');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            if (newMutedState) {
+                card.classList.add('muted');
+                const nameEl = card.querySelector('.contact-name');
+                if (nameEl) {
+                    const text = nameEl.textContent.trim().replace(/🔕$/, '').trim();
+                    nameEl.innerHTML = `${escapeHtml(text)} <span class="muted-indicator"><i class="fa-solid fa-bell-slash"></i></span>`;
+                }
+            } else {
+                card.classList.remove('muted');
+                const nameEl = card.querySelector('.contact-name');
+                if (nameEl) {
+                    const text = nameEl.textContent.trim().replace(/🔕$/, '').trim();
+                    nameEl.textContent = text;
+                }
+            }
+            
+            // Update dropdown button
+            const dropdown = card.querySelector('.contact-dropdown');
+            if (dropdown) {
+                const muteBtn = dropdown.querySelectorAll('.dropdown-item')[1];
+                if (muteBtn) {
+                    muteBtn.innerHTML = `
+                        <i class="fa-solid ${newMutedState ? 'fa-bell' : 'fa-bell-slash'}"></i>
+                        ${newMutedState ? 'Unmute Chat' : 'Mute Chat'}
+                    `;
+                    muteBtn.setAttribute('onclick',
+                        `handleDropdownAction(event, ${contactId}, '${contactType}', '${newMutedState ? 'unmute' : 'mute'}')`
+                    );
+                }
+            }
+            
+            showToast(`Chat ${newMutedState ? 'muted' : 'unmuted'} successfully`);
+            
+            // Update allContacts data
+            const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+            if (contact) {
+                contact.is_muted = newMutedState;
+            }
+        }
+    } catch (error) {
+        console.error('Error muting chat:', error);
+        showToast('Failed to mute chat', 'error');
+    }
+}
+
+// ============================================
+// DELETE CHAT
+// ============================================
+function confirmDeleteChat(contactId, contactType) {
+    if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+        return;
+    }
+    
+    closeAllDropdowns();
+    deleteChat(contactId, contactType);
+}
+
+async function deleteChat(contactId, contactType) {
+    try {
+        const response = await fetch('/admin/messages/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                contact_id: contactId,
+                contact_type: contactType
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete chat');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Chat deleted successfully');
+            
+            const card = findContactCard(contactId, contactType);
+            if (card) {
+                card.style.transition = 'all 0.3s ease';
+                card.style.transform = 'translateX(-100%)';
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.remove();
+                    if (document.querySelectorAll('.contact-card').length === 0) {
+                        renderContacts([]);
+                    }
+                }, 300);
+            }
+            
+            if (currentChat && currentChat.id == contactId && currentChat.type === contactType) {
+                currentChat = null;
+                document.getElementById('noChatSelected').style.display = 'flex';
+                document.getElementById('chatHeader').style.display = 'none';
+                document.getElementById('chatMessages').style.display = 'none';
+                document.getElementById('chatInput').style.display = 'none';
+            }
+            
+            // Remove from allContacts
+            allContacts = allContacts.filter(c => !(c.id == contactId && c.type === contactType));
+        }
+    } catch (error) {
+        console.error('Error deleting chat:', error);
+        showToast('Failed to delete chat', 'error');
+    }
+}
+
+// ============================================
+// TOAST NOTIFICATIONS
+// ============================================
+function showToast(message, type = 'success') {
+    // Remove existing toasts
+    const existingToast = document.querySelector('.custom-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `custom-toast ${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+            <span>${message}</span>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    `;
+    
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        background: type === 'success' ? '#10b981' : '#ef4444',
+        color: 'white',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        zIndex: '9999',
+        fontFamily: 'Poppins, sans-serif',
+        fontSize: '0.9rem',
+        minWidth: '250px',
+        maxWidth: '400px',
+        animation: 'slideInUp 0.3s ease',
+        border: 'none'
+    });
+    
+    document.body.appendChild(toast);
+    
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutDown 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 4000);
+}
+
+// Add toast animations (add this once, outside the function)
+if (!document.querySelector('#toast-styles')) {
+    const toastStyles = document.createElement('style');
+    toastStyles.id = 'toast-styles';
+    toastStyles.textContent = `
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOutDown {
+            from {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+        }
+        .custom-toast .toast-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        .custom-toast .toast-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 4px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .custom-toast .toast-close:hover {
+            opacity: 1;
+        }
+    `;
+    document.head.appendChild(toastStyles);
+}
 </script>
 
 </body>

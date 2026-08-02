@@ -257,6 +257,11 @@ Route::prefix('admin')->group(function () {
             ->where(['type' => 'alumni|admin'])
             ->name('messages.contact-info');
 
+        Route::post('/messages/archive', [MessageController::class, 'archiveChat']);
+        Route::post('/messages/mute', [MessageController::class, 'muteChat']);
+        Route::post('/messages/delete', [MessageController::class, 'deleteChat']);
+        Route::get('/messages/settings', [MessageController::class, 'getDmSettings']);
+
     });
 });
 

@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\Alumni;
 use App\Models\Admin;
 use App\Models\MessagesAttachment;
+use App\Models\DmSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema; 
 use Illuminate\Support\Facades\Log;
@@ -166,12 +167,19 @@ private function deriveKeyMethod3($password, $salt)
                 return response()->json(['error' => 'Unauthorized'], 401);
             }
             
+            // Get all unique contacts from messages
             $sentContacts = Message::where('sender_id', $adminId)
+                ->where(function($query) use ($adminId) {
+                    $query->whereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+                })
                 ->select('receiver_id as contact_id', 'receiver_type as contact_type')
                 ->distinct()
                 ->get();
                 
             $receivedContacts = Message::where('receiver_id', $adminId)
+                ->where(function($query) use ($adminId) {
+                    $query->whereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+                })
                 ->select('sender_id as contact_id', 'sender_type as contact_type')
                 ->distinct()
                 ->get();
@@ -213,6 +221,20 @@ private function deriveKeyMethod3($password, $salt)
                     continue;
                 }
                 
+                // Check if this chat is hidden for this admin
+                if ($contactType === 'alumni') {
+                    $setting = DmSetting::where('user_id', $adminId)
+                        ->where('user_type', 'admin')
+                        ->where('contact_id', $contactId)
+                        ->where('contact_type', 'alumni')
+                        ->first();
+                    
+                    // Skip hidden chats
+                    if ($setting && $setting->is_hidden) {
+                        continue;
+                    }
+                }
+                
                 $userData = null;
                 
                 if ($contactType === 'alumni') {
@@ -224,6 +246,21 @@ private function deriveKeyMethod3($password, $salt)
                 if ($userData) {
                     $contactData = $this->buildContactData($userData, $contactType, $adminId);
                     if ($contactData) {
+                        // Add archive/mute status to contact data
+                        if ($contactType === 'alumni') {
+                            $setting = DmSetting::where('user_id', $adminId)
+                                ->where('user_type', 'admin')
+                                ->where('contact_id', $contactId)
+                                ->where('contact_type', 'alumni')
+                                ->first();
+                            
+                            $contactData['is_archived'] = $setting->is_archived ?? false;
+                            $contactData['is_muted'] = $setting->is_muted ?? false;
+                        } else {
+                            $contactData['is_archived'] = false;
+                            $contactData['is_muted'] = false;
+                        }
+                        
                         $contacts->push($contactData);
                     }
                 }
@@ -1086,6 +1123,149 @@ private function deriveKeyMethod3($password, $salt)
         return response()->json([
             'success' => true,
             'url' => $this->getSecureAttachmentUrl($attachment),
+        ]);
+    }
+
+    public function archiveChat(Request $request)
+    {
+        $request->validate([
+            'contact_id' => 'required|integer',
+            'contact_type' => 'required|in:alumni,admin',
+            'archived' => 'required|boolean'
+        ]);
+
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // Only alumni DMs can be archived
+        if ($request->contact_type !== 'alumni') {
+            return response()->json(['error' => 'Archiving only supported for alumni DMs'], 400);
+        }
+
+        $setting = DmSetting::firstOrCreate([
+            'user_id' => $adminId,
+            'user_type' => 'admin',
+            'contact_id' => $request->contact_id,
+            'contact_type' => 'alumni',
+        ]);
+
+        $setting->is_archived = $request->archived;
+        $setting->save();
+
+        return response()->json([
+            'success' => true, 
+            'archived' => $setting->is_archived
+        ]);
+    }
+
+    /**
+     * Mute a chat (DM only)
+     */
+    public function muteChat(Request $request)
+    {
+        $request->validate([
+            'contact_id' => 'required|integer',
+            'contact_type' => 'required|in:alumni,admin',
+            'muted' => 'required|boolean'
+        ]);
+
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        if ($request->contact_type !== 'alumni') {
+            return response()->json(['error' => 'Muting only supported for alumni DMs'], 400);
+        }
+
+        $setting = DmSetting::firstOrCreate([
+            'user_id' => $adminId,
+            'user_type' => 'admin',
+            'contact_id' => $request->contact_id,
+            'contact_type' => 'alumni',
+        ]);
+
+        $setting->is_muted = $request->muted;
+        $setting->save();
+
+        return response()->json([
+            'success' => true, 
+            'muted' => $setting->is_muted
+        ]);
+    }
+
+    /**
+     * Delete a chat (soft delete - hide for user)
+     */
+    public function deleteChat(Request $request)
+    {
+        $request->validate([
+            'contact_id' => 'required|integer',
+            'contact_type' => 'required|in:alumni,admin',
+        ]);
+
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // For DM, mark messages as deleted for this admin
+        $deletedCount = Message::where(function($query) use ($adminId, $request) {
+            $query->where('sender_id', $adminId)
+                ->where('sender_type', 'admin')
+                ->where('receiver_id', $request->contact_id)
+                ->where('receiver_type', $request->contact_type);
+        })->orWhere(function($query) use ($adminId, $request) {
+            $query->where('sender_id', $request->contact_id)
+                ->where('sender_type', $request->contact_type)
+                ->where('receiver_id', $adminId)
+                ->where('receiver_type', 'admin');
+        })->update([
+            'deleted_by' => \DB::raw("array_append(COALESCE(deleted_by, '{}'), {$adminId})")
+        ]);
+
+        // Also mark as hidden in dm_settings for alumni DMs
+        if ($request->contact_type === 'alumni') {
+            $setting = DmSetting::firstOrCreate([
+                'user_id' => $adminId,
+                'user_type' => 'admin',
+                'contact_id' => $request->contact_id,
+                'contact_type' => 'alumni',
+            ]);
+            $setting->is_hidden = true;
+            $setting->save();
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get DM settings for a contact
+     */
+    public function getDmSettings(Request $request)
+    {
+        $request->validate([
+            'contact_id' => 'required|integer',
+            'contact_type' => 'required|in:alumni,admin',
+        ]);
+
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $setting = DmSetting::where('user_id', $adminId)
+            ->where('user_type', 'admin')
+            ->where('contact_id', $request->contact_id)
+            ->where('contact_type', $request->contact_type)
+            ->first();
+
+        return response()->json([
+            'is_archived' => $setting->is_archived ?? false,
+            'is_muted' => $setting->is_muted ?? false,
+            'is_hidden' => $setting->is_hidden ?? false,
         ]);
     }
 
