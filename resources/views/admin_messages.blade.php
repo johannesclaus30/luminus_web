@@ -502,6 +502,39 @@
     }
 }
 
+/* Archived warning styles */
+.archived-warning {
+    background: #fef3c7 !important;
+    border: 1px solid #f59e0b !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    margin-bottom: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    color: #92400e !important;
+    font-size: 14px !important;
+}
+
+.archived-warning i {
+    font-size: 18px !important;
+    color: #f59e0b !important;
+}
+
+.archived-warning button {
+    background: none !important;
+    border: none !important;
+    color: #f59e0b !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    text-decoration: underline !important;
+    padding: 0 !important;
+}
+
+.archived-warning button:hover {
+    color: #d97706 !important;
+}
+
 
     </style>
 </head>
@@ -599,12 +632,16 @@
                 <!-- Left Panel: Contacts & Search -->
                 <aside class="contacts-panel">
                     <div class="panel-header">
-                        <h2>Messages</h2>
-                        <button class="btn-icon" title="New Message" onclick="openNewMessageModal()">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
+                        <h2 id="panelTitle">Messages</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-icon" id="archiveToggleBtn" title="Archived Chats" onclick="toggleArchiveView()">
+                                <i class="fa-solid fa-box-archive"></i>
+                            </button>
+                            <button class="btn-icon" id="newMessageBtn" title="New Message" onclick="openNewMessageModal()">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </div>
                     </div>
-
                     <div class="search-container">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" id="searchContacts" placeholder="Search alumni by name..." oninput="handleSearchInput()">
@@ -726,6 +763,7 @@
     let lastMessageId = 0;
     let isDecrypting = false;
     let conversationsLoaded = false;
+    let archiveMode = false;
     let typingChannel;
     let presenceChannel;
     let typingTimeout;
@@ -1242,7 +1280,8 @@
         clearTimeout(refreshTimeout);
         refreshTimeout = setTimeout(async () => {
             try {
-                const response = await fetch('/admin/messages/conversations');
+                const url = archiveMode ? '/admin/messages/conversations?archived=1' : '/admin/messages/conversations';
+                const response = await fetch(url);
                 if (!response.ok) return;
                 
                 const freshConversations = await response.json();
@@ -1385,7 +1424,8 @@
     // ============================================
     async function loadConversations() {
         try {
-            const response = await fetch('/admin/messages/conversations');
+            const url = archiveMode ? '/admin/messages/conversations?archived=1' : '/admin/messages/conversations';
+            const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to load conversations');
             
             allContacts = await response.json();
@@ -1639,6 +1679,67 @@
             }
         }, 300);
     }
+
+async function toggleArchiveView() {
+    archiveMode = !archiveMode;
+    const archiveBtn = document.getElementById('archiveToggleBtn');
+    const panelTitle = document.getElementById('panelTitle');
+    const newMsgBtn = document.getElementById('newMessageBtn');
+    
+    if (archiveMode) {
+        // Switch to archive view
+        archiveBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+        archiveBtn.title = 'Back to Messages';
+        panelTitle.textContent = 'Archived Chats';
+        newMsgBtn.style.display = 'none';
+        
+        // Load archived conversations
+        try {
+            const url = '/admin/messages/conversations?archived=1';
+            const response = await fetch(url);
+            if (response.ok) {
+                allContacts = await response.json();
+                applyFilter();
+            }
+        } catch (error) {
+            console.error('Error loading archived chats:', error);
+        }
+
+        // Close any open chat that's not archived
+        if (currentChat) {
+            const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+            if (contact && !contact.is_archived) {
+                currentChat = null;
+                document.getElementById('noChatSelected').style.display = 'flex';
+                document.getElementById('chatHeader').style.display = 'none';
+                document.getElementById('chatMessages').style.display = 'none';
+                document.getElementById('chatInput').style.display = 'none';
+            }
+        }
+
+    } else {
+        // Switch back to normal view
+        archiveBtn.innerHTML = '<i class="fa-solid fa-box-archive"></i>';
+        archiveBtn.title = 'Archived Chats';
+        panelTitle.textContent = 'Messages';
+        newMsgBtn.style.display = '';
+        
+        // Reload normal conversations
+        await loadConversations();
+        
+        // If current chat is archived, close it
+        if (currentChat) {
+            const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+            if (contact && contact.is_archived) {
+                currentChat = null;
+                document.getElementById('noChatSelected').style.display = 'flex';
+                document.getElementById('chatHeader').style.display = 'none';
+                document.getElementById('chatMessages').style.display = 'none';
+                document.getElementById('chatInput').style.display = 'none';
+            }
+        }
+    }
+}
     
     function updateUnreadBadge() {
         const totalUnread = allContacts.reduce((sum, c) => sum + (c.unread_count || 0), 0);
@@ -1692,7 +1793,8 @@
                     batch: batchEl ? batchEl.textContent.trim().replace('Batch ', '') : '-',
                     is_online: false,
                     avatar: avatarImgEl ? avatarImgEl.src : null,
-                    admin_role: type === 'admin' ? 'Admin' : null  // Add this line
+                    admin_role: type === 'admin' ? 'Admin' : null,
+                    is_archived: false  // Add this
                 };
             }
         }
@@ -1708,7 +1810,7 @@
                 chatAvatar.style.color = 'var(--nu-gold)';
             }
             
-            document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? `<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">${escapeHtml(contact.admin_role || 'Admin')}</span>` : ''}`;            
+            document.getElementById('chatName').innerHTML = `${escapeHtml(contact.full_name)} ${contact.type === 'admin' ? `<span class="admin-badge" style="font-size: 0.65rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 2px 8px; border-radius: 12px; margin-left: 8px; font-weight: 600;">${escapeHtml(contact.admin_role || 'Admin')}</span>` : ''}`;
             
             // Check real-time presence for admin contacts
             let isOnline = contact.is_online;
@@ -1731,13 +1833,143 @@
             `;
         }
         
+        // ✅ CHECK IF CHAT IS ARCHIVED AND DISABLE INPUT
+        checkAndDisableArchivedChat(contactId, type);
+        
         // Load messages
         await loadMessages(contactId, type);
         await markMessagesAsRead(contactId, type);
         
-        // Focus input
-        document.getElementById('messageInput').focus();
+        // Focus input (only if not archived)
+        const contactCheck = allContacts.find(c => c.id == contactId && c.type === type);
+        if (!contactCheck || !contactCheck.is_archived) {
+            document.getElementById('messageInput').focus();
+        }
+        
         showChatOnMobile();
+    }
+
+    // ============================================
+    // CHECK IF CHAT IS ARCHIVED AND DISABLE INPUT
+    // ============================================
+    function checkAndDisableArchivedChat(contactId, contactType) {
+        // Find the contact in allContacts
+        const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+        
+        const input = document.getElementById('messageInput');
+        const sendBtn = document.querySelector('.btn-send');
+        const attachBtn = document.querySelector('.btn-attach');
+        const emojiBtn = document.querySelector('.btn-emoji');
+        
+        if (contact && contact.is_archived) {
+            // Disable input and buttons
+            input.disabled = true;
+            input.placeholder = 'This conversation is archived. Unarchive to send messages.';
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.5';
+            sendBtn.style.cursor = 'not-allowed';
+            attachBtn.disabled = true;
+            attachBtn.style.opacity = '0.5';
+            attachBtn.style.cursor = 'not-allowed';
+            emojiBtn.disabled = true;
+            emojiBtn.style.opacity = '0.5';
+            emojiBtn.style.cursor = 'not-allowed';
+            
+            // Show a message in the chat area
+            showArchivedWarning();
+        } else {
+            // Enable input and buttons
+            input.disabled = false;
+            input.placeholder = 'Type a message here...';
+            sendBtn.disabled = false;
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+            attachBtn.disabled = false;
+            attachBtn.style.opacity = '1';
+            attachBtn.style.cursor = 'pointer';
+            emojiBtn.disabled = false;
+            emojiBtn.style.opacity = '1';
+            emojiBtn.style.cursor = 'pointer';
+            
+            // Remove archived warning if exists
+            const warning = document.querySelector('.archived-warning');
+            if (warning) warning.remove();
+        }
+    }
+
+    function showArchivedWarning() {
+        const container = document.getElementById('chatMessages');
+        
+        // Remove existing warning
+        const existingWarning = container.querySelector('.archived-warning');
+        if (existingWarning) existingWarning.remove();
+        
+        // Add warning at the top of messages
+        const warning = document.createElement('div');
+        warning.className = 'archived-warning';
+        warning.style.cssText = `
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #92400e;
+            font-size: 14px;
+        `;
+        warning.innerHTML = `
+            <i class="fa-solid fa-box-archive" style="color: #f59e0b; font-size: 18px;"></i>
+            <span>This conversation is archived. <button onclick="unarchiveAndRefresh()" style="background: none; border: none; color: #f59e0b; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 0;">Unarchive</button> to continue messaging.</span>
+        `;
+        
+        container.prepend(warning);
+    }
+
+    async function unarchiveAndRefresh() {
+        if (!currentChat) return;
+        
+        try {
+            const response = await fetch('/admin/messages/archive', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    contact_id: currentChat.id,
+                    contact_type: currentChat.type,
+                    archived: false
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update local data
+                const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+                if (contact) {
+                    contact.is_archived = false;
+                }
+                
+                // Update card
+                const card = findContactCard(currentChat.id, currentChat.type);
+                if (card) {
+                    card.classList.remove('archived');
+                }
+                
+                // Refresh chat
+                await loadConversations();
+                checkAndDisableArchivedChat(currentChat.id, currentChat.type);
+                
+                showToast('Chat unarchived successfully');
+            }
+        } catch (error) {
+            console.error('Error unarchiving:', error);
+            showToast('Failed to unarchive chat', 'error');
+        }
     }
 
     // ============================================
@@ -1892,6 +2124,13 @@
         const content = input.value.trim();
         
         if (!content || !currentChat) return;
+
+        // ✅ ADD THIS: Check if chat is archived
+        const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+        if (contact && contact.is_archived) {
+            showToast('Cannot send messages to archived chat. Unarchive it first.', 'error');
+            return;
+        }
         
         // Clear typing timeout since we're sending
         clearTimeout(typingTimeout);
@@ -2917,16 +3156,22 @@ function closeAllDropdowns() {
 // HELPER: Find contact card by ID and type
 // ============================================
 function findContactCard(contactId, contactType) {
-    // Try finding the dropdown first, then get its parent card
+    // The dropdown is a sibling of the card, not a child
     const dropdown = document.getElementById(`dropdown-${contactId}-${contactType}`);
-    if (dropdown) return dropdown.closest('.contact-card');
+    if (dropdown) {
+        // Find the card that comes right before this dropdown
+        const card = dropdown.previousElementSibling;
+        if (card && card.classList.contains('contact-card')) {
+            return card;
+        }
+    }
     
     // Fallback: find by onclick attribute
     return document.querySelector(`.contact-card[onclick*="openChat(${contactId}, '${contactType}')"]`);
 }
 
 // ============================================
-// ARCHIVE CHAT
+// ARCHIVE CHAT - WITH MODAL CONFIRMATION
 // ============================================
 async function toggleArchiveChat(contactId, contactType) {
     const card = findContactCard(contactId, contactType);
@@ -2934,6 +3179,11 @@ async function toggleArchiveChat(contactId, contactType) {
     
     const isCurrentlyArchived = card.classList.contains('archived');
     const newArchivedState = !isCurrentlyArchived;
+    
+    const action = newArchivedState ? 'archive' : 'unarchive';
+    const confirmed = await showArchiveConfirmModal(contactId, contactType, action);
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch('/admin/messages/archive', {
@@ -2950,46 +3200,216 @@ async function toggleArchiveChat(contactId, contactType) {
             })
         });
         
-        if (!response.ok) throw new Error('Failed to archive chat');
+        // Get the response as text first to see what's happening
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
         
-        const data = await response.json();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Failed to parse JSON:', e);
+            showToast('Server returned invalid response: ' + responseText.substring(0, 100), 'error');
+            return;
+        }
         
-        if (data.success) {
-            // Update card class
-            if (newArchivedState) {
-                card.classList.add('archived');
-            } else {
-                card.classList.remove('archived');
-            }
-            
-            // Update the dropdown button text
-            const dropdown = card.querySelector('.contact-dropdown');
-            if (dropdown) {
-                const archiveBtn = dropdown.querySelector('.dropdown-item:first-child');
-                if (archiveBtn) {
-                    archiveBtn.innerHTML = `
-                        <i class="fa-solid ${newArchivedState ? 'fa-box-open' : 'fa-box-archive'}"></i>
-                        ${newArchivedState ? 'Unarchive Chat' : 'Archive Chat'}
-                    `;
-                    // Update onclick
-                    archiveBtn.setAttribute('onclick', 
-                        `handleDropdownAction(event, ${contactId}, '${contactType}', '${newArchivedState ? 'unarchive' : 'archive'}')`
-                    );
-                }
-            }
-            
-            showToast(`Chat ${newArchivedState ? 'archived' : 'unarchived'} successfully`);
-            
-            // Update allContacts data
-            const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
-            if (contact) {
-                contact.is_archived = newArchivedState;
+        if (!response.ok || !data.success) {
+            console.error('Archive failed:', data);
+            showToast(data.error || data.message || 'Failed to archive chat', 'error');
+            return;
+        }
+        
+        // Update UI...
+        if (newArchivedState) {
+            card.classList.add('archived');
+        } else {
+            card.classList.remove('archived');
+        }
+        
+        // Update the dropdown button text
+        const dropdown = document.getElementById(`dropdown-${contactId}-${contactType}`);
+        if (dropdown) {
+            const archiveBtn = dropdown.querySelector('.dropdown-item:first-child');
+            if (archiveBtn) {
+                archiveBtn.innerHTML = `
+                    <i class="fa-solid ${newArchivedState ? 'fa-box-open' : 'fa-box-archive'}"></i>
+                    ${newArchivedState ? 'Unarchive Chat' : 'Archive Chat'}
+                `;
+                archiveBtn.setAttribute('onclick', 
+                    `handleDropdownAction(event, ${contactId}, '${contactType}', '${newArchivedState ? 'unarchive' : 'archive'}')`
+                );
             }
         }
+        
+        // Update allContacts data
+        const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+        if (contact) {
+            contact.is_archived = newArchivedState;
+        }
+        
+        // If archiving and currently viewing this chat, close it
+        if (newArchivedState && currentChat && currentChat.id == contactId && currentChat.type === contactType) {
+            currentChat = null;
+            document.getElementById('noChatSelected').style.display = 'flex';
+            document.getElementById('chatHeader').style.display = 'none';
+            document.getElementById('chatMessages').style.display = 'none';
+            document.getElementById('chatInput').style.display = 'none';
+        } else if (!newArchivedState && currentChat && currentChat.id == contactId && currentChat.type === contactType) {
+            // If unarchiving and currently viewing, refresh the input
+            checkAndDisableArchivedChat(contactId, contactType);
+        }
+        
+        // Reload conversations to reflect changes
+        await loadConversations();
+        
+        showToast(`Chat ${newArchivedState ? 'archived' : 'unarchived'} successfully`);
+        
     } catch (error) {
         console.error('Error archiving chat:', error);
-        showToast('Failed to archive chat', 'error');
+        showToast('Failed to archive chat: ' + error.message, 'error');
     }
+}
+
+// ============================================
+// ARCHIVE CONFIRMATION MODAL
+// ============================================
+function showArchiveConfirmModal(contactId, contactType, action) {
+    return new Promise((resolve) => {
+        // Get contact name
+        const contact = allContacts.find(c => c.id == contactId && c.type === contactType);
+        const contactName = contact ? contact.full_name : 'this chat';
+        
+        const actionText = action === 'archive' ? 'archive' : 'unarchive';
+        const icon = action === 'archive' ? 'fa-box-archive' : 'fa-box-open';
+        const color = action === 'archive' ? '#f59e0b' : '#10b981';
+        
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'archive-modal-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.2s ease;
+        `;
+        
+        overlay.innerHTML = `
+            <div class="archive-modal" style="
+                background: white;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 400px;
+                padding: 24px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: scaleIn 0.3s ease;
+                font-family: 'Poppins', sans-serif;
+            ">
+                <div style="
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    background: ${color}15;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 16px;
+                ">
+                    <i class="fa-solid ${icon}" style="font-size: 28px; color: ${color};"></i>
+                </div>
+                <h3 style="margin: 0 0 8px; font-size: 18px; color: #1f2937;">
+                    ${action === 'archive' ? 'Archive Chat' : 'Unarchive Chat'}
+                </h3>
+                <p style="margin: 0 0 24px; font-size: 14px; color: #6b7280; line-height: 1.5;">
+                    Are you sure you want to ${actionText} your conversation with <strong>${escapeHtml(contactName)}</strong>?
+                    ${action === 'archive' ? '<br><small>You can find archived chats by clicking the archive icon.</small>' : ''}
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button id="archiveModalCancel" style="
+                        padding: 10px 24px;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 8px;
+                        background: white;
+                        color: #374151;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        transition: all 0.2s;
+                    ">Cancel</button>
+                    <button id="archiveModalConfirm" style="
+                        padding: 10px 24px;
+                        border: none;
+                        border-radius: 8px;
+                        background: ${color};
+                        color: white;
+                        cursor: pointer;
+                        font-size: 14px;
+                        font-weight: 500;
+                        transition: all 0.2s;
+                    ">${action === 'archive' ? 'Archive' : 'Unarchive'}</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Add animation styles if not present
+        if (!document.querySelector('#archive-modal-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'archive-modal-styles';
+            styles.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    from { transform: scale(0.9); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .archive-modal-overlay .archive-modal button:hover {
+                    opacity: 0.9;
+                    transform: translateY(-1px);
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        // Button handlers
+        overlay.querySelector('#archiveModalCancel').onclick = () => {
+            overlay.remove();
+            resolve(false);
+        };
+        
+        overlay.querySelector('#archiveModalConfirm').onclick = () => {
+            overlay.remove();
+            resolve(true);
+        };
+        
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+                resolve(false);
+            }
+        });
+        
+        // Close on Escape
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                resolve(false);
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    });
 }
 
 // ============================================
