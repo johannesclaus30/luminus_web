@@ -1601,13 +1601,106 @@
         applyFilter();
     }
     
-    function applyFilter() {
-        const query = document.getElementById('searchContacts')?.value?.toLowerCase() || '';
+function applyFilter() {
+    const query = document.getElementById('searchContacts')?.value?.toLowerCase() || '';
+    
+    // In applyFilter(), update the empty query section:
+    if (!query || query.length < 2) {
+        let filtered = allContacts;
         
-        // If query is empty, just show filtered conversations as before
-        if (!query || query.length < 2) {
-            let filtered = allContacts;
+        // ✅ Filter out archived chats if not in archive mode
+        if (!archiveMode) {
+            filtered = filtered.filter(c => !c.is_archived);
+        }
+        
+        switch(activeTab) {
+            case 'unread':
+                filtered = filtered.filter(c => c.unread_count > 0);
+                break;
+            case 'online':
+                filtered = filtered.filter(c => c.is_online);
+                break;
+        }
+        
+        renderContacts(filtered);
+        return;
+}
+    
+    // Show loading state
+    document.getElementById('contactsList').innerHTML = `
+        <div class="loading-spinner">
+            <i class="fa-solid fa-spinner fa-spin"></i> Searching all alumni...
+        </div>
+    `;
+    
+    // Search ALL alumni via API
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+        try {
+            const response = await fetch(`/admin/messages/search/alumni?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
             
+            if (!response.ok) {
+                document.getElementById('contactsList').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-exclamation-circle"></i>
+                        <h3>Search failed</h3>
+                        <p>Please try again</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (data.length === 0) {
+                document.getElementById('contactsList').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-user-group"></i>
+                        <h3>No results found</h3>
+                        <p>No alumni or admins match "${query}"</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Convert search results to contact format
+            const searchResults = data.map(result => ({
+                id: result.id,
+                type: result.type,
+                full_name: result.full_name,
+                initials: result.initials,
+                program: result.program,
+                batch: result.batch,
+                is_online: result.is_online,
+                last_message: null,
+                last_message_time: null,
+                unread_count: 0,
+                avatar: result.avatar,
+                admin_role: (result.admin_role || 'Admin').toUpperCase(),
+                is_archived: false,  // Default for search results
+                is_muted: false
+            }));
+            
+            // ✅ CRITICAL: Filter out archived chats unless in archive mode
+            let filtered = searchResults;
+            
+            // If not in archive mode, remove archived chats
+            if (!archiveMode) {
+                // We need to check each search result against the actual archive status
+                // Since search results don't have archive status, we need to fetch it
+                // Or we can filter by what's in allContacts
+                
+                // Get archived contact IDs from allContacts
+                const archivedIds = allContacts
+                    .filter(c => c.is_archived)
+                    .map(c => `${c.type}_${c.id}`);
+                
+                filtered = searchResults.filter(result => {
+                    const key = `${result.type}_${result.id}`;
+                    return !archivedIds.includes(key);
+                });
+            }
+            
+            // Apply tab filters to search results
             switch(activeTab) {
                 case 'unread':
                     filtered = filtered.filter(c => c.unread_count > 0);
@@ -1618,89 +1711,19 @@
             }
             
             renderContacts(filtered);
-            return;
+            
+        } catch (error) {
+            console.error('Search error:', error);
+            document.getElementById('contactsList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <h3>Search error</h3>
+                    <p>Please try again</p>
+                </div>
+            `;
         }
-        
-        // Show loading state
-        document.getElementById('contactsList').innerHTML = `
-            <div class="loading-spinner">
-                <i class="fa-solid fa-spinner fa-spin"></i> Searching all alumni...
-            </div>
-        `;
-        
-        // Search ALL alumni via API
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(async () => {
-            try {
-                const response = await fetch(`/admin/messages/search/alumni?q=${encodeURIComponent(query)}`);
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    document.getElementById('contactsList').innerHTML = `
-                        <div class="empty-state">
-                            <i class="fa-solid fa-exclamation-circle"></i>
-                            <h3>Search failed</h3>
-                            <p>Please try again</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                if (data.length === 0) {
-                    document.getElementById('contactsList').innerHTML = `
-                        <div class="empty-state">
-                            <i class="fa-solid fa-user-group"></i>
-                            <h3>No results found</h3>
-                            <p>No alumni or admins match "${query}"</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                // In applyFilter(), update the search results mapping:
-                const searchResults = data.map(result => ({
-                    id: result.id,
-                    type: result.type,
-                    full_name: result.full_name,
-                    initials: result.initials,
-                    program: result.program,
-                    batch: result.batch,
-                    is_online: result.is_online,
-                    last_message: null,
-                    last_message_time: null,
-                    unread_count: 0,
-                    avatar: result.avatar,
-                    admin_role: (result.admin_role || 'Admin').toUpperCase(),
-                    is_archived: false,  // ✅ Search results are not archived by default
-                    is_muted: false
-                }));
-                
-                // Apply tab filters to search results
-                let filtered = searchResults;
-                switch(activeTab) {
-                    case 'unread':
-                        // Can't filter search results by unread
-                        filtered = [];
-                        break;
-                    case 'online':
-                        filtered = filtered.filter(c => c.is_online);
-                        break;
-                }
-                
-                renderContacts(filtered);
-                
-            } catch (error) {
-                console.error('Search error:', error);
-                document.getElementById('contactsList').innerHTML = `
-                    <div class="empty-state">
-                        <i class="fa-solid fa-exclamation-circle"></i>
-                        <h3>Search error</h3>
-                        <p>Please try again</p>
-                    </div>
-                `;
-            }
-        }, 300);
-    }
+    }, 300);
+}
 
 async function toggleArchiveView() {
     archiveMode = !archiveMode;
