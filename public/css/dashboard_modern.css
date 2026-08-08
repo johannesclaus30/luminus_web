@@ -1408,3 +1408,116 @@ html, body {
         font-size: 1.5rem;
     }
 }
+
+/* ========================================
+   FIXED NAVBAR (Match Settings Page)
+   ======================================== */
+
+/* Override navbar to be fixed */
+.nav-main {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1000 !important;
+    width: 100% !important;
+}
+
+/* Adjust admin layout */
+.admin-layout {
+    margin-top: 80px !important;
+    height: calc(100vh - 80px) !important;
+    min-height: calc(100vh - 80px) !important;
+}
+
+/* Sidebar positioning */
+.admin-sidebar {
+    top: 80px !important;
+    height: calc(100vh - 80px) !important;
+}
+
+/* Main content */
+.admin-main {
+    height: calc(100vh - 80px) !important;
+    min-height: calc(100vh - 80px) !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* Mobile menu toggle - below navbar */
+.mobile-menu-toggle {
+    top: 90px !important;
+}
+
+/* Page header adjustment */
+.page-header {
+    padding-top: 0 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .admin-sidebar {
+        top: 80px !important;
+        height: calc(100vh - 80px) !important;
+    }
+    
+    .admin-main {
+        height: calc(100vh - 80px) !important;
+        min-height: calc(100vh - 80px) !important;
+    }
+    
+    .mobile-menu-toggle {
+        top: 90px !important;
+    }
+}
+
+/* Add to your CSS */
+.mobile-menu-toggle {
+    position: fixed !important;
+    top: 12px !important; /* Center vertically in 80px navbar */
+    left: 16px !important;
+    z-index: 1001 !important; /* Above navbar */
+    width: 44px !important;
+    height: 44px !important;
+    background-color: #32418c;
+    border-radius: var(--radius-lg) !important;
+    backdrop-filter: blur(4px);
+}
+
+.mobile-menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Hide the standalone hamburger on desktop */
+@media (min-width: 1025px) {
+    .mobile-menu-toggle {
+        display: none !important;
+    }
+}
+/* ========================================
+   SIDEBAR SCROLLBAR - Minimalist (Matches Directory)
+   ======================================== */
+
+/* Sidebar scrollbar - clean and minimal */
+.admin-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+    background: var(--gray-200, #E5E7EB);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300, #D1D5DB);
+}
+
+/* Firefox scrollbar for sidebar */
+.admin-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-200, #E5E7EB) transparent;
+}

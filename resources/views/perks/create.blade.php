@@ -13,6 +13,7 @@
 
     <!-- Stylesheets -->
     <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-fixed-navbar.css">
     <link rel="stylesheet" href="/css/perks_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 </head>

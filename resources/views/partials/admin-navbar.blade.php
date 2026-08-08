@@ -101,6 +101,7 @@
         height: 100%;
         width: auto;
         padding: 10px;
+        margin-left: 30px;
     }
 
     /* =========================================

@@ -1344,7 +1344,7 @@ body {
 }
 
 /* Custom Scrollbar */
-.admin-sidebar::-webkit-scrollbar,
+/* .admin-sidebar::-webkit-scrollbar,
 .admin-main::-webkit-scrollbar {
     width: 8px;
 }
@@ -1365,6 +1365,61 @@ body {
 .admin-sidebar::-webkit-scrollbar-thumb:hover,
 .admin-main::-webkit-scrollbar-thumb:hover {
     background: var(--gray-400);
+} */
+
+/* ========================================
+   SIDEBAR SCROLLBAR - Minimalist (Matches Directory)
+   ======================================== */
+
+/* Sidebar scrollbar - clean and minimal */
+.admin-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+    background: var(--gray-200, #E5E7EB);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300, #D1D5DB);
+}
+
+/* Firefox scrollbar for sidebar */
+.admin-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-200, #E5E7EB) transparent;
+}
+
+/* Main content scrollbar - keep slightly more visible for content */
+.admin-main::-webkit-scrollbar {
+    width: 8px;
+}
+
+.admin-main::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+}
+
+.admin-main::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: var(--radius-full);
+    transition: background var(--transition);
+}
+
+.admin-main::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+/* Firefox scrollbar for main content */
+.admin-main {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-300) transparent;
 }
 
 /* Animation Keyframes */

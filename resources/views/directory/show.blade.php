@@ -16,6 +16,7 @@
     
     <!-- Stylesheets -->
     <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-fixed-navbar.css">
     <link rel="stylesheet" href="/css/directory_modern.css">
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
 
@@ -61,7 +62,7 @@
         
         /* Status Badge */
         .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
-        .status-badge.active { background: #dcfce7; color: #166534; }
+        .status-badge.active { background: #dcfce7; color: #21ac56; }
         .status-badge.inactive { background: #fee2e2; color: #991b1b; }
         
         /* Professional Items */
