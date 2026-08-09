@@ -162,10 +162,7 @@
                 <a href="/admin/messages" class="nav-item"><i class="fa-solid fa-envelope"></i><span>Messages</span></a>
                 <a href="{{ route('admin.settings') }}" class="nav-item"><i class="fa-solid fa-gear"></i><span>Settings</span></a>
             </nav>
-            
-            <div class="sidebar-footer">
-                <a href="{{ route('admin.logout') }}" class="nav-item logout-btn"><i class="fa-solid fa-right-from-bracket"></i><span>Sign Out</span></a>
-            </div>
+
         </aside>
 
         <!-- Main Content -->

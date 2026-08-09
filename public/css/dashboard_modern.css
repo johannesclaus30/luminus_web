@@ -329,6 +329,7 @@ body {
 .header-title-section {
     flex: 1;
     min-width: 280px;
+    margin-top: 20px;
 }
 
 .page-title {
