@@ -95,6 +95,7 @@ class TracerFormController extends Controller
             'phases.*.subtitle' => 'nullable|string|max:255',
             'phases.*.icon'     => 'nullable|string|max:100',
             'phases.*.color'    => 'nullable|string|max:20',
+            'phases.*.target_alumni_type' => 'nullable|string|in:all,college,shs',
             'phases.*.sections' => 'nullable|array',
             'phases.*.sections.*.title'       => 'required_with:phases.*.sections|string|max:255',
             'phases.*.sections.*.description' => 'nullable|string',
@@ -118,7 +119,7 @@ class TracerFormController extends Controller
 
         try {
             $form = TracerForm::create([
-                'admin_id'         => session('admin_id') ?? 1,  // ✅ FIXED
+                'admin_id'         => session('admin_id') ?? 1,
                 'form_title'       => $validated['form_title'],
                 'form_description' => $validated['form_description'] ?? null,
                 'status'           => $validated['status'] ?? TracerForm::STATUS_DRAFT,
@@ -161,6 +162,7 @@ class TracerFormController extends Controller
             'phases.*.subtitle' => 'nullable|string|max:255',
             'phases.*.icon'     => 'nullable|string|max:100',
             'phases.*.color'    => 'nullable|string|max:20',
+            'phases.*.target_alumni_type' => 'nullable|string|in:all,college,shs',
             'phases.*.sections' => 'nullable|array',
             'phases.*.sections.*.title'       => 'required|string|max:255',
             'phases.*.sections.*.description' => 'nullable|string',
@@ -334,11 +336,12 @@ class TracerFormController extends Controller
     {
         foreach ($phases as $phaseIdx => $phaseData) {
             $phase = $form->phases()->create([
-                'title'          => $phaseData['title'],
-                'subtitle'       => $phaseData['subtitle'] ?? null,
-                'icon'           => $phaseData['icon'] ?? 'fa-user',
-                'color'          => $phaseData['color'] ?? '#3b82f6',
-                'order_priority' => $phaseIdx,
+                'title'               => $phaseData['title'],
+                'subtitle'            => $phaseData['subtitle'] ?? null,
+                'icon'                => $phaseData['icon'] ?? 'fa-user',
+                'color'               => $phaseData['color'] ?? '#3b82f6',
+                'target_alumni_type'  => $phaseData['target_alumni_type'] ?? 'all',
+                'order_priority'      => $phaseIdx,
             ]);
 
             if (!empty($phaseData['sections'])) {
@@ -962,5 +965,411 @@ class TracerFormController extends Controller
         }
     }
 
+    // ═══════════════════════════════════════
+    // NEW: Get Phases Filtered by Alumni Type
+    // ═══════════════════════════════════════
+
+    /**
+     * Get phases filtered by alumni type for the mobile app.
+     * Route: GET /admin/alumni_tracer/{formId}/phases-for-alumni?alumni_id={alumniId}
+     */
+    public function getPhasesForAlumni(Request $request, $formId)
+    {
+        try {
+            $alumniId = $request->input('alumni_id');
+            
+            if (!$alumniId) {
+                return response()->json([
+                    'error' => 'alumni_id parameter is required'
+                ], 400);
+            }
+            
+            $alumni = \App\Models\Alumni::findOrFail($alumniId);
+            $alumniType = $alumni->alumni_type ?? 'college'; // Default to college if not set
+            
+            $form = TracerForm::with([
+                'phases' => function ($q) use ($alumniType) {
+                    $q->where(function ($query) use ($alumniType) {
+                        $query->where('target_alumni_type', 'all')
+                              ->orWhere('target_alumni_type', $alumniType);
+                    })->orderBy('order_priority');
+                },
+                'phases.sections' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'phases.sections.questions' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'phases.sections.questions.options' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'phases.sections.questions.gridRows' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'phases.sections.questions.gridColumns' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+            ])->findOrFail($formId);
+            
+            return response()->json([
+                'form' => $form,
+                'alumni_type' => $alumniType,
+                'phases_count' => $form->phases->count(),
+                'filtered_phases' => $form->phases->map(function ($phase) {
+                    return [
+                        'id' => $phase->id,
+                        'title' => $phase->title,
+                        'subtitle' => $phase->subtitle,
+                        'icon' => $phase->icon,
+                        'color' => $phase->color,
+                        'target_alumni_type' => $phase->target_alumni_type,
+                        'sections_count' => $phase->sections->count(),
+                        'questions_count' => $phase->sections->sum(function ($section) {
+                            return $section->questions->count();
+                        }),
+                    ];
+                }),
+            ]);
+            
+        } catch (\Throwable $e) {
+            \Log::error('Failed to get phases for alumni: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to load phases',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getPhasesDirectly()
+    {
+        try {
+            $phases = TracerPhase::with([
+                'sections' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'sections.questions' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'sections.questions.options' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'sections.questions.gridRows' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+                'sections.questions.gridColumns' => function ($q) {
+                    $q->orderBy('order_priority');
+                },
+            ])
+            ->orderBy('order_priority')
+            ->get();
+
+            return response()->json($phases);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to load phases directly: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to load phases',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+   public function savePhasesDirectly(Request $request)
+{
+    try {
+        \Log::info('savePhasesDirectly called');
+        
+        $validated = $request->validate([
+            'phases' => 'required|array',
+            'phases.*.id' => 'nullable|integer',
+            'phases.*.title' => 'required|string|max:255',
+            'phases.*.subtitle' => 'nullable|string|max:255',
+            'phases.*.icon' => 'nullable|string|max:100',
+            'phases.*.color' => 'nullable|string|max:20',
+            'phases.*.target_alumni_type' => 'nullable|string|in:all,college,shs',
+            'phases.*.sections' => 'nullable|array',
+            'phases.*.sections.*.id' => 'nullable|integer',
+            'phases.*.sections.*.title' => 'required|string|max:255',
+            'phases.*.sections.*.description' => 'nullable|string',
+            'phases.*.sections.*.questions' => 'nullable|array',
+            'phases.*.sections.*.questions.*.id' => 'nullable|integer',
+            'phases.*.sections.*.questions.*.question_text' => 'required|string',
+            'phases.*.sections.*.questions.*.type' => 'required|string|in:short_answer,paragraph,multiple_choice,checkboxes,dropdown,file_upload,likert_scale,multiple_choice_grid',
+            'phases.*.sections.*.questions.*.description' => 'nullable|string',
+            'phases.*.sections.*.questions.*.placeholder' => 'nullable|string|max:255',
+            'phases.*.sections.*.questions.*.is_required' => 'boolean',
+            'phases.*.sections.*.questions.*.file_types' => 'nullable|array',
+            'phases.*.sections.*.questions.*.max_file_size' => 'nullable|integer',
+            'phases.*.sections.*.questions.*.options' => 'nullable|array',
+            'phases.*.sections.*.questions.*.options.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_rows' => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_rows.*.label' => 'required|string',
+            'phases.*.sections.*.questions.*.grid_columns' => 'nullable|array',
+            'phases.*.sections.*.questions.*.grid_columns.*.label' => 'required|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Get existing phase IDs
+            $existingPhaseIds = TracerPhase::pluck('id')->toArray();
+            $newPhaseIds = [];
+
+            foreach ($validated['phases'] as $phaseIdx => $phaseData) {
+                // ✅ FIX: Check if phase exists properly
+                $phase = null;
+                
+                if (isset($phaseData['id']) && $phaseData['id'] !== null && $phaseData['id'] > 0) {
+                    $phase = TracerPhase::find($phaseData['id']);
+                }
+                
+                // If phase doesn't exist or ID is null/0, create a new one
+                if (!$phase) {
+                    $phase = new TracerPhase();
+                }
+
+                $phase->title = $phaseData['title'];
+                $phase->subtitle = $phaseData['subtitle'] ?? null;
+                $phase->icon = $phaseData['icon'] ?? 'fa-user';
+                $phase->color = $phaseData['color'] ?? '#3b82f6';
+                $phase->target_alumni_type = $phaseData['target_alumni_type'] ?? 'all';
+                $phase->order_priority = $phaseIdx;
+                $phase->save();
+
+                $newPhaseIds[] = $phase->id;
+
+                // Handle sections (if any)
+                if (!empty($phaseData['sections'])) {
+                    $existingSectionIds = $phase->sections()->pluck('id')->toArray();
+                    $newSectionIds = [];
+
+                    foreach ($phaseData['sections'] as $sectionIdx => $sectionData) {
+                        // ✅ FIX: Check if section exists properly
+                        $section = null;
+                        
+                        if (isset($sectionData['id']) && $sectionData['id'] !== null && $sectionData['id'] > 0) {
+                            $section = TracerSection::find($sectionData['id']);
+                        }
+                        
+                        if (!$section) {
+                            $section = new TracerSection();
+                        }
+
+                        $section->phase_id = $phase->id;
+                        $section->title = $sectionData['title'];
+                        $section->description = $sectionData['description'] ?? null;
+                        $section->order_priority = $sectionIdx;
+                        $section->save();
+
+                        $newSectionIds[] = $section->id;
+
+                        // Handle questions
+                        if (!empty($sectionData['questions'])) {
+                            $existingQuestionIds = $section->questions()->pluck('id')->toArray();
+                            $newQuestionIds = [];
+
+                            foreach ($sectionData['questions'] as $qIdx => $qData) {
+                                // ✅ FIX: Check if question exists properly
+                                $question = null;
+                                
+                                if (isset($qData['id']) && $qData['id'] !== null && $qData['id'] > 0) {
+                                    $question = TracerQuestion::find($qData['id']);
+                                }
+                                
+                                if (!$question) {
+                                    $question = new TracerQuestion();
+                                }
+
+                                $question->section_id = $section->id;
+                                $question->type = $qData['type'];
+                                $question->question_text = $qData['question_text'];
+                                $question->description = $qData['description'] ?? null;
+                                $question->placeholder = $qData['placeholder'] ?? null;
+                                $question->is_required = $qData['is_required'] ?? true;
+                                $question->file_types = $qData['file_types'] ?? null;
+                                $question->max_file_size = $qData['max_file_size'] ?? null;
+                                $question->order_priority = $qIdx;
+                                $question->save();
+
+                                $newQuestionIds[] = $question->id;
+
+                                // Handle options
+                                if (!empty($qData['options'])) {
+                                    $question->options()->delete();
+                                    foreach ($qData['options'] as $optIdx => $optData) {
+                                        $question->options()->create([
+                                            'option_label' => is_array($optData) ? ($optData['label'] ?? '') : $optData,
+                                            'order_priority' => $optIdx,
+                                        ]);
+                                    }
+                                }
+
+                                // Handle grid rows
+                                if (!empty($qData['grid_rows'])) {
+                                    $question->gridRows()->delete();
+                                    foreach ($qData['grid_rows'] as $rowIdx => $rowData) {
+                                        $question->gridRows()->create([
+                                            'row_label' => is_array($rowData) ? ($rowData['label'] ?? '') : $rowData,
+                                            'order_priority' => $rowIdx,
+                                        ]);
+                                    }
+                                }
+
+                                // Handle grid columns
+                                if (!empty($qData['grid_columns'])) {
+                                    $question->gridColumns()->delete();
+                                    foreach ($qData['grid_columns'] as $colIdx => $colData) {
+                                        $question->gridColumns()->create([
+                                            'column_label' => is_array($colData) ? ($colData['label'] ?? '') : $colData,
+                                            'order_priority' => $colIdx,
+                                        ]);
+                                    }
+                                }
+                            }
+
+                            // Delete questions that were removed
+                            $questionsToDelete = array_diff($existingQuestionIds, $newQuestionIds);
+                            if (!empty($questionsToDelete)) {
+                                TracerQuestion::whereIn('id', $questionsToDelete)->delete();
+                            }
+                        }
+                    }
+
+                    // Delete sections that were removed
+                    $sectionsToDelete = array_diff($existingSectionIds, $newSectionIds);
+                    if (!empty($sectionsToDelete)) {
+                        TracerSection::whereIn('id', $sectionsToDelete)->delete();
+                    }
+                }
+            }
+
+            // Delete phases that were removed
+            $phasesToDelete = array_diff($existingPhaseIds, $newPhaseIds);
+            if (!empty($phasesToDelete)) {
+                TracerPhase::whereIn('id', $phasesToDelete)->delete();
+            }
+
+            DB::commit();
+
+            // Return all phases
+            $allPhases = TracerPhase::with([
+                'sections.questions.options',
+                'sections.questions.gridRows',
+                'sections.questions.gridColumns',
+            ])->orderBy('order_priority')->get();
+
+            return response()->json([
+                'message' => 'Phases saved successfully.',
+                'phases' => $allPhases
+            ]);
+            
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Failed to save phases directly: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'Failed to save phases.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    } catch (\Throwable $e) {
+        \Log::error('Validation error: ' . $e->getMessage());
+        \Log::error('Stack trace: ' . $e->getTraceAsString());
+        return response()->json([
+            'message' => 'Failed to save phases.',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+    public function getActiveFormId()
+    {
+        try {
+            $form = TracerForm::first();
+            
+            if (!$form) {
+                // Create a default form if none exists
+                $form = TracerForm::create([
+                    'admin_id' => session('admin_id') ?? 1,
+                    'form_title' => 'Alumni Tracer',
+                    'form_description' => 'Default tracer form',
+                    'status' => 1, // ✅ Use 1 for ACTIVE (not 2)
+                ]);
+            }
+            
+            return response()->json([
+                'form_id' => $form->id,
+                'form_title' => $form->form_title,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to get active form ID: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to get form ID',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+    * Delete a single question directly.
+    */
+    public function deleteQuestionDirectly($questionId)
+    {
+        try {
+            $question = TracerQuestion::findOrFail($questionId);
+            $question->delete();
+            
+            return response()->json([
+                'message' => 'Question deleted successfully.',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to delete question: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete question.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a single section directly.
+     */
+    public function deleteSectionDirectly($sectionId)
+    {
+        try {
+            $section = TracerSection::findOrFail($sectionId);
+            $section->delete();
+            
+            return response()->json([
+                'message' => 'Section deleted successfully.',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to delete section: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete section.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a single phase directly.
+     */
+    public function deletePhaseDirectly($phaseId)
+    {
+        try {
+            $phase = TracerPhase::findOrFail($phaseId);
+            $phase->delete();
+            
+            return response()->json([
+                'message' => 'Phase deleted successfully.',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Failed to delete phase: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete phase.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 }

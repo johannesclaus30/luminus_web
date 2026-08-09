@@ -572,6 +572,39 @@
                     <label>Subtitle</label>
                     <input type="text" class="form-control" id="phaseSubtitle" placeholder="e.g. Basic & contact info">
                 </div>
+                
+                <!-- 🆕 TARGET ALUMNI TYPE SELECTOR -->
+                <div class="form-group">
+                    <label>Target Alumni Type</label>
+                    <div class="alumni-type-selector">
+                        <label class="type-option selected" data-type="all" onclick="selectAlumniType('all')">
+                            <input type="radio" name="target_alumni_type" value="all" checked>
+                            <div class="type-option-content">
+                                <i class="fa-solid fa-users"></i>
+                                <span>All Alumni</span>
+                                <small>Visible to everyone</small>
+                            </div>
+                        </label>
+                        <label class="type-option" data-type="shs" onclick="selectAlumniType('shs')">
+                            <input type="radio" name="target_alumni_type" value="shs">
+                            <div class="type-option-content">
+                                <i class="fa-solid fa-school"></i>
+                                <span>SHS Only</span>
+                                <small>Senior High School only</small>
+                            </div>
+                        </label>
+                        <label class="type-option" data-type="college" onclick="selectAlumniType('college')">
+                            <input type="radio" name="target_alumni_type" value="college">
+                            <div class="type-option-content">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                                <span>College Only</span>
+                                <small>College graduates only</small>
+                            </div>
+                        </label>
+                    </div>
+                    <p class="help-text">Select which alumni group can see this phase</p>
+                </div>
+                
                 <div class="form-group">
                     <label>Icon</label>
                     <div class="icon-grid" id="iconGrid"></div>
@@ -763,8 +796,36 @@
         </div>
     </div>
 
+    <!-- Warning Modal -->
+    <div id="warningModal" class="warning-modal-overlay">
+        <div class="warning-modal">
+            <div class="warning-modal-icon" id="warningModalIcon">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="warning-modal-content">
+                <h3 class="warning-modal-title" id="warningModalTitle">Confirm Action</h3>
+                <p class="warning-modal-message" id="warningModalMessage">Are you sure you want to proceed with this action?</p>
+            </div>
+            <div class="warning-modal-actions">
+                <button class="btn btn-secondary" id="warningModalCancel">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="warningModalConfirm">
+                    <i class="fa-solid fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Container -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Global Loading Overlay -->
+    <div class="loading-overlay-global" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p class="loading-text" id="loadingText">Saving phases...</p>
+        <p class="loading-subtext" id="loadingSubtext">Please wait while we save your changes</p>
+    </div>
 
     <script>
     // ═══════════════════════════════════════
@@ -841,6 +902,8 @@
     let analyticsCharts = [];
     let currentEditingChart = null;
     let selectedColorScheme = 'default';
+    let selectedTargetType = 'all';
+    let isLoading = false;
 
     const colorSchemes = {
         default: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'],
@@ -878,49 +941,156 @@
         }
     }
 
-    async function loadForms() {
-        const forms = await apiFetch(`${API_BASE}/list`);
-        if (forms.length > 0) {
-            currentFormId = forms[0].id;
-            const form = await apiFetch(`${API_BASE}/${currentFormId}`);
-            phases = mapFormToPhases(form);
-            selectedPhaseId = phases.length > 0 ? phases[0].id : null;
-            analyticsCharts = getDefaultCharts();
-        } else {
+    // Rename your existing loadForms to loadFormsFallback and keep it as backup
+    async function loadFormsFallback() {
+        console.log('🔍 Loading forms (fallback)...');
+        try {
+            const forms = await apiFetch(`${API_BASE}/list`);
+            console.log('📋 Forms list:', forms);
+            
+            if (forms.length > 0) {
+                currentFormId = forms[0].id;
+                console.log('📝 Selected form ID:', currentFormId);
+                
+                const form = await apiFetch(`${API_BASE}/${currentFormId}`);
+                console.log('📄 Form data:', form);
+                console.log('📂 Form phases:', form.phases);
+                
+                // ✅ CLEAR existing data before mapping
+                phases = [];
+                expandedSections = new Set();
+                
+                // Map the data
+                phases = mapFormToPhases(form);
+                console.log('🔄 Mapped phases:', phases);
+                
+                selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+                analyticsCharts = getDefaultCharts();
+            } else {
+                console.warn('⚠️ No forms found!');
+                currentFormId = null;
+                phases = [];
+                selectedPhaseId = null;
+                analyticsCharts = [];
+                expandedSections = new Set();
+            }
+            
+            // ✅ Render after all data is ready
+            renderBuilder();
+        } catch (error) {
+            console.error('❌ Failed to load forms (fallback):', error);
             currentFormId = null;
             phases = [];
             selectedPhaseId = null;
             analyticsCharts = [];
+            expandedSections = new Set();
+            renderBuilder();
         }
-        renderBuilder();
     }
 
-    async function saveFormToBackend() {
-        const payload = mapPhasesToPayload();
-        const existingForms = await apiFetch(`${API_BASE}/list`);
-        
-        if (existingForms.length > 0) {
-            const formId = existingForms[0].id;
-            await apiFetch(`${API_BASE}/${formId}`, {
-                method: 'PUT',
-                body: JSON.stringify(payload),
-            });
-        } else {
-            await apiFetch(API_BASE, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
+async function savePhasesToBackend() {
+    // Show loading indicator
+    showLoading('Saving phases...', 'Please wait while we save your changes to the database');
+    
+    const payload = {
+        phases: phases.map((phase, index) => ({
+            id: (phase.id && typeof phase.id === 'number' && phase.id > 0) ? phase.id : null,
+            title: phase.title,
+            subtitle: phase.subtitle || '',
+            icon: phase.icon || 'fa-user',
+            color: phase.color || '#3b82f6',
+            target_alumni_type: phase.target_type || 'all',
+            sections: (phase.sections || []).map((section, sIdx) => ({
+                id: (section.id && typeof section.id === 'number' && section.id > 0) ? section.id : null,
+                title: section.title,
+                description: section.description || '',
+                questions: (section.questions || []).map((q, qIdx) => {
+                    const question = {
+                        id: (q.id && typeof q.id === 'number' && q.id > 0) ? q.id : null,
+                        question_text: q.label,
+                        type: q.type,
+                        is_required: q.required,
+                        placeholder: q.placeholder || null,
+                    };
+                    
+                    if (q.options && q.options.length > 0) {
+                        question.options = q.options.map(opt => ({ label: opt }));
+                    }
+                    
+                    if (q.type === 'file_upload') {
+                        question.file_types = q.fileTypes || [];
+                        question.max_file_size = q.maxSize || 10;
+                    }
+                    
+                    if (q.gridRows && q.gridRows.length > 0) {
+                        question.grid_rows = q.gridRows.map(row => ({ label: row }));
+                    }
+                    if (q.gridColumns && q.gridColumns.length > 0) {
+                        question.grid_columns = q.gridColumns.map(col => ({ label: col }));
+                    }
+                    
+                    return question;
+                })
+            }))
+        }))
+    };
+
+    console.log('💾 Saving phases directly:', payload);
+
+    try {
+        const response = await fetch(`${API_BASE}/phases/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        // Hide loading indicator
+        hideLoading();
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to save phases');
         }
+
+        const result = await response.json();
+        console.log('✅ Save successful:', result);
+        
+        // Update phases with returned data
+        if (result.phases) {
+            phases = result.phases.map(phase => mapPhaseToFrontend(phase));
+        }
+        
+        showToast('Phases saved successfully!', 'success');
+        renderBuilder();
+        return true;
+    } catch (error) {
+        // Hide loading indicator if still showing
+        hideLoading();
+        console.error('❌ Failed to save phases:', error);
+        showToast('Failed to save phases: ' + error.message, 'error');
+        return false;
     }
+}
 
     function mapFormToPhases(form) {
-        if (!form.phases) return [];
+        console.log('mapFormToPhases received:', form);
+        
+        if (!form.phases) {
+            console.warn('No phases found in form data');
+            return [];
+        }
+        
         return form.phases.map(phase => ({
             id: phase.id,
             title: phase.title,
             subtitle: phase.subtitle || '',
             icon: phase.icon || 'fa-user',
             color: phase.color || '#3b82f6',
+            target_type: phase.target_alumni_type || 'all',
             sections: (phase.sections || []).map(section => ({
                 id: section.id,
                 title: section.title,
@@ -968,6 +1138,7 @@
                 subtitle: phase.subtitle || '',
                 icon: phase.icon || 'fa-user',
                 color: phase.color || '#3b82f6',
+                target_alumni_type: phase.target_type || 'all',  // Send to backend
                 sections: (phase.sections || []).map(section => ({
                     title: section.title,
                     description: section.description || '',
@@ -1564,9 +1735,13 @@
     // BUILDER RENDERING
     // ═══════════════════════════════════════
 
+    // Replace the renderPhasesList function
     function renderPhasesList() {
         const container = document.getElementById('phasesList');
         
+        // ✅ Clear container first
+        container.innerHTML = '';
+
         if (!phases || phases.length === 0) {
             container.innerHTML = `
                 <div style="padding: 1.5rem; text-align: center; color: var(--gray-400); font-size: 0.8125rem;">
@@ -1580,6 +1755,15 @@
         container.innerHTML = phases.map(phase => {
             const isSel = selectedPhaseId === phase.id;
             const totalQ = phase.sections.reduce((s, sec) => s + sec.questions.length, 0);
+            
+            // Get target type label and icon
+            const targetInfo = {
+                all: { label: 'All', icon: 'fa-users', class: 'all' },
+                college: { label: 'College', icon: 'fa-graduation-cap', class: 'college' },
+                shs: { label: 'SHS', icon: 'fa-school', class: 'shs' }
+            };
+            const target = targetInfo[phase.target_type] || targetInfo.all;
+            
             return `
                 <div class="phase-card ${isSel ? 'active' : ''}" onclick="selectPhase(${phase.id})">
                     <div class="phase-card-header">
@@ -1587,7 +1771,13 @@
                             <i class="fa-solid ${phase.icon}"></i>
                         </div>
                         <div class="phase-card-info">
-                            <p class="phase-card-title">${phase.title}</p>
+                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <p class="phase-card-title">${phase.title}</p>
+                                <span class="phase-target-badge ${target.class}">
+                                    <i class="fa-solid ${target.icon}"></i>
+                                    ${target.label}
+                                </span>
+                            </div>
                             <p class="phase-card-meta">${phase.sections.length} sections · ${totalQ} questions</p>
                         </div>
                         <div class="phase-card-actions">
@@ -1606,10 +1796,16 @@
     }
 
     function renderBuilder() {
+        // ✅ Clear the detail content first to prevent duplicates
+        const detailContent = document.getElementById('phaseDetailContent');
+        detailContent.style.display = 'none';
+        detailContent.innerHTML = '';
+
         renderPhasesList();
         const phase = phases.find(p => p.id === selectedPhaseId);
         const emptyState = document.getElementById('emptyBuilderState');
-        const detailContent = document.getElementById('phaseDetailContent');
+        // ✅ REMOVE THIS LINE - it's redeclaring detailContent
+        // const detailContent = document.getElementById('phaseDetailContent');
 
         if (!phase) {
             emptyState.style.display = 'block';
@@ -1627,7 +1823,21 @@
                         <i class="fa-solid ${phase.icon}"></i>
                     </div>
                     <div class="builder-phase-details">
-                        <h2>${phase.title}</h2>
+                        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                            <h2 style="margin:0;">${phase.title}</h2>
+                            ${(() => {
+                                const targetInfo = {
+                                    all: { label: 'All', icon: 'fa-users', class: 'all' },
+                                    college: { label: 'College', icon: 'fa-graduation-cap', class: 'college' },
+                                    shs: { label: 'SHS', icon: 'fa-school', class: 'shs' }
+                                };
+                                const target = targetInfo[phase.target_type] || targetInfo.all;
+                                return `<span class="phase-target-badge ${target.class}">
+                                    <i class="fa-solid ${target.icon}"></i>
+                                    ${target.label}
+                                </span>`;
+                            })()}
+                        </div>
                         <p>${phase.subtitle || 'No subtitle'}</p>
                     </div>
                 </div>
@@ -1644,52 +1854,62 @@
             ` : `
                 <div class="sections-list">
                     ${phase.sections.map((section, secIdx) => {
-                        const isOpen = expandedSections.has(section.id);
-                        return `
-                            <div class="section-card ${isOpen ? 'expanded' : ''}">
-                                <div class="section-header" onclick="toggleSection('${section.id}')">
-                                    <div class="section-number" style="background:${phase.color};">${secIdx + 1}</div>
-                                    <div class="section-info">
-                                        <h4>${section.title}</h4>
-                                        <p>${section.description ? section.description + ' · ' : ''}${section.questions.length} question${section.questions.length !== 1 ? 's' : ''}</p>
-                                    </div>
-                                    <div class="section-actions" onclick="event.stopPropagation();">
-                                        <button class="btn-icon" onclick="openSectionModal('${section.id}', ${phase.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                                        <button class="btn-icon delete" onclick="deleteSection(${phase.id}, '${section.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                                    </div>
-                                    <i class="fa-solid fa-chevron-${isOpen ? 'up' : 'down'} section-toggle"></i>
+                    // Auto-expand if section has no questions (makes it easier to add first question)
+                    const hasQuestions = section.questions && section.questions.length > 0;
+                    const isOpen = expandedSections.has(section.id) || !hasQuestions;
+                    // Store the state so it persists
+                    if (!expandedSections.has(section.id) && !hasQuestions) {
+                        expandedSections.add(section.id);
+                    }
+                    return `
+                        <div class="section-card ${isOpen ? 'expanded' : ''}">
+                            <div class="section-header" onclick="toggleSection('${section.id}')">
+                                <div class="section-number" style="background:${phase.color};">${secIdx + 1}</div>
+                                <div class="section-info">
+                                    <h4>${section.title}</h4>
+                                    <p>${section.description ? section.description + ' · ' : ''}${section.questions.length} question${section.questions.length !== 1 ? 's' : ''}</p>
                                 </div>
-                                <div class="section-body">
-                                    ${section.questions.length === 0 ? '<p style="color: var(--gray-400); text-align: center; padding: 1.5rem;">No questions yet.</p>' : `
-                                        <div class="questions-list">
-                                            ${section.questions.map((q, qi) => `
-                                                <div class="question-item">
-                                                    <i class="fa-solid fa-grip-vertical question-drag"></i>
-                                                    <div class="question-number" style="background:${phase.color};">${qi + 1}</div>
-                                                    <div class="question-content">
-                                                        <p class="question-label-text">${q.label}</p>
-                                                        <div class="question-meta">
-                                                            <span class="question-type-badge"><i class="fa-solid ${typeIcons[q.type] || 'fa-question'}"></i> ${typeLabels[q.type] || q.type}</span>
-                                                            ${q.required ? '<span class="required-badge">Required</span>' : ''}
-                                                            ${q.options ? `<span style="font-size:0.6875rem;color:var(--gray-400);">${q.options.length} options</span>` : ''}
-                                                            ${q.gridRows ? `<span style="font-size:0.6875rem;color:var(--gray-400);">${q.gridRows.length} rows</span>` : ''}
-                                                        </div>
-                                                    </div>
-                                                    <div class="question-actions">
-                                                        <button onclick="openQuestionModal(${phase.id}, '${section.id}', ${JSON.stringify(q).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                                                        <button class="delete-question" onclick="deleteQuestion(${phase.id}, '${section.id}', '${q.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                                                    </div>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    `}
-                                    <button class="add-question-btn" onclick="openQuestionModal(${phase.id}, '${section.id}', null)">
-                                        <i class="fa-solid fa-plus"></i> Add Question
+                                <div class="section-actions" onclick="event.stopPropagation();">
+                                    <button class="btn-icon" onclick="openSectionModal('${section.id}', ${phase.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn-icon delete" onclick="deleteSection(${phase.id}, '${section.id}')" title="Delete">
+                                        <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </div>
+                                <i class="fa-solid fa-chevron-${isOpen ? 'up' : 'down'} section-toggle"></i>
                             </div>
-                        `;
-                    }).join('')}
+                            <div class="section-body">
+                                ${section.questions.length === 0 ? '<p style="color: var(--gray-400); text-align: center; padding: 1.5rem;">No questions yet.</p>' : `
+                                    <div class="questions-list">
+                                        ${section.questions.map((q, qi) => `
+                                            <div class="question-item">
+                                                <i class="fa-solid fa-grip-vertical question-drag"></i>
+                                                <div class="question-number" style="background:${phase.color};">${qi + 1}</div>
+                                                <div class="question-content">
+                                                    <p class="question-label-text">${q.label}</p>
+                                                    <div class="question-meta">
+                                                        <span class="question-type-badge"><i class="fa-solid ${typeIcons[q.type] || 'fa-question'}"></i> ${typeLabels[q.type] || q.type}</span>
+                                                        ${q.required ? '<span class="required-badge">Required</span>' : ''}
+                                                        ${q.options ? `<span style="font-size:0.6875rem;color:var(--gray-400);">${q.options.length} options</span>` : ''}
+                                                        ${q.gridRows ? `<span style="font-size:0.6875rem;color:var(--gray-400);">${q.gridRows.length} rows</span>` : ''}
+                                                    </div>
+                                                </div>
+                                                <div class="question-actions">
+                                                    <button onclick="openQuestionModal(${phase.id}, '${section.id}', ${JSON.stringify(q).replace(/"/g, '&quot;')})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                                                    <button class="delete-question" onclick="deleteQuestion(${phase.id}, '${section.id}', '${q.id}')" title="Delete">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `}
+                                <button class="add-question-btn" onclick="openQuestionModal(${phase.id}, '${section.id}', null)">
+                                    <i class="fa-solid fa-plus"></i> Add Question
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
                 </div>
             `}
         `;
@@ -1705,39 +1925,164 @@
         renderBuilder();
     }
 
-    function deletePhase(id) {
-        if (!confirm('Delete this phase and all its content?')) return;
-        phases = phases.filter(p => p.id !== id);
-        if (selectedPhaseId === id) selectedPhaseId = phases.length > 0 ? phases[0].id : null;
-        renderBuilder();
-        saveFormToBackend();
+    async function deletePhase(id) {
+        showWarningModal({
+            title: 'Delete Phase',
+            message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you sure you want to <strong>delete</strong> this phase?<br><small>All sections, questions, and associated data will be permanently removed.</small>',
+            iconType: 'danger',
+            confirmText: 'Delete Phase',
+            confirmClass: 'btn-danger',
+            onConfirm: async function() {
+                console.log('🗑️ Deleting phase:', id);
+                
+                showLoading('Deleting phase...', 'Please wait');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/phase/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.message || 'Failed to delete phase');
+                    }
+
+                    phases = phases.filter(p => p.id !== id);
+                    if (selectedPhaseId === id) {
+                        selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+                    }
+                    
+                    hideLoading();
+                    showToast('Phase deleted successfully!', 'success');
+                    renderBuilder();
+                } catch (error) {
+                    hideLoading();
+                    console.error('❌ Failed to delete phase:', error);
+                    showToast('Failed to delete phase: ' + error.message, 'error');
+                }
+            }
+        });
     }
 
-    function deleteSection(phaseId, secId) {
-        if (!confirm('Delete this section?')) return;
-        phases = phases.map(p => {
-            if (Number(p.id) !== Number(phaseId)) return p;
-            return { ...p, sections: p.sections.filter(s => Number(s.id) !== Number(secId)) };
+    async function deleteSection(phaseId, secId) {
+        showWarningModal({
+            title: 'Delete Section',
+            message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you sure you want to <strong>delete</strong> this section?<br><small>All questions and associated data within this section will be permanently removed.</small>',
+            iconType: 'danger',
+            confirmText: 'Delete Section',
+            confirmClass: 'btn-danger',
+            onConfirm: async function() {
+                console.log('🗑️ Deleting section:', { phaseId, secId });
+                
+                showLoading('Deleting section...', 'Please wait');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/section/${secId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.message || 'Failed to delete section');
+                    }
+
+                    let found = false;
+                    phases = phases.map(p => {
+                        if (Number(p.id) !== Number(phaseId)) return p;
+                        const filteredSections = p.sections.filter(s => Number(s.id) !== Number(secId));
+                        if (filteredSections.length < p.sections.length) {
+                            found = true;
+                        }
+                        return { ...p, sections: filteredSections };
+                    });
+                    
+                    hideLoading();
+                    
+                    if (found) {
+                        console.log('✅ Section deleted successfully');
+                        showToast('Section deleted successfully!', 'success');
+                        expandedSections.delete(Number(secId));
+                        renderBuilder();
+                    } else {
+                        console.warn('⚠️ Section not found in frontend:', secId);
+                        await loadPhases();
+                    }
+                } catch (error) {
+                    hideLoading();
+                    console.error('❌ Failed to delete section:', error);
+                    showToast('Failed to delete section: ' + error.message, 'error');
+                }
+            }
         });
-        expandedSections.delete(Number(secId));
-        renderBuilder();
-        saveFormToBackend();
     }
 
-    function deleteQuestion(phaseId, secId, qId) {
-        if (!confirm('Delete this question?')) return;
-        phases = phases.map(p => {
-            if (Number(p.id) !== Number(phaseId)) return p;
-            return {
-                ...p,
-                sections: p.sections.map(s => {
-                    if (Number(s.id) !== Number(secId)) return s;
-                    return { ...s, questions: s.questions.filter(q => Number(q.id) !== Number(qId)) };
-                })
-            };
+    async function deleteQuestion(phaseId, secId, qId) {
+        showWarningModal({
+            title: 'Delete Question',
+            message: '<strong style="color: #ef4444;">⚠️ Warning: This action cannot be undone!</strong><br><br>Are you sure you want to <strong>delete</strong> this question?<br><small>All associated options and data will be permanently removed.</small>',
+            iconType: 'danger',
+            confirmText: 'Delete Question',
+            confirmClass: 'btn-danger',
+            onConfirm: async function() {
+                console.log('🗑️ Deleting question:', { phaseId, secId, qId });
+                
+                showLoading('Deleting question...', 'Please wait');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/question/${qId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.message || 'Failed to delete question');
+                    }
+
+                    let found = false;
+                    phases = phases.map(p => {
+                        if (Number(p.id) !== Number(phaseId)) return p;
+                        return {
+                            ...p,
+                            sections: p.sections.map(s => {
+                                if (Number(s.id) !== Number(secId)) return s;
+                                const filteredQuestions = s.questions.filter(q => Number(q.id) !== Number(qId));
+                                if (filteredQuestions.length < s.questions.length) {
+                                    found = true;
+                                }
+                                return { ...s, questions: filteredQuestions };
+                            })
+                        };
+                    });
+                    
+                    hideLoading();
+                    
+                    if (found) {
+                        console.log('✅ Question deleted successfully');
+                        showToast('Question deleted successfully!', 'success');
+                        renderBuilder();
+                    } else {
+                        console.warn('⚠️ Question not found in frontend:', qId);
+                        await loadPhases();
+                    }
+                } catch (error) {
+                    hideLoading();
+                    console.error('❌ Failed to delete question:', error);
+                    showToast('Failed to delete question: ' + error.message, 'error');
+                }
+            }
         });
-        renderBuilder();
-        saveFormToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -1973,7 +2318,10 @@
         }
         
         const qData = {
-            id: currentEditQuestion.question ? currentEditQuestion.question.id : 'q-' + Date.now(),
+            // ✅ Only use temporary ID for new questions, or null if it's a string ID
+            id: currentEditQuestion.question && typeof currentEditQuestion.question.id === 'number' && currentEditQuestion.question.id > 0 
+                ? currentEditQuestion.question.id 
+                : null,
             label,
             type,
             required: document.getElementById('qRequired').checked
@@ -2013,27 +2361,46 @@
 
         closeQuestionModal();
         renderBuilder();
-        saveFormToBackend();
+        savePhasesToBackend();
     }
 
     // ═══════════════════════════════════════
     // PHASE MODAL
     // ═══════════════════════════════════════
 
+    // Replace the openPhaseModal function
     function openPhaseModal(phaseId) {
         const phase = phaseId ? phases.find(p => p.id === phaseId) : null;
         currentEditPhase = phase;
         selectedIcon = phase ? phase.icon : 'fa-user';
         selectedColor = phase ? phase.color : '#3b82f6';
+        selectedTargetType = phase ? phase.target_type || 'all' : 'all';
         
         document.getElementById('phaseModalTitle').textContent = phase ? 'Edit Phase' : 'Add New Phase';
         document.getElementById('phaseTitle').value = phase ? phase.title : '';
         document.getElementById('phaseSubtitle').value = phase ? phase.subtitle : '';
         
+        // Set the selected target type
+        document.querySelectorAll('.type-option').forEach(opt => {
+            const value = opt.querySelector('input[type="radio"]').value;
+            opt.classList.toggle('selected', value === selectedTargetType);
+            opt.querySelector('input[type="radio"]').checked = value === selectedTargetType;
+        });
+        
         renderIconGrid();
         renderColorGrid();
         
         document.getElementById('phaseModal').classList.add('active');
+    }
+
+    // Add this new function for selecting alumni type
+    function selectAlumniType(type) {
+        selectedTargetType = type;
+        document.querySelectorAll('.type-option').forEach(opt => {
+            const value = opt.querySelector('input[type="radio"]').value;
+            opt.classList.toggle('selected', value === type);
+            opt.querySelector('input[type="radio"]').checked = value === type;
+        });
     }
 
     function closePhaseModal() {
@@ -2061,15 +2428,20 @@
         `).join('');
     }
 
+    // Replace the savePhase function
     function savePhase() {
         const title = document.getElementById('phaseTitle').value.trim();
-        if (!title) return;
+        if (!title) {
+            showToast('Please enter a phase title.', 'warning');
+            return;
+        }
         
         const data = {
             title,
             subtitle: document.getElementById('phaseSubtitle').value.trim(),
             icon: selectedIcon,
-            color: selectedColor
+            color: selectedColor,
+            target_type: selectedTargetType || 'all'  // Include the target type
         };
 
         if (currentEditPhase) {
@@ -2082,7 +2454,7 @@
 
         closePhaseModal();
         renderBuilder();
-        saveFormToBackend();
+        savePhasesToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -2125,13 +2497,31 @@
                 ...p,
                 sections: section
                     ? p.sections.map(s => Number(s.id) === Number(section.id) ? { ...s, ...data } : s)
-                    : [...p.sections, { id: phaseId + '-' + Date.now(), ...data, questions: [] }]
+                    : [...p.sections, { 
+                    // ✅ For new sections, use null as ID (not a string)
+                    id: null, 
+                    ...data, 
+                    questions: [] 
+                }]
             };
         });
 
+        // 🆕 Auto-expand the section if it's new (or always expand it)
+        if (!section) {
+            // Get the newly added section (the last one in the array)
+            const phase = phases.find(p => Number(p.id) === Number(phaseId));
+            if (phase && phase.sections.length > 0) {
+                const newSection = phase.sections[phase.sections.length - 1];
+                expandedSections.add(Number(newSection.id));
+            }
+        } else {
+            // If editing, keep it expanded
+            expandedSections.add(Number(section.id));
+        }
+
         closeSectionModal();
         renderBuilder();
-        saveFormToBackend();
+        savePhasesToBackend();
     }
 
     // ═══════════════════════════════════════
@@ -2311,6 +2701,15 @@
     // ═══════════════════════════════════════
 
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 DOM Content Loaded - Initializing Tracer...');
+        
+        // Prevent multiple initializations
+        if (window._tracerInitialized) {
+            console.log('⚠️ Tracer already initialized, skipping...');
+            return;
+        }
+        window._tracerInitialized = true;
+
         // Search & filter for responses
         const searchInput = document.getElementById('responsesSearch');
         const filterSelect = document.getElementById('responsesFilter');
@@ -2397,7 +2796,7 @@
         detailContent.style.display = 'none';
 
         // Load tracer form and initial data
-        loadForms().then(async () => {
+        loadPhases().then(async () => {
             // Load responses for the responses tab
             if (document.getElementById('responses-panel').classList.contains('active')) {
                 await loadResponses();
@@ -2706,6 +3105,310 @@ function showToast(message, type = 'info') {
             setTimeout(() => toast.remove(), 300);
         }
     }, 4000);
+}
+
+async function loadPhases() {
+    // Prevent multiple simultaneous loads
+    if (isLoading) {
+        console.log('⚠️ Load already in progress, skipping...');
+        return;
+    }
+    isLoading = true;
+
+    console.log('🔍 Loading phases directly...');
+    try {
+        // Clear existing data FIRST
+        phases = [];
+        expandedSections = new Set();
+        selectedPhaseId = null;
+        
+        // Clear the UI immediately
+        document.getElementById('phasesList').innerHTML = `
+            <div class="loading-overlay">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Loading phases...</p>
+            </div>
+        `;
+        document.getElementById('phaseDetailContent').style.display = 'none';
+        document.getElementById('phaseDetailContent').innerHTML = '';
+        
+        // 🆕 Fetch phases directly from the database
+        const response = await fetch(`${API_BASE}/phases`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const phasesData = await response.json();
+        console.log('📋 Phases data:', phasesData);
+        
+        // Map the phases directly
+        phases = phasesData.map(phase => mapPhaseToFrontend(phase));
+        console.log('🔄 Mapped phases:', phases);
+        
+        selectedPhaseId = phases.length > 0 ? phases[0].id : null;
+        analyticsCharts = getDefaultCharts();
+        
+        // ✅ Get or create a form ID for dashboard/analytics
+        try {
+            console.log('🔍 Fetching active form ID...');
+            const formResponse = await fetch(`${API_BASE}/active-form`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+            });
+            
+            if (formResponse.ok) {
+                const formData = await formResponse.json();
+                currentFormId = formData.form_id;
+                console.log('📝 Active form ID:', currentFormId);
+            } else {
+                const errorText = await formResponse.text();
+                console.error('❌ Active form endpoint returned error:', formResponse.status, errorText);
+                throw new Error(`HTTP ${formResponse.status}: ${errorText}`);
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not get active form, using fallback:', error);
+            
+            // Try to get from forms list
+            try {
+                console.log('🔍 Trying to get form from list...');
+                const forms = await apiFetch(`${API_BASE}/list`);
+                console.log('📋 Forms list:', forms);
+                
+                if (forms && forms.length > 0) {
+                    currentFormId = forms[0].id;
+                    console.log('✅ Found existing form with ID:', currentFormId);
+                } else {
+                    // Create a default form
+                    console.log('📝 Creating default form...');
+                    const newForm = await apiFetch(API_BASE, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            form_title: 'Alumni Tracer',
+                            form_description: 'Default tracer form',
+                            status: 1, // Use 1 for ACTIVE
+                            phases: []
+                        })
+                    });
+                    currentFormId = newForm.form.id;
+                    console.log('✅ Created default form with ID:', currentFormId);
+                }
+            } catch (fallbackError) {
+                console.error('❌ All fallback attempts failed:', fallbackError);
+                // Last resort: try to get any form from the database directly
+                try {
+                    const directResponse = await fetch(`${API_BASE}/list`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        },
+                    });
+                    const directData = await directResponse.json();
+                    if (directData && directData.length > 0) {
+                        currentFormId = directData[0].id;
+                        console.log('✅ Found form via direct fetch with ID:', currentFormId);
+                    } else {
+                        currentFormId = 1; // Ultimate fallback
+                        console.warn('⚠️ Using fallback form ID: 1');
+                    }
+                } catch (directError) {
+                    currentFormId = 1; // Ultimate fallback
+                    console.warn('⚠️ Using fallback form ID: 1');
+                }
+            }
+        }
+
+        console.log('🏁 Final currentFormId:', currentFormId);
+        
+        // If we have a form ID, load dashboard data if dashboard tab is active
+        if (currentFormId) {
+            const dashboardPanel = document.getElementById('dashboard-panel');
+            if (dashboardPanel && dashboardPanel.classList.contains('active')) {
+                console.log('📊 Dashboard is active, loading data...');
+                await loadDashboardData();
+            }
+        }
+
+        // Render after all data is ready
+        renderBuilder();
+    } catch (error) {
+        console.error('❌ Failed to load phases:', error);
+        // If the direct phases endpoint fails, try the old form-based method as fallback
+        console.log('⚠️ Falling back to form-based loading...');
+        await loadFormsFallback();
+    } finally {
+        isLoading = false;
+    }
+}
+
+// Helper function to map a single phase to frontend format
+function mapPhaseToFrontend(phase) {
+    return {
+        id: phase.id,
+        title: phase.title,
+        subtitle: phase.subtitle || '',
+        icon: phase.icon || 'fa-user',
+        color: phase.color || '#3b82f6',
+        target_type: phase.target_alumni_type || 'all',
+        sections: (phase.sections || []).map(section => ({
+            id: section.id,
+            title: section.title,
+            description: section.description || '',
+            questions: (section.questions || []).map(q => ({
+                id: q.id,
+                label: q.question_text,
+                type: q.type,
+                placeholder: q.placeholder || '',
+                required: q.is_required,
+                options: q.options ? q.options.map(o => o.option_label) : undefined,
+                fileTypes: q.file_types || undefined,
+                maxSize: q.max_file_size || undefined,
+                gridRows: q.grid_rows ? q.grid_rows.map(r => r.row_label) : undefined,
+                gridColumns: q.grid_columns ? q.grid_columns.map(c => c.column_label) : undefined,
+            }))
+        }))
+    };
+}
+
+// ═══════════════════════════════════════
+// LOADING INDICATORS
+// ═══════════════════════════════════════
+
+let loadingTimeout = null;
+
+function showLoading(text = 'Saving phases...', subtext = 'Please wait while we save your changes') {
+    const overlay = document.getElementById('loadingOverlay');
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingSubtext').textContent = subtext;
+    overlay.classList.add('active');
+    
+    // Disable all buttons
+    document.querySelectorAll('button:not(.modal-close):not(.toast-close)').forEach(btn => {
+        btn.disabled = true;
+        btn.style.cursor = 'not-allowed';
+        btn.style.opacity = '0.6';
+    });
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.classList.remove('active');
+    
+    // Re-enable buttons after a small delay
+    setTimeout(() => {
+        document.querySelectorAll('button:not(.modal-close):not(.toast-close)').forEach(btn => {
+            btn.disabled = false;
+            btn.style.cursor = '';
+            btn.style.opacity = '1';
+        });
+    }, 300);
+}
+
+// Show loading with timeout protection
+function showLoadingWithTimeout(text = 'Saving phases...', subtext = 'Please wait...', timeout = 30000) {
+    showLoading(text, subtext);
+    
+    // Clear any existing timeout
+    if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+    }
+    
+    // Auto-hide after timeout (safety net)
+    loadingTimeout = setTimeout(() => {
+        hideLoading();
+        showToast('Operation is taking longer than expected. Please try again.', 'warning');
+    }, timeout);
+}
+
+// ═══════════════════════════════════════
+// WARNING MODAL SYSTEM
+// ═══════════════════════════════════════
+
+// Modal elements
+const warningOverlay = document.getElementById('warningModal');
+const warningTitle = document.getElementById('warningModalTitle');
+const warningMessage = document.getElementById('warningModalMessage');
+const warningIcon = document.getElementById('warningModalIcon');
+const confirmBtn = document.getElementById('warningModalConfirm');
+const cancelBtn = document.getElementById('warningModalCancel');
+
+let pendingAction = null;
+
+function closeWarningModal() {
+    if (warningOverlay) warningOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+    pendingAction = null;
+}
+
+if (cancelBtn) {
+    cancelBtn.addEventListener('click', closeWarningModal);
+}
+
+if (warningOverlay) {
+    warningOverlay.addEventListener('click', function(e) {
+        if (e.target === warningOverlay) closeWarningModal();
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && warningOverlay && warningOverlay.classList.contains('active')) {
+        closeWarningModal();
+    }
+});
+
+if (confirmBtn) {
+    confirmBtn.addEventListener('click', function() {
+        if (typeof pendingAction === 'function') {
+            pendingAction();
+        }
+        closeWarningModal();
+    });
+}
+
+function showWarningModal(config) {
+    const {
+        title = 'Confirm Action',
+        message = 'Are you sure?',
+        iconType = 'warning',
+        confirmText = 'Confirm',
+        confirmClass = 'btn-danger',
+        onConfirm = null
+    } = config;
+
+    if (!warningOverlay || !warningTitle || !warningMessage || !warningIcon || !confirmBtn) return;
+
+    warningTitle.textContent = title;
+    warningMessage.innerHTML = message;
+    warningIcon.className = 'warning-modal-icon ' + iconType;
+
+    const iconElement = warningIcon.querySelector('i');
+    if (iconElement) {
+        if (iconType === 'danger') {
+            iconElement.className = 'fa-solid fa-triangle-exclamation';
+        } else if (iconType === 'success') {
+            iconElement.className = 'fa-solid fa-circle-check';
+        } else if (iconType === 'info') {
+            iconElement.className = 'fa-solid fa-circle-info';
+        } else {
+            iconElement.className = 'fa-solid fa-triangle-exclamation';
+        }
+    }
+
+    confirmBtn.className = 'btn ' + confirmClass;
+    confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> ' + confirmText;
+
+    pendingAction = onConfirm;
+
+    warningOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    confirmBtn.focus();
 }
 
 </script>

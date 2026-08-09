@@ -186,9 +186,28 @@ Route::prefix('admin')->group(function () {
         Route::get('/alumni_tracer/deleted', [TracerFormController::class, 'deleted'])
             ->name('admin.alumni_tracer.deleted');
 
-        // Alumni Tracer
-        Route::get('/alumni_tracer', [TracerFormController::class, 'index'])
-            ->name('admin.alumni_tracer');
+        Route::get('/alumni_tracer/phases', [TracerFormController::class, 'getPhasesDirectly'])
+        ->name('admin.alumni_tracer.phases');
+
+        // 🆕 Save phases directly (bypasses tracer_forms)
+        Route::post('/alumni_tracer/phases/save', [TracerFormController::class, 'savePhasesDirectly'])
+            ->name('admin.alumni_tracer.phases.save');
+
+        // 🆕 Delete a single question directly
+        Route::delete('/alumni_tracer/question/{questionId}', [TracerFormController::class, 'deleteQuestionDirectly'])
+            ->name('admin.alumni_tracer.question.delete');
+
+        // 🆕 Delete a single section directly
+        Route::delete('/alumni_tracer/section/{sectionId}', [TracerFormController::class, 'deleteSectionDirectly'])
+            ->name('admin.alumni_tracer.section.delete');
+
+        // 🆕 Delete a single phase directly
+        Route::delete('/alumni_tracer/phase/{phaseId}', [TracerFormController::class, 'deletePhaseDirectly'])
+            ->name('admin.alumni_tracer.phase.delete');
+
+        // 🆕 Get active form ID (for dashboard/analytics)
+        Route::get('/alumni_tracer/active-form', [TracerFormController::class, 'getActiveFormId'])
+            ->name('admin.alumni_tracer.active-form');
 
         // List routes (static paths - NO wildcards)
         Route::get('/alumni_tracer/list', [TracerFormController::class, 'list'])
@@ -210,6 +229,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/alumni_tracer/{formId}/incomplete-alumni', [TracerFormController::class, 'getIncompleteAlumni']);
         Route::post('/alumni_tracer/{formId}/send-reminder/{alumniId}', [TracerFormController::class, 'sendReminder']);
         Route::post('/alumni_tracer/{formId}/send-reminder-all', [TracerFormController::class, 'sendReminderToAll']);
+
+        // 🆕 NEW: Get phases filtered by alumni type
+        Route::get('/alumni_tracer/{formId}/phases-for-alumni/{alumniId}', [TracerFormController::class, 'getPhasesForAlumni']);
 
         // ⬇️ CRUD routes with {id} wildcard come LAST ⬇️
         Route::get('/alumni_tracer/{id}', [TracerFormController::class, 'show'])
