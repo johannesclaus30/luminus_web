@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Admin;
 use App\Models\Alumni;
 use App\Models\AdminPermission;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -286,8 +287,8 @@ class AdminController extends Controller
             $cardPhotoPath = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($storedPath, '/');
         }
 
-        // Generate a random 10-character temporary password
-        $temporaryPassword = Str::random(10);
+        // Generate a clean, mobile-friendly temporary password
+        $temporaryPassword = $this->generateTemporaryPassword(10);
 
         // Create the alumni record
         $alumnus = Alumni::create([
@@ -306,6 +307,18 @@ class AdminController extends Controller
             'program' => $validated['program'] ?? null,
             'card_photo' => $cardPhotoPath,
         ]);
+
+        // 🔑 CRITICAL: Create the Supabase Auth user
+        $authCreated = $this->createSupabaseAuthUser(
+            $alumnus->email,
+            $temporaryPassword,
+            $alumnus->first_name,
+            $alumnus->last_name
+        );
+
+        if (!$authCreated) {
+            \Log::error('Failed to create Supabase auth user for: ' . $alumnus->email);
+        }
 
         // Send welcome email with the temporary password
         try {
@@ -676,6 +689,158 @@ class AdminController extends Controller
         // Delete from S3
         if (Storage::disk('s3')->exists($photoPath)) {
             Storage::disk('s3')->delete($photoPath);
+        }
+    }
+
+    /**
+     * Generate a clean, mobile-app-friendly temporary password
+     * Meets all mobile app password requirements:
+     * - Minimum 6 characters
+     * - At least 1 uppercase letter
+     * - At least 1 number
+     * - At least 1 special character
+     * 
+     * Uses only unambiguous characters for readability
+     */
+    protected function generateTemporaryPassword($length = 10): string
+    {
+        // Character sets (avoiding ambiguous characters: 0, O, o, 1, I, l)
+        $uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $lowercase = 'abcdefghijkmnopqrstuvwxyz';
+        $numbers = '23456789';
+        $special = '!@#$%^&*?';
+        
+        // Ensure we have at least one from each required set
+        $password = [
+            $uppercase[random_int(0, strlen($uppercase) - 1)],
+            $lowercase[random_int(0, strlen($lowercase) - 1)],
+            $numbers[random_int(0, strlen($numbers) - 1)],
+            $special[random_int(0, strlen($special) - 1)],
+        ];
+        
+        // All characters combined for remaining positions
+        $all = $uppercase . $lowercase . $numbers . $special;
+        $remainingLength = max(0, $length - 4);
+        
+        for ($i = 0; $i < $remainingLength; $i++) {
+            $password[] = $all[random_int(0, strlen($all) - 1)];
+        }
+        
+        // Shuffle to randomize order
+        shuffle($password);
+        
+        return implode('', $password);
+    }
+
+    /**
+     * Create a new Supabase Auth user
+     */
+    protected function createSupabaseAuthUser($email, $password, $firstName = '', $lastName = '')
+    {
+        try {
+            $supabaseKey = config('services.supabase.service_key');
+            $supabaseUrl = config('services.supabase.url');
+            
+            if (!$supabaseKey || !$supabaseUrl) {
+                \Log::error('Supabase credentials not configured');
+                return false;
+            }
+            
+            $response = Http::withHeaders([
+                'apikey' => $supabaseKey,
+                'Authorization' => 'Bearer ' . $supabaseKey,
+            ])->post("{$supabaseUrl}/auth/v1/admin/users", [
+                'email' => $email,
+                'password' => $password,
+                'email_confirm' => true,
+                'user_metadata' => [
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                ]
+            ]);
+            
+            if ($response->failed()) {
+                $errorData = $response->json();
+                
+                // If user already exists, try to update their password instead
+                if (isset($errorData['error_code']) && $errorData['error_code'] === 'email_exists') {
+                    \Log::info('User already exists in Supabase, attempting to update password: ' . $email);
+                    return $this->updateSupabaseAuthPassword($email, $password);
+                }
+                
+                \Log::error('Failed to create Supabase user: ' . $response->body());
+                return false;
+            }
+            
+            \Log::info('Supabase auth user created for: ' . $email);
+            return true;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error creating Supabase auth user: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update Supabase Auth user password
+     */
+    protected function updateSupabaseAuthPassword($email, $newPassword)
+    {
+        try {
+            $supabaseKey = config('services.supabase.service_key');
+            $supabaseUrl = config('services.supabase.url');
+            
+            if (!$supabaseKey || !$supabaseUrl) {
+                \Log::error('Supabase credentials not configured');
+                return false;
+            }
+
+            // First, get the user by email from Supabase Auth
+            $userResponse = Http::withHeaders([
+                'apikey' => $supabaseKey,
+                'Authorization' => 'Bearer ' . $supabaseKey,
+            ])->get("{$supabaseUrl}/auth/v1/admin/users", [
+                'email' => $email
+            ]);
+            
+            if ($userResponse->failed()) {
+                \Log::error('Failed to fetch Supabase user: ' . $userResponse->body());
+                return false;
+            }
+            
+            $responseData = $userResponse->json();
+            
+            // 🔥 FIXED: Get the users array from the response
+            $users = $responseData['users'] ?? [];
+            
+            // Check if user exists in Supabase Auth
+            if (empty($users) || empty($users[0]['id'])) {
+                \Log::warning('Supabase user not found for: ' . $email . ' - attempting to create');
+                // User doesn't exist in Supabase Auth - create them
+                return $this->createSupabaseAuthUser($email, $newPassword);
+            }
+            
+            $userId = $users[0]['id'];
+            
+            // Update the user's password in Supabase Auth
+            $updateResponse = Http::withHeaders([
+                'apikey' => $supabaseKey,
+                'Authorization' => 'Bearer ' . $supabaseKey,
+            ])->put("{$supabaseUrl}/auth/v1/admin/users/{$userId}", [
+                'password' => $newPassword
+            ]);
+            
+            if ($updateResponse->failed()) {
+                \Log::error('Failed to update Supabase password: ' . $updateResponse->body());
+                return false;
+            }
+            
+            \Log::info('Supabase auth password updated for: ' . $email);
+            return true;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error updating Supabase auth password: ' . $e->getMessage());
+            return false;
         }
     }
 
@@ -1264,61 +1429,99 @@ protected function forceLogoutAdmin($adminId)
     }
 
     /**
- * Reset alumni password and trigger force change on next login
- */
-public function resetAlumniPassword(Request $request, $id)
-{
-    $alumnus = Alumni::findOrFail($id);
-    $currentAdmin = $this->getAuthenticatedAdmin($request);
+     * Reset alumni password and trigger force change on next login
+     */
+    public function resetAlumniPassword(Request $request, $id)
+    {
+        $alumnus = Alumni::findOrFail($id);
+        $currentAdmin = $this->getAuthenticatedAdmin($request);
 
-    // Generate temporary password (10 chars, matching creation flow)
-    $temporaryPassword = Str::random(10);
+        // Generate a clean, mobile-friendly temporary password
+        $temporaryPassword = $this->generateTemporaryPassword(10);
 
-    // Update password and flag for forced change
-    $alumnus->update([
-        'password_hash' => Hash::make($temporaryPassword),
-        'needs_password_change' => true, // ← This triggers the force change on login
-    ]);
-
-    // Send email notification
-    try {
-        $service = new BrevoMailService();
-        $htmlContent = view('emails.alumni_password_reset_notify', [
-            'alumnus' => $alumnus,
-            'temporaryPassword' => $temporaryPassword,
-            'resetBy' => trim(
-                ($currentAdmin->admin_first_name ?? '') . ' ' . 
-                ($currentAdmin->admin_last_name ?? '')
-            )
-        ])->render();
-
-        $service->sendEmail(
-            $alumnus->email,
-            'Your LumiNUs Password Has Been Reset',
-            $htmlContent
-        );
-
-        \Log::info('Alumni password reset', [
-            'alumni_id' => $alumnus->id,
-            'alumni_email' => $alumnus->email,
-            'reset_by' => $currentAdmin->id ?? null,
-            'ip' => $request->ip()
+        // 🔥 ADD THIS DEBUG LOG
+        \Log::info('=== GENERATED PASSWORD ===', [
+            'email' => $alumnus->email,
+            'password' => $temporaryPassword,
+            'length' => strlen($temporaryPassword),
+            'has_uppercase' => preg_match('/[A-Z]/', $temporaryPassword) ? 'YES' : 'NO',
+            'has_lowercase' => preg_match('/[a-z]/', $temporaryPassword) ? 'YES' : 'NO',
+            'has_number' => preg_match('/[0-9]/', $temporaryPassword) ? 'YES' : 'NO',
+            'has_special' => preg_match('/[!@#$%^&*?]/', $temporaryPassword) ? 'YES' : 'NO',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password reset successfully. ' . $alumnus->first_name . ' has been emailed their new temporary password.'
-        ], 200);
+        // Update password in your database
+        $alumnus->update([
+            'password_hash' => Hash::make($temporaryPassword),
+            'needs_password_change' => true,
+        ]);
 
-    } catch (\Throwable $e) {
-        \Log::error('Failed to send password reset email to ' . $alumnus->email . ': ' . $e->getMessage());
+        // Update Supabase Auth
+        $authUpdated = $this->updateSupabaseAuthPassword(
+            $alumnus->email,
+            $temporaryPassword
+        );
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Password reset but email could not be sent. Please try again.'
-        ], 500);
+        // 🔥 ADD THIS DEBUG LOG
+        \Log::info('=== SUPABASE UPDATE RESULT ===', [
+            'email' => $alumnus->email,
+            'auth_updated' => $authUpdated ? 'SUCCESS' : 'FAILED',
+        ]);
+
+        // ✅ ADD THIS DEBUG LOG
+        \Log::info('=== PASSWORD RESET DEBUG ===', [
+            'alumni_id' => $alumnus->id,
+            'alumni_email' => $alumnus->email,
+            'temporary_password' => $temporaryPassword,
+            'auth_updated' => $authUpdated,
+            'auth_updated_success' => $authUpdated ? 'YES' : 'NO',
+            'timestamp' => now()->toDateTimeString()
+        ]);
+
+        if (!$authUpdated) {
+            \Log::error('Failed to update Supabase auth password for: ' . $alumnus->email);
+        }
+
+        // Send email notification
+        try {
+            $service = new BrevoMailService();
+            $htmlContent = view('emails.alumni_password_reset_notify', [
+                'alumnus' => $alumnus,
+                'temporaryPassword' => $temporaryPassword,
+                'resetBy' => trim(
+                    ($currentAdmin->admin_first_name ?? '') . ' ' . 
+                    ($currentAdmin->admin_last_name ?? '')
+                )
+            ])->render();
+
+            $service->sendEmail(
+                $alumnus->email,
+                'Your LumiNUs Password Has Been Reset',
+                $htmlContent
+            );
+
+            \Log::info('Alumni password reset', [
+                'alumni_id' => $alumnus->id,
+                'alumni_email' => $alumnus->email,
+                'reset_by' => $currentAdmin->id ?? null,
+                'ip' => $request->ip(),
+                'auth_synced' => $authUpdated
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password reset successfully. ' . $alumnus->first_name . ' has been emailed their new temporary password.'
+            ], 200);
+
+        } catch (\Throwable $e) {
+            \Log::error('Failed to send password reset email to ' . $alumnus->email . ': ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Password reset but email could not be sent. Please try again.'
+            ], 500);
+        }
     }
-}
 
 /**
  * Toggle alumni account restriction

@@ -314,3 +314,4 @@ Route::get('/debug-mail', function() {
         'mail_timeout' => config('mail.mailers.smtp.timeout'),
     ];
 });
+

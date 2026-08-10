@@ -315,7 +315,8 @@
                                         <button type="button" 
                                                 class="btn-action btn-info-action manage-btn" 
                                                 data-id="{{ $alumnus->id }}" 
-                                                data-name="{{ addslashes($displayName) }}" 
+                                                data-name="{{ addslashes($displayName) }}"
+                                                data-status="{{ $alumnus->account_status ?? 1 }}" 
                                                 title="Manage Account">
                                             <i class="fa-solid fa-circle-info"></i>
                                         </button>
@@ -1033,19 +1034,6 @@
             }
         });
 
-        // --- Manage Modal Functions ---
-        function openManageModal(id, name) {
-            document.getElementById('manageAlumniId').value = id;
-            document.getElementById('manageAlumniName').textContent = name;
-            document.getElementById('manageModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function hideManageModal() {
-            document.getElementById('manageModal').classList.remove('active');
-            document.body.style.overflow = '';
-        }
-
         // Close manage modal when clicking outside
     document.getElementById('manageModal')?.addEventListener('click', function(e) {
         if (e.target === this) hideManageModal();
@@ -1073,7 +1061,8 @@
             if (btn) {
                 const id = btn.dataset.id;
                 const name = btn.dataset.name;
-                openManageModal(id, name);
+                const status = btn.dataset.status || 1; // Get status from data attribute
+                openManageModal(id, name, status);
             }
         });
 
@@ -1154,16 +1143,21 @@
         let currentManageAlumniName = '';
         let currentManageAccountStatus = 1;
 
-        function openManageModal(id, name) {
+        // --- Manage Modal Functions ---
+        function openManageModal(id, name, status) {
+            // If status is not provided, default to 1 (active)
+            const accountStatus = status !== undefined ? parseInt(status) : 1;
+            
             currentManageAlumniId = id;
             currentManageAlumniName = name;
-            currentManageAccountStatus = 1; // Default, will be updated by backend if needed
+            currentManageAccountStatus = accountStatus;
             
             document.getElementById('manageAlumniId').value = id;
             document.getElementById('manageAlumniName').textContent = name;
+            document.getElementById('manageAccountStatus').value = accountStatus;
             
             // Update restrict button based on current status
-            updateRestrictButton(1); // Default to active
+            updateRestrictButton(accountStatus);
             
             document.getElementById('manageModal').classList.add('active');
             document.body.style.overflow = 'hidden';
