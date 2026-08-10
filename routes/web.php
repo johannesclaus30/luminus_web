@@ -46,6 +46,8 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/settings/admin/{id}', [AdminController::class, 'deleteAdmin'])
             ->name('admin.settings.delete-admin');
+
+
         
         // ✅ Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])
@@ -68,6 +70,16 @@ Route::prefix('admin')->group(function () {
             ->name('admin.alumni.update');
         Route::delete('/alumni/{id}', [AdminController::class, 'destroy'])
             ->name('admin.alumni.destroy');
+
+        // Alumni Management - Reset Password, Restrict, Export
+        Route::post('/alumni/{id}/reset-password', [AdminController::class, 'resetAlumniPassword'])
+            ->name('admin.alumni.reset-password');
+
+        Route::patch('/alumni/{id}/toggle-restrict', [AdminController::class, 'toggleRestrictAlumni'])
+            ->name('admin.alumni.toggle-restrict');
+
+        Route::get('/alumni/export', [AdminController::class, 'exportAlumni'])
+            ->name('admin.alumni.export');
         
         Route::post('/alumni/{id}/message', [AdminController::class, 'messageAlumni'])
             ->name('admin.alumni.message');

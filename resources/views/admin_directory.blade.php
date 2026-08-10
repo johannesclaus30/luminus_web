@@ -544,37 +544,38 @@
                 </div>
                 <div class="modal-body" style="padding: 1.5rem;">
                     <input type="hidden" id="manageAlumniId">
+                    <input type="hidden" id="manageAccountStatus" value="1">
                     
                     <div class="manage-action-group">
-                        <!-- Reset Password (Reserved) -->
+                        <!-- Reset Password - NOW ACTIVE -->
                         <div class="manage-action-item">
                             <div class="manage-action-icon icon-info">
                                 <i class="fa-solid fa-key"></i>
                             </div>
                             <div class="manage-action-content">
                                 <h4>Reset Password</h4>
-                                <p>Reset the account password to the default or a custom one.</p>
+                                <p>Generate a new temporary password. Alumni must change it on next login.</p>
                             </div>
-                            <button type="button" class="btn btn-secondary" disabled title="Coming Soon">
-                                Reserved
+                            <button type="button" class="btn btn-primary" onclick="prepareResetPassword()">
+                                <i class="fa-solid fa-rotate"></i> Reset
                             </button>
                         </div>
 
-                        <!-- Restrict Account (Reserved) -->
-                        <div class="manage-action-item">
-                            <div class="manage-action-icon icon-warning">
+                        <!-- Restrict Account - NOW ACTIVE -->
+                        <div class="manage-action-item" id="restrictActionItem">
+                            <div class="manage-action-icon icon-warning" id="restrictActionIcon">
                                 <i class="fa-solid fa-user-slash"></i>
                             </div>
                             <div class="manage-action-content">
-                                <h4>Restrict Account</h4>
-                                <p>Temporarily suspend or restrict access for this alumnus.</p>
+                                <h4 id="restrictTitle">Restrict Account</h4>
+                                <p id="restrictDesc">Temporarily suspend access for this alumnus.</p>
                             </div>
-                            <button type="button" class="btn btn-secondary" disabled title="Coming Soon">
-                                Reserved
+                            <button type="button" class="btn btn-warning" id="manageRestrictBtn" onclick="prepareToggleRestrict()">
+                                <i class="fa-solid fa-lock"></i> Restrict
                             </button>
                         </div>
 
-                        <!-- Delete Account (Active) -->
+                        <!-- Delete Account (Already Functional) -->
                         <div class="manage-action-item danger-zone">
                             <div class="manage-action-icon icon-danger">
                                 <i class="fa-solid fa-trash-can"></i>
@@ -611,6 +612,54 @@
                     </button>
                     <button type="button" class="btn btn-danger" onclick="executeDelete()">
                         <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Confirmation Modal -->
+    <div id="resetPasswordConfirmModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content-wrapper" style="max-width: 450px;">
+            <div class="confirm-modal-card">
+                <div class="confirm-icon-wrapper" style="background: #eff6ff; color: #3b82f6;">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <h3 class="confirm-title">Reset Password</h3>
+                <p class="confirm-message">
+                    Are you sure you want to reset the password for <strong id="resetConfirmName"></strong>?
+                    <br><small>A new temporary password will be generated and emailed. The alumnus will be required to change it upon next login.</small>
+                </p>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideResetPasswordConfirm()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="executeResetPassword()">
+                        <i class="fa-solid fa-rotate"></i> Reset Password
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restrict Account Confirmation Modal -->
+    <div id="restrictConfirmModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content-wrapper" style="max-width: 450px;">
+            <div class="confirm-modal-card">
+                <div class="confirm-icon-wrapper" id="restrictConfirmIcon" style="background: #fef3c7; color: #d97706;">
+                    <i class="fa-solid fa-user-slash"></i>
+                </div>
+                <h3 class="confirm-title" id="restrictConfirmTitle">Restrict Account</h3>
+                <p class="confirm-message" id="restrictConfirmMessage">
+                    Are you sure you want to restrict <strong id="restrictConfirmName"></strong>'s account?
+                    <br><small>They will not be able to log in until unrestricted.</small>
+                </p>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideRestrictConfirm()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-warning" id="restrictConfirmBtn" onclick="executeToggleRestrict()">
+                        <i class="fa-solid fa-lock"></i> Restrict
                     </button>
                 </div>
             </div>
@@ -1097,6 +1146,248 @@
             // Redirect to messages page
             window.location.href = '/admin/messages';
         }
+
+        // ========================================
+        // MANAGE MODAL - ENHANCED LOGIC
+        // ========================================
+        let currentManageAlumniId = null;
+        let currentManageAlumniName = '';
+        let currentManageAccountStatus = 1;
+
+        function openManageModal(id, name) {
+            currentManageAlumniId = id;
+            currentManageAlumniName = name;
+            currentManageAccountStatus = 1; // Default, will be updated by backend if needed
+            
+            document.getElementById('manageAlumniId').value = id;
+            document.getElementById('manageAlumniName').textContent = name;
+            
+            // Update restrict button based on current status
+            updateRestrictButton(1); // Default to active
+            
+            document.getElementById('manageModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideManageModal() {
+            document.getElementById('manageModal').classList.remove('active');
+            document.body.style.overflow = '';
+            currentManageAlumniId = null;
+        }
+
+        function updateRestrictButton(status) {
+            const isRestricted = status == 0;
+            const restrictTitle = document.getElementById('restrictTitle');
+            const restrictDesc = document.getElementById('restrictDesc');
+            const restrictBtn = document.getElementById('manageRestrictBtn');
+            const restrictIcon = document.getElementById('restrictActionIcon');
+            
+            if (isRestricted) {
+                restrictTitle.textContent = 'Unrestrict Account';
+                restrictDesc.textContent = 'Restore access for this alumnus.';
+                restrictBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
+                restrictBtn.className = 'btn btn-success';
+                restrictIcon.innerHTML = '<i class="fa-solid fa-user-check"></i>';
+            } else {
+                restrictTitle.textContent = 'Restrict Account';
+                restrictDesc.textContent = 'Temporarily suspend access for this alumnus.';
+                restrictBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
+                restrictBtn.className = 'btn btn-warning';
+                restrictIcon.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+            }
+        }
+
+        // ========================================
+        // RESET PASSWORD
+        // ========================================
+        function prepareResetPassword() {
+            const id = document.getElementById('manageAlumniId').value;
+            const name = document.getElementById('manageAlumniName').textContent;
+            
+            document.getElementById('resetConfirmName').textContent = name;
+            hideManageModal();
+            document.getElementById('resetPasswordConfirmModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideResetPasswordConfirm() {
+            document.getElementById('resetPasswordConfirmModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        async function executeResetPassword() {
+            const id = document.getElementById('manageAlumniId').value;
+            
+            try {
+                const response = await fetch(`/admin/alumni/${id}/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                hideResetPasswordConfirm();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    showAlert(data.message || 'Failed to reset password.', 'error');
+                }
+            } catch (error) {
+                console.error('Reset password error:', error);
+                hideResetPasswordConfirm();
+                showAlert('An error occurred while resetting the password.', 'error');
+            }
+        }
+
+        // ========================================
+        // RESTRICT / UNRESTRICT
+        // ========================================
+        function prepareToggleRestrict() {
+            const id = document.getElementById('manageAlumniId').value;
+            const name = document.getElementById('manageAlumniName').textContent;
+            const isRestricted = currentManageAccountStatus == 0;
+            
+            document.getElementById('restrictConfirmName').textContent = name;
+            
+            if (isRestricted) {
+                document.getElementById('restrictConfirmTitle').textContent = 'Unrestrict Account';
+                document.getElementById('restrictConfirmMessage').innerHTML = 
+                    'Are you sure you want to <strong>unrestrict</strong> ' + name + '\'s account?<br><small>They will be able to log in again.</small>';
+                document.getElementById('restrictConfirmBtn').innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
+                document.getElementById('restrictConfirmBtn').className = 'btn btn-success';
+                document.getElementById('restrictConfirmIcon').style.background = '#d1fae5';
+                document.getElementById('restrictConfirmIcon').style.color = '#065f46';
+                document.getElementById('restrictConfirmIcon').innerHTML = '<i class="fa-solid fa-user-check"></i>';
+            } else {
+                document.getElementById('restrictConfirmTitle').textContent = 'Restrict Account';
+                document.getElementById('restrictConfirmMessage').innerHTML = 
+                    'Are you sure you want to <strong>restrict</strong> ' + name + '\'s account?<br><small>They will not be able to log in until unrestricted.</small>';
+                document.getElementById('restrictConfirmBtn').innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
+                document.getElementById('restrictConfirmBtn').className = 'btn btn-warning';
+                document.getElementById('restrictConfirmIcon').style.background = '#fef3c7';
+                document.getElementById('restrictConfirmIcon').style.color = '#d97706';
+                document.getElementById('restrictConfirmIcon').innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+            }
+            
+            hideManageModal();
+            document.getElementById('restrictConfirmModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideRestrictConfirm() {
+            document.getElementById('restrictConfirmModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        async function executeToggleRestrict() {
+            const id = document.getElementById('manageAlumniId').value;
+            const isCurrentlyRestricted = currentManageAccountStatus == 0;
+            
+            try {
+                const response = await fetch(`/admin/alumni/${id}/toggle-restrict`, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                hideRestrictConfirm();
+                
+                if (data.success) {
+                    showAlert(data.message, data.warning ? 'warning' : 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    showAlert(data.message || 'Failed to update account status.', 'error');
+                }
+            } catch (error) {
+                console.error('Toggle restrict error:', error);
+                hideRestrictConfirm();
+                showAlert('An error occurred while updating account status.', 'error');
+            }
+        }
+
+        // ========================================
+        // EXPORT FUNCTIONALITY
+        // ========================================
+        function exportAlumni() {
+            // Show loading state
+            const exportBtn = document.querySelector('.btn-secondary .fa-download')?.closest('button');
+            if (exportBtn) {
+                exportBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exporting...';
+                exportBtn.disabled = true;
+            }
+            
+            // Create a hidden link and trigger download
+            const link = document.createElement('a');
+            link.href = '{{ route('admin.alumni.export') }}';
+            link.download = 'alumni_export_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Reset button after delay
+            setTimeout(() => {
+                if (exportBtn) {
+                    exportBtn.innerHTML = '<i class="fa-solid fa-download"></i> Export';
+                    exportBtn.disabled = false;
+                }
+            }, 2000);
+            
+            showAlert('Exporting alumni data...', 'info');
+        }
+
+        // ========================================
+        // KEYBOARD SHORTCUTS - UPDATE
+        // ========================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideModal();
+                hideManageModal();
+                hideResetPasswordConfirm();
+                hideRestrictConfirm();
+                hideDeleteConfirm();
+                hideAlert();
+            }
+        });
+
+        // ========================================
+        // CLOSE MODALS ON OVERLAY CLICK
+        // ========================================
+        document.getElementById('resetPasswordConfirmModal')?.addEventListener('click', function(e) {
+            if (e.target === this) hideResetPasswordConfirm();
+        });
+
+        document.getElementById('restrictConfirmModal')?.addEventListener('click', function(e) {
+            if (e.target === this) hideRestrictConfirm();
+        });
+
+        document.getElementById('manageModal')?.addEventListener('click', function(e) {
+            if (e.target === this) hideManageModal();
+        });
+
+        // ========================================
+        // HANDLE SUCCESS MESSAGES FROM SERVER
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for session flash messages
+            @if(session('success'))
+                showAlert('{{ session('success') }}', 'success');
+            @endif
+            
+            @if(session('error'))
+                showAlert('{{ session('error') }}', 'error');
+            @endif
+        });
 
     </script>
 </body>

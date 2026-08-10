@@ -1937,3 +1937,155 @@ html, body {
     background-color: #dc2626;
     transform: translateY(-2px);
 }
+
+/* ========================================
+   ADDITIONS FOR ALUMNI MANAGEMENT MODALS
+   ======================================== */
+
+/* --- Reset Password & Restrict Confirm Modals --- */
+
+/* Reuse existing confirm-modal-card but override icon colors */
+#resetPasswordConfirmModal .confirm-icon-wrapper {
+    background: var(--info-light);
+    color: var(--info);
+}
+
+#restrictConfirmModal .confirm-icon-wrapper {
+    background: var(--warning-light);
+    color: var(--warning);
+}
+
+/* Success variant for unrestrict */
+#restrictConfirmModal .confirm-icon-wrapper.success-variant {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+/* Ensure confirm action buttons match our design */
+.confirm-actions .btn-primary {
+    background: var(--info);
+    color: var(--white);
+}
+
+.confirm-actions .btn-primary:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.confirm-actions .btn-success {
+    background: var(--success);
+    color: var(--white);
+}
+
+.confirm-actions .btn-success:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.confirm-actions .btn-warning {
+    background: var(--warning);
+    color: var(--white);
+}
+
+.confirm-actions .btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* --- Manage Action Item Button Variants --- */
+
+/* Primary button in manage actions */
+.manage-action-item .btn-primary {
+    background: var(--info);
+    color: var(--white);
+}
+
+.manage-action-item .btn-primary:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Success button in manage actions (for unrestrict) */
+.manage-action-item .btn-success {
+    background: var(--success);
+    color: var(--white);
+}
+
+.manage-action-item .btn-success:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Warning button in manage actions (for restrict) */
+.manage-action-item .btn-warning {
+    background: var(--warning);
+    color: var(--white);
+}
+
+.manage-action-item .btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* Icon success variant for unrestrict state */
+.manage-action-icon.icon-success {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+/* --- Responsive tweaks for new modals --- */
+
+@media (max-width: 480px) {
+    .confirm-modal-card {
+        padding: 1.75rem 1.25rem;
+    }
+    
+    .confirm-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .confirm-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .manage-action-item {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+    
+    .manage-action-item .manage-action-icon {
+        align-self: center;
+    }
+    
+    .manage-action-item .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* --- Toast Alert Warning Variant --- */
+
+.alert-toast.error {
+    border-color: var(--danger);
+}
+
+.alert-toast.error .alert-icon {
+    color: var(--danger);
+}
+
+.alert-toast.warning {
+    border-color: var(--warning);
+}
+
+.alert-toast.warning .alert-icon {
+    color: var(--warning);
+}

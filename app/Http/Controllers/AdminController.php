@@ -1263,5 +1263,211 @@ protected function forceLogoutAdmin($adminId)
         ]);
     }
 
+    /**
+ * Reset alumni password and trigger force change on next login
+ */
+public function resetAlumniPassword(Request $request, $id)
+{
+    $alumnus = Alumni::findOrFail($id);
+    $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+    // Generate temporary password (10 chars, matching creation flow)
+    $temporaryPassword = Str::random(10);
+
+    // Update password and flag for forced change
+    $alumnus->update([
+        'password_hash' => Hash::make($temporaryPassword),
+        'needs_password_change' => true, // ← This triggers the force change on login
+    ]);
+
+    // Send email notification
+    try {
+        $service = new BrevoMailService();
+        $htmlContent = view('emails.alumni_password_reset_notify', [
+            'alumnus' => $alumnus,
+            'temporaryPassword' => $temporaryPassword,
+            'resetBy' => trim(
+                ($currentAdmin->admin_first_name ?? '') . ' ' . 
+                ($currentAdmin->admin_last_name ?? '')
+            )
+        ])->render();
+
+        $service->sendEmail(
+            $alumnus->email,
+            'Your LumiNUs Password Has Been Reset',
+            $htmlContent
+        );
+
+        \Log::info('Alumni password reset', [
+            'alumni_id' => $alumnus->id,
+            'alumni_email' => $alumnus->email,
+            'reset_by' => $currentAdmin->id ?? null,
+            'ip' => $request->ip()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully. ' . $alumnus->first_name . ' has been emailed their new temporary password.'
+        ], 200);
+
+    } catch (\Throwable $e) {
+        \Log::error('Failed to send password reset email to ' . $alumnus->email . ': ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Password reset but email could not be sent. Please try again.'
+        ], 500);
+    }
+}
+
+/**
+ * Toggle alumni account restriction
+ */
+public function toggleRestrictAlumni(Request $request, $id)
+{
+    $alumnus = Alumni::findOrFail($id);
+    $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+    // Toggle status (1 = active, 0 = restricted)
+    $newStatus = ($alumnus->account_status ?? 1) == 1 ? 0 : 1;
+    $isRestricted = $newStatus == 0;
+
+    $alumnus->update(['account_status' => $newStatus]);
+
+    // Force logout if restricting
+    if ($isRestricted) {
+        $this->forceLogoutAlumni($alumnus->id);
+    }
+
+    // Send email notification
+    try {
+        $service = new BrevoMailService();
+        $htmlContent = view('emails.alumni_account_restricted', [
+            'alumnus' => $alumnus,
+            'isRestricted' => $isRestricted,
+            'updatedBy' => trim(
+                ($currentAdmin->admin_first_name ?? '') . ' ' . 
+                ($currentAdmin->admin_last_name ?? '')
+            )
+        ])->render();
+
+        $subject = $isRestricted 
+            ? 'Your LumiNUs Account Has Been Restricted' 
+            : 'Your LumiNUs Account Has Been Restored';
+
+        $service->sendEmail($alumnus->email, $subject, $htmlContent);
+
+        \Log::info('Alumni account ' . ($isRestricted ? 'restricted' : 'unrestricted'), [
+            'alumni_id' => $alumnus->id,
+            'alumni_email' => $alumnus->email,
+            'performed_by' => $currentAdmin->id ?? null,
+            'new_status' => $newStatus,
+            'ip' => $request->ip()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $isRestricted 
+                ? $alumnus->first_name . '\'s account has been restricted and they have been logged out.'
+                : $alumnus->first_name . '\'s account has been unrestricted.'
+        ], 200);
+
+    } catch (\Throwable $e) {
+        \Log::error('Failed to send restriction email to ' . $alumnus->email . ': ' . $e->getMessage());
+
+        return response()->json([
+            'success' => true,
+            'message' => $isRestricted 
+                ? 'Account restricted, but email could not be sent.'
+                : 'Account unrestricted, but email could not be sent.',
+            'warning' => true
+        ], 200);
+    }
+}
+
+/**
+ * Force logout an alumni by clearing their sessions
+ */
+protected function forceLogoutAlumni($alumniId)
+{
+    try {
+        if (config('session.driver') !== 'database') {
+            \Log::info('Session driver is not database, skipping force logout for alumni: ' . $alumniId);
+            return;
+        }
+
+        $deleted = \DB::table('sessions')
+            ->where('payload', 'LIKE', '%"alumni_id";i:' . $alumniId . '%')
+            ->orWhere('payload', 'LIKE', '%"alumni_id";s:' . $alumniId . '%')
+            ->orWhere('payload', 'LIKE', '%"alumni_id":' . $alumniId . '%')
+            ->orWhere('user_id', $alumniId) // For web sessions using user_id
+            ->delete();
+
+        \Log::info('Force logout alumni', [
+            'alumni_id' => $alumniId,
+            'sessions_deleted' => $deleted
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to force logout alumni ' . $alumniId . ': ' . $e->getMessage());
+    }
+}
+
+/**
+ * Export alumni data to CSV
+ */
+public function exportAlumni(Request $request)
+{
+    $alumni = Alumni::all();
+
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="alumni_export_' . date('Y-m-d') . '.csv"',
+    ];
+
+    $columns = [
+        'Student ID',
+        'First Name',
+        'Middle Name',
+        'Last Name',
+        'Email',
+        'Phone Number',
+        'Program',
+        'Graduation Year',
+        'Date of Birth',
+        'Sex',
+        'Verification Status',
+        'Account Status',
+        'Created At'
+    ];
+
+    $callback = function() use ($alumni, $columns) {
+        $file = fopen('php://output', 'w');
+        fputcsv($file, $columns);
+
+        foreach ($alumni as $alumnus) {
+            fputcsv($file, [
+                $alumnus->student_id_number ?? '',
+                $alumnus->first_name ?? '',
+                $alumnus->middle_name ?? '',
+                $alumnus->last_name ?? '',
+                $alumnus->email ?? '',
+                $alumnus->phone_number ?? '',
+                $alumnus->program ?? '',
+                optional($alumnus->year_graduated)->format('Y') ?? '',
+                optional($alumnus->date_of_birth)->format('Y-m-d') ?? '',
+                $alumnus->sex ?? '',
+                $alumnus->verification_status ?? 'pending',
+                $alumnus->account_status == 1 ? 'Active' : 'Restricted',
+                optional($alumnus->created_at)->format('Y-m-d H:i:s') ?? ''
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
+
 
 }
