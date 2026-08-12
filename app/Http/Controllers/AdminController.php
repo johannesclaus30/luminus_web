@@ -1616,61 +1616,503 @@ protected function forceLogoutAlumni($alumniId)
     }
 }
 
-/**
- * Export alumni data to CSV
+    /**
+     * Export alumni data to CSV
+     */
+    public function exportAlumni(Request $request)
+    {
+        $alumni = Alumni::all();
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="alumni_export_' . date('Y-m-d') . '.csv"',
+        ];
+
+        $columns = [
+            'Student ID',
+            'First Name',
+            'Middle Name',
+            'Last Name',
+            'Email',
+            'Phone Number',
+            'Program',
+            'Graduation Year',
+            'Date of Birth',
+            'Sex',
+            'Verification Status',
+            'Account Status',
+            'Created At'
+        ];
+
+        $callback = function() use ($alumni, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($alumni as $alumnus) {
+                fputcsv($file, [
+                    $alumnus->student_id_number ?? '',
+                    $alumnus->first_name ?? '',
+                    $alumnus->middle_name ?? '',
+                    $alumnus->last_name ?? '',
+                    $alumnus->email ?? '',
+                    $alumnus->phone_number ?? '',
+                    $alumnus->program ?? '',
+                    optional($alumnus->year_graduated)->format('Y') ?? '',
+                    optional($alumnus->date_of_birth)->format('Y-m-d') ?? '',
+                    $alumnus->sex ?? '',
+                    $alumnus->verification_status ?? 'pending',
+                    $alumnus->account_status == 1 ? 'Active' : 'Restricted',
+                    optional($alumnus->created_at)->format('Y-m-d H:i:s') ?? ''
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+
+    /**
+ * Preview bulk import data - Native PHP CSV parser
+ * NO PACKAGES REQUIRED - works with your current PHP setup
  */
-public function exportAlumni(Request $request)
+public function previewBulkImport(Request $request)
 {
-    $alumni = Alumni::all();
+    $request->validate([
+        'file' => 'required|file|mimes:csv,txt|max:5120', // 5MB max
+    ]);
 
-    $headers = [
-        'Content-Type' => 'text/csv',
-        'Content-Disposition' => 'attachment; filename="alumni_export_' . date('Y-m-d') . '.csv"',
-    ];
-
-    $columns = [
-        'Student ID',
-        'First Name',
-        'Middle Name',
-        'Last Name',
-        'Email',
-        'Phone Number',
-        'Program',
-        'Graduation Year',
-        'Date of Birth',
-        'Sex',
-        'Verification Status',
-        'Account Status',
-        'Created At'
-    ];
-
-    $callback = function() use ($alumni, $columns) {
-        $file = fopen('php://output', 'w');
-        fputcsv($file, $columns);
-
-        foreach ($alumni as $alumnus) {
-            fputcsv($file, [
-                $alumnus->student_id_number ?? '',
-                $alumnus->first_name ?? '',
-                $alumnus->middle_name ?? '',
-                $alumnus->last_name ?? '',
-                $alumnus->email ?? '',
-                $alumnus->phone_number ?? '',
-                $alumnus->program ?? '',
-                optional($alumnus->year_graduated)->format('Y') ?? '',
-                optional($alumnus->date_of_birth)->format('Y-m-d') ?? '',
-                $alumnus->sex ?? '',
-                $alumnus->verification_status ?? 'pending',
-                $alumnus->account_status == 1 ? 'Active' : 'Restricted',
-                optional($alumnus->created_at)->format('Y-m-d H:i:s') ?? ''
-            ]);
+    try {
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        
+        // Read CSV using native PHP
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not read file.'
+            ], 400);
         }
-
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
+        
+        // Auto-detect delimiter
+        $firstLine = fgets($handle);
+        rewind($handle);
+        
+        $delimiter = ',';
+        $delimiters = [',', ';', "\t", '|'];
+        foreach ($delimiters as $d) {
+            if (strpos($firstLine, $d) !== false) {
+                $delimiter = $d;
+                break;
+            }
+        }
+        
+        // Read all rows
+        $records = [];
+        while (($row = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
+            // Clean up the row
+            $row = array_map(function($value) {
+                return trim(str_replace(['\r', '\n', '\t'], '', $value));
+            }, $row);
+            $records[] = $row;
+        }
+        fclose($handle);
+        
+        if (empty($records) || count($records) < 2) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File is empty or contains only headers.'
+            ], 400);
+        }
+        
+        // Find header row
+        $headerRowIndex = -1;
+        $headers = [];
+        $dataRows = [];
+        
+        for ($i = 0; $i < min(10, count($records)); $i++) {
+            $row = $records[$i];
+            if (empty(array_filter($row))) continue;
+            
+            $rowString = implode(' ', array_map('strtolower', array_map('trim', $row)));
+            
+            $hasStudentId = strpos($rowString, 'student id') !== false || 
+                            strpos($rowString, 'studentid') !== false ||
+                            strpos($rowString, 'id') !== false;
+            $hasFirstName = strpos($rowString, 'first name') !== false || 
+                            strpos($rowString, 'firstname') !== false ||
+                            strpos($rowString, 'first') !== false;
+            $hasLastName = strpos($rowString, 'last name') !== false || 
+                            strpos($rowString, 'lastname') !== false ||
+                            strpos($rowString, 'last') !== false;
+            $hasEmail = strpos($rowString, 'email') !== false || 
+                        strpos($rowString, 'e-mail') !== false;
+            
+            if ($hasStudentId && $hasFirstName && $hasLastName && $hasEmail) {
+                $headerRowIndex = $i;
+                $headers = array_map('trim', $row);
+                break;
+            }
+        }
+        
+        if ($headerRowIndex === -1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not find required headers. Please ensure your CSV has: Student ID, First Name, Last Name, and Email columns.'
+            ], 400);
+        }
+        
+        // Extract data rows
+        for ($i = $headerRowIndex + 1; $i < count($records); $i++) {
+            $row = $records[$i];
+            if (empty(array_filter($row))) continue;
+            
+            // Ensure row has same number of columns as headers
+            $rowData = [];
+            foreach ($headers as $index => $header) {
+                $value = isset($row[$index]) ? trim((string)$row[$index]) : '';
+                $rowData[$header] = $value;
+            }
+            $dataRows[] = $rowData;
+        }
+        
+        if (empty($dataRows)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No data rows found after headers.'
+            ], 400);
+        }
+        
+        // Validate each row
+        $validationResults = $this->validateBulkRows($dataRows);
+        
+        return response()->json([
+            'success' => true,
+            'headers' => $headers,
+            'rows' => $dataRows,
+            'total' => count($dataRows),
+            'validation' => $validationResults,
+            'delimiter' => $delimiter,
+        ]);
+        
+    } catch (\Exception $e) {
+        \Log::error('Bulk import preview error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Error reading file: ' . $e->getMessage()
+        ], 500);
+    }
 }
 
+/**
+ * Validate bulk rows and return validation results
+ */
+protected function validateBulkRows($rows)
+{
+    $results = [];
+    $requiredFields = ['student_id_number', 'first_name', 'last_name', 'email', 'program'];
+    
+    // Get all student IDs for duplicate check
+    $studentIds = [];
+    $emails = [];
+    
+    foreach ($rows as $index => $row) {
+        $errors = [];
+        $valid = true;
+        
+        // Helper to find value by key (case-insensitive)
+        $findValue = function($searchKeys, $row) {
+            foreach ($row as $key => $value) {
+                $keyLower = strtolower(trim($key));
+                foreach ((array)$searchKeys as $searchKey) {
+                    if ($keyLower === strtolower(trim($searchKey))) {
+                        return trim($value);
+                    }
+                }
+            }
+            return '';
+        };
+        
+        // Get values with flexible key matching
+        $studentId = $findValue(['Student ID', 'student_id', 'studentid', 'ID'], $row);
+        $firstName = $findValue(['First Name', 'first_name', 'firstname', 'First'], $row);
+        $lastName = $findValue(['Last Name', 'last_name', 'lastname', 'Last'], $row);
+        $email = $findValue(['Email', 'e-mail', 'email_address'], $row);
+        $program = $findValue(['Program', 'program', 'Strand', 'Department'], $row);
+        $middleName = $findValue(['Middle Name', 'middle_name', 'middlename', 'Middle'], $row);
+        $phone = $findValue(['Phone', 'phone_number', 'Mobile', 'Contact'], $row);
+        $gradYear = $findValue(['Graduation Year', 'year_graduated', 'Year Graduated', 'Graduation'], $row);
+        $dob = $findValue(['Date of Birth', 'date_of_birth', 'Birth Date', 'DOB'], $row);
+        $sex = $findValue(['Sex', 'gender', 'Gender'], $row);
+        
+        // Check required fields
+        if (empty($studentId)) {
+            $errors[] = 'Student ID is required';
+            $valid = false;
+        }
+        if (empty($firstName)) {
+            $errors[] = 'First Name is required';
+            $valid = false;
+        }
+        if (empty($lastName)) {
+            $errors[] = 'Last Name is required';
+            $valid = false;
+        }
+        if (empty($email)) {
+            $errors[] = 'Email is required';
+            $valid = false;
+        }
+        if (empty($program)) {
+            $errors[] = 'Program is required';
+            $valid = false;
+        }
+        
+        // Validate email format
+        if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Invalid email format';
+            $valid = false;
+        }
+        
+        // Check for duplicate student IDs in the import
+        if (!empty($studentId)) {
+            $studentIds[] = $studentId;
+        }
+        if (!empty($email)) {
+            $emails[] = $email;
+        }
+        
+        // Store the row data with normalized keys for later use
+        $results[$index] = [
+            'valid' => $valid,
+            'errors' => $errors,
+            'data' => [
+                'student_id_number' => $studentId,
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'email' => $email,
+                'program' => $program,
+                'middle_name' => $middleName,
+                'phone_number' => $phone,
+                'year_graduated' => $gradYear,
+                'date_of_birth' => $dob,
+                'sex' => $sex,
+            ]
+        ];
+    }
+    
+    // Check for duplicates within the import
+    $duplicateStudentIds = array_filter(array_count_values($studentIds), function($count) {
+        return $count > 1;
+    });
+    
+    $duplicateEmails = array_filter(array_count_values($emails), function($count) {
+        return $count > 1;
+    });
+    
+    foreach ($results as $index => &$result) {
+        $studentId = $result['data']['student_id_number'] ?? '';
+        $email = $result['data']['email'] ?? '';
+        
+        if (!empty($studentId) && isset($duplicateStudentIds[$studentId]) && $duplicateStudentIds[$studentId] > 1) {
+            $result['errors'][] = 'Duplicate Student ID in import file';
+            $result['valid'] = false;
+        }
+        
+        if (!empty($email) && isset($duplicateEmails[$email]) && $duplicateEmails[$email] > 1) {
+            $result['errors'][] = 'Duplicate Email in import file';
+            $result['valid'] = false;
+        }
+    }
+    
+    return $results;
+}
+
+/**
+ * Process bulk import with validated data
+ */
+public function processBulkImport(Request $request)
+{
+    $request->validate([
+        'data' => 'required|array',
+        'data.*' => 'required|array',
+        'mapping' => 'required|array',
+    ]);
+
+    $importData = $request->input('data');
+    $mapping = $request->input('mapping');
+    
+    $results = [
+        'successful' => 0,
+        'failed' => 0,
+        'errors' => [],
+        'duplicates' => [],
+        'warnings' => [],
+    ];
+    
+    // Get existing student IDs and emails for duplicate checking
+    $existingStudentIds = Alumni::pluck('student_id_number')->toArray();
+    $existingEmails = Alumni::pluck('email')->toArray();
+    
+    foreach ($importData as $index => $row) {
+        try {
+            // Map fields according to user's mapping
+            $record = [];
+            foreach ($mapping as $dbField => $csvColumn) {
+                if (!empty($csvColumn) && isset($row[$csvColumn])) {
+                    $record[$dbField] = trim((string)$row[$csvColumn]);
+                }
+            }
+            
+            // Check for duplicates in database
+            if (in_array($record['student_id_number'] ?? '', $existingStudentIds)) {
+                $results['duplicates'][] = "Student ID {$record['student_id_number']} already exists (row " . ($index + 1) . ")";
+                $results['failed']++;
+                continue;
+            }
+            
+            if (in_array($record['email'] ?? '', $existingEmails)) {
+                $results['duplicates'][] = "Email {$record['email']} already exists (row " . ($index + 1) . ")";
+                $results['failed']++;
+                continue;
+            }
+            
+            // Validate required fields
+            if (empty($record['first_name']) || empty($record['last_name']) || 
+                empty($record['student_id_number']) || empty($record['email']) || empty($record['program'])) {
+                $results['errors'][] = "Missing required fields in row " . ($index + 1);
+                $results['failed']++;
+                continue;
+            }
+            
+            // Generate temporary password
+            $temporaryPassword = $this->generateTemporaryPassword(10);
+            
+            // Format dates properly
+            $yearGraduated = null;
+            if (!empty($record['year_graduated'])) {
+                // Try to parse various date formats
+                $yearGraduated = $this->parseDate($record['year_graduated']);
+            }
+            
+            $dateOfBirth = null;
+            if (!empty($record['date_of_birth'])) {
+                $dateOfBirth = $this->parseDate($record['date_of_birth']);
+            }
+            
+            // Create alumni record
+            $alumnus = Alumni::create([
+                'first_name' => $record['first_name'],
+                'middle_name' => $record['middle_name'] ?? null,
+                'last_name' => $record['last_name'],
+                'student_id_number' => $record['student_id_number'],
+                'email' => $record['email'],
+                'phone_number' => $record['phone_number'] ?? null,
+                'program' => $record['program'] ?? null,
+                'date_of_birth' => $dateOfBirth,
+                'sex' => $record['sex'] ?? null,
+                'year_graduated' => $yearGraduated,
+                'password_hash' => Hash::make($temporaryPassword),
+                'verification_status' => 'verified',
+                'needs_password_change' => true,
+                'account_status' => 1,
+            ]);
+            
+            // Create Supabase auth user
+            $authCreated = $this->createSupabaseAuthUser(
+                $alumnus->email,
+                $temporaryPassword,
+                $alumnus->first_name,
+                $alumnus->last_name
+            );
+            
+            if (!$authCreated) {
+                $results['warnings'][] = "Supabase user creation failed for {$alumnus->email} but local record was created.";
+            }
+            
+            // Send welcome email
+            try {
+                $service = new BrevoMailService();
+                $htmlContent = view('emails.welcome-alumni', [
+                    'alumnus' => $alumnus,
+                    'temporaryPassword' => $temporaryPassword,
+                ])->render();
+                
+                $service->sendEmail(
+                    $alumnus->email,
+                    'Welcome to LumiNUs',
+                    $htmlContent
+                );
+            } catch (\Exception $e) {
+                \Log::error('Failed to send welcome email to ' . $alumnus->email . ': ' . $e->getMessage());
+                $results['warnings'][] = "Email could not be sent to {$alumnus->email}";
+            }
+            
+            // Add to existing lists to prevent duplicates within the same import
+            $existingStudentIds[] = $record['student_id_number'];
+            $existingEmails[] = $record['email'];
+            $results['successful']++;
+            
+        } catch (\Exception $e) {
+            $results['errors'][] = "Row " . ($index + 1) . ": " . $e->getMessage();
+            $results['failed']++;
+            \Log::error('Bulk import error at row ' . ($index + 1) . ': ' . $e->getMessage());
+        }
+    }
+    
+    return response()->json([
+        'success' => true,
+        'results' => $results,
+        'message' => "Import complete! {$results['successful']} successful, {$results['failed']} failed.",
+    ]);
+}
+
+/**
+ * Helper function to parse various date formats
+ */
+protected function parseDate($dateString)
+{
+    if (empty($dateString)) {
+        return null;
+    }
+    
+    $dateString = trim($dateString);
+    
+    // Try to parse common date formats
+    $formats = [
+        'Y-m-d',
+        'm/d/Y',
+        'd/m/Y',
+        'Y-m-d H:i:s',
+        'Y-m-d H:i',
+        'm-d-Y',
+        'd-m-Y',
+        'Y.m.d',
+        'm.d.Y',
+        'd.m.Y',
+    ];
+    
+    foreach ($formats as $format) {
+        $date = \DateTime::createFromFormat($format, $dateString);
+        if ($date !== false) {
+            return $date->format('Y-m-d');
+        }
+    }
+    
+    // Try to parse just the year
+    if (preg_match('/^\d{4}$/', $dateString)) {
+        return $dateString . '-01-01';
+    }
+    
+    // Try to parse with strtotime
+    $timestamp = strtotime($dateString);
+    if ($timestamp !== false) {
+        return date('Y-m-d', $timestamp);
+    }
+    
+    // Return as is if no format matches
+    return $dateString;
+}
 
 }

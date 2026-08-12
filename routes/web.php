@@ -296,6 +296,13 @@ Route::prefix('admin')->group(function () {
         Route::post('/messages/delete', [MessageController::class, 'deleteChat']);
         Route::get('/messages/settings', [MessageController::class, 'getDmSettings']);
 
+        // Preview bulk import file
+        Route::post('/alumni/preview-bulk', [AdminController::class, 'previewBulkImport'])
+            ->name('admin.alumni.preview-bulk');
+            
+        // Process bulk import with validated data
+        Route::post('/alumni/process-bulk', [AdminController::class, 'processBulkImport'])
+            ->name('admin.alumni.process-bulk');
     });
 });
 

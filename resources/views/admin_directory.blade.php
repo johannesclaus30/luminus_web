@@ -484,41 +484,154 @@
                         </form>
                     </section>
 
-                    <!-- Bulk Import Section -->
+                    <!-- Bulk Import Section - Enhanced with Preview -->
                     <section class="modal-section" data-modal-section="bulk">
                         <div class="bulk-import-panel">
-                            <div class="bulk-import-header">
-                                <div>
-                                    <h3><i class="fa-solid fa-file-import"></i> Bulk Import</h3>
-                                    <p>Upload a CSV or Excel file to create multiple alumni accounts at once.</p>
+                            <!-- Step 1: Upload -->
+                            <div id="uploadStep" class="bulk-step">
+                                <div class="bulk-import-header">
+                                    <div>
+                                        <h3><i class="fa-solid fa-file-import"></i> Bulk Import</h3>
+                                        <p>Upload a CSV file to create multiple alumni accounts at once.</p>
+                                    </div>
+                                    <span class="bulk-badge">CSV Only</span>
                                 </div>
-                                <span class="bulk-badge">CSV / XLSX</span>
+
+                                <div class="bulk-import-body">
+                                    <div class="file-drop-zone" id="fileDropZone">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                        <p>Drag & drop your CSV file here</p>
+                                        <span class="file-types">.csv only</span>
+                                        <input id="bulkImportFile" type="file" accept=".csv" class="file-input" />
+                                    </div>
+                                    
+                                    <!-- Template & Preview Buttons -->
+                                    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 0.5rem; flex-wrap: wrap;">
+                                        <button type="button" class="btn btn-secondary" onclick="downloadTemplate()">
+                                            <i class="fa-solid fa-download"></i> Download Template
+                                        </button>
+                                        <button type="button" class="btn btn-primary" onclick="previewFile()" id="previewBtn" disabled>
+                                            <i class="fa-solid fa-eye"></i> Preview Data
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <p id="bulkImportStatus" class="bulk-import-status">No file selected yet.</p>
                             </div>
 
-                            <div class="bulk-import-body">
-                                <div class="file-drop-zone" id="fileDropZone">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                                    <p>Drag & drop your file here</p>
-                                    <span class="file-types">.csv, .xls, .xlsx</span>
-                                    <input id="bulkImportFile" type="file" accept=".csv,.xls,.xlsx" class="file-input" />
+                            <!-- Step 2: Preview & Edit -->
+                            <div id="previewStep" class="bulk-step" style="display: none;">
+                                <div class="preview-header">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
+                                        <div>
+                                            <h4><i class="fa-solid fa-table"></i> Data Preview</h4>
+                                            <p id="recordCount" style="font-size: 0.875rem; color: var(--gray-500); margin: 0.25rem 0 0 0;"></p>
+                                        </div>
+                                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                                            <button type="button" class="btn btn-secondary" onclick="backToUpload()">
+                                                <i class="fa-solid fa-arrow-left"></i> Back
+                                            </button>
+                                            <button type="button" class="btn btn-primary" onclick="validateAndImport()" id="confirmImportBtn" disabled>
+                                                <i class="fa-solid fa-check"></i> Import All
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn btn-primary" onclick="handleBulkImport()">
-                                    <i class="fa-solid fa-upload"></i>
-                                    <span>Import File</span>
-                                </button>
+
+                                <!-- Column Mapping -->
+                                <div id="columnMapping" style="margin-bottom: 1rem; padding: 1rem; background: var(--gray-50); border-radius: var(--radius-lg); border: 2px solid var(--gray-200);">
+                                    <h5 style="margin: 0 0 0.5rem 0; color: var(--nu-blue); font-size: 0.9375rem;">
+                                        <i class="fa-solid fa-code-branch"></i> Column Mapping
+                                    </h5>
+                                    <p style="font-size: 0.8125rem; color: var(--gray-500); margin: 0 0 0.75rem 0;">
+                                        Map your CSV columns to database fields. Required fields are marked with <span style="color: var(--danger);">*</span>
+                                    </p>
+                                    <div id="mappingControls" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
+                                        <!-- Dynamic mapping controls will be inserted here -->
+                                    </div>
+                                </div>
+                                <!-- Editable Table -->
+                                <div class="preview-table-wrapper">
+                                    <div class="table-controls" style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
+                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <span style="font-size: 0.8125rem; font-weight: 500;">Show:</span>
+                                            <select id="pageSizeSelect" onchange="changePageSize()" style="padding: 0.375rem 0.75rem; border: 2px solid var(--gray-200); border-radius: var(--radius); font-size: 0.8125rem; font-family: inherit; background: var(--white);">
+                                                <option value="10">10</option>
+                                                <option value="25" selected>25</option>
+                                                <option value="50">50</option>
+                                                <option value="100">100</option>
+                                                <option value="0">All Records</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap;">
+                                            <span id="paginationInfo" style="font-size: 0.8125rem; color: var(--gray-500);"></span>
+                                            <button type="button" class="btn btn-sm btn-secondary" onclick="validateAllRows()">
+                                                <i class="fa-solid fa-check-double"></i> Re-validate
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-secondary" onclick="clearAllErrors()">
+                                                <i class="fa-solid fa-eraser"></i> Clear Errors
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="table-scroll-container">
+                                        <table id="previewTable" class="editable-table" style="width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.875rem;">
+                                            <thead style="position: sticky; top: 0; background: var(--nu-blue); color: white; z-index: 10;">
+                                                <!-- Dynamic headers will be inserted here -->
+                                            </thead>
+                                            <tbody>
+                                                <!-- Dynamic rows will be inserted here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- Pagination Controls -->
+                                    <div id="paginationControls" style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;">
+                                        <!-- Dynamic pagination controls will be inserted here -->
+                                    </div>
+                                </div>
+
+                                <!-- Validation Summary -->
+                                <div id="validationSummary" style="margin-top: 1rem; padding: 1rem; border-radius: var(--radius-lg); background: var(--gray-50); border: 2px solid var(--gray-200); display: none;">
+                                    <!-- Dynamic validation summary will be inserted here -->
+                                </div>
                             </div>
 
-                            <p id="bulkImportStatus" class="bulk-import-status">No file selected yet.</p>
-                            
-                            <div class="bulk-import-help">
-                                <h4><i class="fa-solid fa-lightbulb"></i> Required Columns</h4>
-                                <ul>
-                                    <li><strong>Student ID</strong> (unique identifier)</li>
-                                    <li><strong>First Name</strong> & <strong>Last Name</strong></li>
-                                    <li><strong>Email</strong> (for login)</li>
-                                    <li><strong>Program</strong> (e.g., BS Computer Science)</li>
+                            <!-- Help Section -->
+                            <div class="bulk-import-help" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--gray-200);">
+                                <h4 style="font-size: 1rem; font-weight: 600; color: var(--nu-blue); margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fa-solid fa-lightbulb" style="color: var(--nu-gold);"></i> Required Columns
+                                </h4>
+                                <ul style="list-style: none; padding: 0; margin: 0 0 0.75rem 0;">
+                                    <li style="font-size: 0.875rem; color: var(--gray-600); padding: 0.375rem 0 0.375rem 1.75rem; position: relative; line-height: 1.5;">
+                                        <span style="position: absolute; left: 0; color: var(--danger); font-weight: 700;">*</span>
+                                        <strong>Student ID</strong> (unique identifier)
+                                    </li>
+                                    <li style="font-size: 0.875rem; color: var(--gray-600); padding: 0.375rem 0 0.375rem 1.75rem; position: relative; line-height: 1.5;">
+                                        <span style="position: absolute; left: 0; color: var(--danger); font-weight: 700;">*</span>
+                                        <strong>First Name</strong>
+                                    </li>
+                                    <li style="font-size: 0.875rem; color: var(--gray-600); padding: 0.375rem 0 0.375rem 1.75rem; position: relative; line-height: 1.5;">
+                                        <span style="position: absolute; left: 0; color: var(--danger); font-weight: 700;">*</span>
+                                        <strong>Last Name</strong>
+                                    </li>
+                                    <li style="font-size: 0.875rem; color: var(--gray-600); padding: 0.375rem 0 0.375rem 1.75rem; position: relative; line-height: 1.5;">
+                                        <span style="position: absolute; left: 0; color: var(--danger); font-weight: 700;">*</span>
+                                        <strong>Email</strong> (for login)
+                                    </li>
+                                    <li style="font-size: 0.875rem; color: var(--gray-600); padding: 0.375rem 0 0.375rem 1.75rem; position: relative; line-height: 1.5;">
+                                        <span style="position: absolute; left: 0; color: var(--danger); font-weight: 700;">*</span>
+                                        <strong>Program</strong> (e.g., BS Computer Science)
+                                    </li>
                                 </ul>
-                                <p class="help-note">Optional: Middle Name, Phone, Graduation Year, Date of Birth, Sex</p>
+                                <p class="help-note" style="font-size: 0.875rem; color: var(--gray-500); margin: 0; font-style: italic; padding: 0.75rem 1rem; background: var(--white); border-radius: var(--radius); border: 1px solid var(--gray-200);">
+                                    <i class="fa-solid fa-circle-info" style="color: var(--info);"></i>
+                                    Optional: Middle Name, Phone Number, Graduation Year, Date of Birth, Sex
+                                </p>
+                                <p class="help-note" style="font-size: 0.875rem; color: var(--gray-500); margin: 0.5rem 0 0 0; padding: 0.75rem 1rem; background: var(--info-light); border-radius: var(--radius); border: 1px solid var(--info);">
+                                    <i class="fa-solid fa-pen-to-square" style="color: var(--info);"></i>
+                                    You can edit any cell in the preview table before importing.
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -1382,6 +1495,783 @@
                 showAlert('{{ session('error') }}', 'error');
             @endif
         });
+
+        // ========================================
+// ENHANCED BULK IMPORT WITH PREVIEW
+// ========================================
+
+let importedData = [];
+let currentPage = 1;
+let pageSize = 25;
+let columnMapping = {};
+let validationResults = {};
+let fileHeaders = [];
+
+// --- Download Template ---
+function downloadTemplate() {
+    const headers = [
+        'Student ID', 'First Name', 'Middle Name', 'Last Name',
+        'Email', 'Phone Number', 'Program', 'Graduation Year',
+        'Date of Birth', 'Sex'
+    ];
+    
+    const sample = [
+        '2020-00001', 'Jane', 'Dela', 'Cruz',
+        'jane.cruz@email.com', '09123456789', 'BS Computer Science',
+        '2024-06-01', '2000-01-15', 'Female'
+    ];
+    
+    // Create CSV content with BOM for Excel compatibility
+    const BOM = '\uFEFF';
+    const csvContent = BOM + headers.join(',') + '\n' + sample.join(',') + '\n';
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'alumni_import_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    showAlert('Template downloaded successfully!', 'success');
+}
+
+// --- Preview File Function ---
+async function previewFile() {
+    const fileInput = document.getElementById('bulkImportFile');
+    const file = fileInput?.files[0];
+    const status = document.getElementById('bulkImportStatus');
+    
+    if (!file) {
+        showAlert('Please select a file first.', 'error');
+        return;
+    }
+
+    status.textContent = 'Reading file...';
+    status.style.color = 'var(--warning)';
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        
+        // Get all data as array of arrays with proper headers
+        const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+        
+        if (!rawData || rawData.length < 2) {
+            status.textContent = 'Error: File is empty or contains only headers.';
+            status.style.color = 'var(--danger)';
+            return;
+        }
+
+        // Find header row
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+            const row = rawData[i] || [];
+            const rowString = row.join(' ').toLowerCase();
+            // Check for common header keywords
+            const hasStudentId = rowString.includes('student id') || rowString.includes('studentid');
+            const hasLastName = rowString.includes('last name') || rowString.includes('lastname');
+            const hasFirstName = rowString.includes('first name') || rowString.includes('firstname');
+            const hasEmail = rowString.includes('email') || rowString.includes('e-mail');
+            
+            if (hasStudentId && hasLastName && hasFirstName && hasEmail) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) {
+            status.textContent = 'Error: Could not find required headers. Ensure file has "Student ID", "Last Name", "First Name", and "Email" columns.';
+            status.style.color = 'var(--danger)';
+            return;
+        }
+
+        // Extract headers and data
+        const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
+        const dataRows = [];
+        
+        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+            const row = rawData[i] || [];
+            // Skip empty rows
+            if (row.every(cell => !cell || String(cell).trim() === '')) continue;
+            
+            const rowData = {};
+            headers.forEach((header, index) => {
+                const value = row[index] || '';
+                rowData[header] = typeof value === 'string' ? value.trim() : String(value).trim();
+            });
+            dataRows.push(rowData);
+        }
+
+        if (dataRows.length === 0) {
+            status.textContent = 'Error: No data rows found after headers.';
+            status.style.color = 'var(--danger)';
+            return;
+        }
+
+        // Store data for preview
+        importedData = dataRows;
+        fileHeaders = headers;
+        
+        // Show preview step
+        document.getElementById('uploadStep').style.display = 'none';
+        document.getElementById('previewStep').style.display = 'block';
+        document.getElementById('bulkImportStatus').textContent = `Loaded ${dataRows.length} records for preview.`;
+        document.getElementById('bulkImportStatus').style.color = 'var(--success)';
+        
+        // Render preview table
+        renderPreviewTable(dataRows);
+        renderColumnMapping(headers);
+        validateAllRows();
+        
+    } catch (error) {
+        console.error('Preview error:', error);
+        status.textContent = 'Error reading file: ' + error.message;
+        status.style.color = 'var(--danger)';
+    }
+}
+
+// --- Render Preview Table ---
+function renderPreviewTable(data) {
+    const table = document.getElementById('previewTable');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    
+    // Clear existing content
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    
+    // Determine which columns to show (based on mapping or all)
+    const columnsToShow = getVisibleColumns();
+    
+    // If no columns to show, use all file headers
+    if (columnsToShow.length === 0 && fileHeaders.length > 0) {
+        columnsToShow = fileHeaders;
+    }
+    
+    // Build header
+    const headerRow = document.createElement('tr');
+    
+    // Add row number column
+    const numTh = document.createElement('th');
+    numTh.textContent = '#';
+    numTh.style.width = '50px';
+    numTh.style.minWidth = '50px';
+    numTh.style.maxWidth = '50px';
+    numTh.style.textAlign = 'center';
+    numTh.style.position = 'sticky';
+    numTh.style.left = '0';
+    numTh.style.zIndex = '11';
+    numTh.style.background = 'var(--nu-blue)';
+    headerRow.appendChild(numTh);
+    
+    // Add status column
+    const statusTh = document.createElement('th');
+    statusTh.textContent = 'Status';
+    statusTh.style.width = '70px';
+    statusTh.style.minWidth = '70px';
+    statusTh.style.maxWidth = '70px';
+    statusTh.style.textAlign = 'center';
+    statusTh.style.position = 'sticky';
+    statusTh.style.left = '50px';
+    statusTh.style.zIndex = '11';
+    statusTh.style.background = 'var(--nu-blue)';
+    headerRow.appendChild(statusTh);
+    
+    // Data columns - make them scrollable
+    columnsToShow.forEach((col, index) => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        th.dataset.column = col;
+        th.style.minWidth = '150px';
+        th.style.maxWidth = '300px';
+        th.style.position = 'sticky';
+        th.style.top = '0';
+        th.style.background = 'var(--nu-blue)';
+        th.style.zIndex = '10';
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    
+    // Calculate pagination
+    const total = data.length;
+    const totalPages = Math.ceil(total / pageSize);
+    
+    // Ensure current page is valid
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const pageData = data.slice(start, end);
+    
+    // Build rows
+    pageData.forEach((row, index) => {
+        const actualIndex = start + index;
+        const tr = document.createElement('tr');
+        tr.dataset.rowIndex = actualIndex;
+        tr.id = `row-${actualIndex}`;
+        
+        // Row number - sticky
+        const numTd = document.createElement('td');
+        numTd.className = 'row-number';
+        numTd.textContent = actualIndex + 1;
+        numTd.style.position = 'sticky';
+        numTd.style.left = '0';
+        numTd.style.zIndex = '5';
+        numTd.style.background = 'var(--white)';
+        tr.appendChild(numTd);
+        
+        // Status - sticky
+        const statusTd = document.createElement('td');
+        statusTd.className = 'row-status';
+        statusTd.id = `status-${actualIndex}`;
+        statusTd.style.position = 'sticky';
+        statusTd.style.left = '50px';
+        statusTd.style.zIndex = '5';
+        statusTd.style.background = 'var(--white)';
+        statusTd.innerHTML = '<i class="fa-regular fa-hourglass-half" style="color: var(--gray-400);"></i>';
+        tr.appendChild(statusTd);
+        
+        // Data cells
+        columnsToShow.forEach(col => {
+            const td = document.createElement('td');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = row[col] || '';
+            input.dataset.column = col;
+            input.dataset.rowIndex = actualIndex;
+            input.className = 'editable-cell';
+            input.placeholder = 'Enter value...';
+            input.id = `cell-${actualIndex}-${col}`;
+            input.style.width = '100%';
+            input.style.minWidth = '120px';
+            
+            input.addEventListener('input', function() {
+                handleCellEdit(this, actualIndex, col);
+            });
+            
+            input.addEventListener('blur', function() {
+                validateSingleRow(actualIndex);
+            });
+            
+            td.appendChild(input);
+            tr.appendChild(td);
+        });
+        
+        tbody.appendChild(tr);
+    });
+    
+    // Update record count with pagination info
+    let countText = `Showing ${start + 1}-${end} of ${total} records`;
+    if (totalPages > 1) {
+        countText += ` (Page ${currentPage} of ${totalPages})`;
+    }
+    document.getElementById('recordCount').textContent = countText;
+    
+    // Render pagination controls
+    renderPaginationControls();
+}
+
+// --- Get Visible Columns ---
+function getVisibleColumns() {
+  
+    return fileHeaders; // <-- This saves the day!
+}
+
+// --- Render Column Mapping ---
+function renderColumnMapping(headers) {
+    const container = document.getElementById('mappingControls');
+    container.innerHTML = '';
+    
+    const requiredFields = {
+        'student_id_number': 'Student ID *',
+        'first_name': 'First Name *',
+        'last_name': 'Last Name *',
+        'email': 'Email *',
+        'program': 'Program *'
+    };
+    
+    const optionalFields = {
+        'middle_name': 'Middle Name',
+        'phone_number': 'Phone Number',
+        'year_graduated': 'Graduation Year',
+        'date_of_birth': 'Date of Birth',
+        'sex': 'Sex'
+    };
+    
+    const allFields = { ...requiredFields, ...optionalFields };
+    
+    Object.entries(allFields).forEach(([field, label]) => {
+        const div = document.createElement('div');
+        div.className = 'mapping-item';
+        
+        const labelEl = document.createElement('label');
+        labelEl.className = 'mapping-label';
+        labelEl.textContent = label;
+        div.appendChild(labelEl);
+        
+        const select = document.createElement('select');
+        select.id = `map-${field}`;
+        select.dataset.field = field;
+        
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = '-- Select Column --';
+        select.appendChild(defaultOption);
+        
+        headers.forEach(header => {
+            const option = document.createElement('option');
+            option.value = header;
+            option.textContent = header;
+            
+            // Auto-detect matching columns
+            const headerLower = header.toLowerCase();
+            const fieldLower = field.toLowerCase();
+            if (headerLower.includes(fieldLower.replace('_', ' ')) || 
+                headerLower === fieldLower ||
+                headerLower.replace(' ', '_') === fieldLower) {
+                option.selected = true;
+            }
+            
+            select.appendChild(option);
+        });
+        
+        select.addEventListener('change', function() {
+            columnMapping[this.dataset.field] = this.value;
+            renderPreviewTable(importedData);
+            validateAllRows();
+        });
+        
+        div.appendChild(select);
+        container.appendChild(div);
+    });
+}
+
+// --- Cell Edit Handler ---
+function handleCellEdit(input, rowIndex, column) {
+    const value = input.value;
+    importedData[rowIndex][column] = value;
+    
+    // Remove any existing error state
+    input.classList.remove('error', 'success');
+    const errorMsg = input.parentElement.querySelector('.error-message');
+    if (errorMsg) errorMsg.remove();
+}
+
+// --- Validate Single Row ---
+function validateSingleRow(rowIndex) {
+    const row = importedData[rowIndex];
+    if (!row) return;
+    
+    const errors = [];
+    const mappedFields = getFieldMapping();
+    
+    // Check required fields
+    const required = ['student_id_number', 'first_name', 'last_name', 'email', 'program'];
+    required.forEach(field => {
+        const col = mappedFields[field];
+        if (!col) {
+            errors.push(`Missing mapping for ${field}`);
+            return;
+        }
+        const value = row[col] || '';
+        if (!value.trim()) {
+            errors.push(`${field.replace('_', ' ')} is required`);
+        }
+    });
+    
+    // Validate email format
+    if (mappedFields.email && row[mappedFields.email]) {
+        const email = row[mappedFields.email];
+        if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+            errors.push('Invalid email format');
+        }
+    }
+    
+    // Update UI
+    const statusTd = document.getElementById(`status-${rowIndex}`);
+    const tr = statusTd?.closest('tr');
+    const inputs = tr?.querySelectorAll('.editable-cell');
+    
+    if (errors.length > 0) {
+        statusTd.innerHTML = '<i class="fa-solid fa-times-circle"></i>';
+        tr?.classList.add('error-row');
+        tr?.classList.remove('success-row');
+        
+        // Highlight fields with errors
+        inputs?.forEach(input => {
+            const col = input.dataset.column;
+            const field = findFieldByColumn(col);
+            if (field && required.includes(field)) {
+                if (!input.value.trim()) {
+                    input.classList.add('error');
+                }
+            }
+        });
+    } else {
+        statusTd.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
+        tr?.classList.remove('error-row');
+        tr?.classList.add('success-row');
+        
+        // Clear error states
+        inputs?.forEach(input => {
+            input.classList.remove('error');
+        });
+    }
+    
+    // Store validation result
+    validationResults[rowIndex] = { errors, valid: errors.length === 0 };
+}
+
+// --- Validate All Rows ---
+function validateAllRows() {
+    const total = importedData.length;
+    let validCount = 0;
+    let errorCount = 0;
+    
+    for (let i = 0; i < total; i++) {
+        validateSingleRow(i);
+        if (validationResults[i]?.valid) {
+            validCount++;
+        } else {
+            errorCount++;
+        }
+    }
+    
+    // Update summary
+    updateValidationSummary(validCount, errorCount, total);
+    
+    // Enable/disable import button
+    const importBtn = document.getElementById('confirmImportBtn');
+    if (errorCount === 0 && validCount > 0) {
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+    } else {
+        importBtn.disabled = true;
+        importBtn.style.opacity = '0.6';
+    }
+}
+
+// --- Update Validation Summary ---
+function updateValidationSummary(valid, errors, total) {
+    const summary = document.getElementById('validationSummary');
+    summary.style.display = 'block';
+    
+    summary.innerHTML = `
+        <h5 style="margin: 0 0 0.75rem 0; color: var(--nu-blue);">
+            <i class="fa-solid fa-clipboard-check"></i> Validation Summary
+        </h5>
+        <div class="validation-summary-grid">
+            <div class="validation-stat success">
+                <span class="stat-number">${valid}</span>
+                <span class="stat-label">Valid Records</span>
+            </div>
+            <div class="validation-stat error">
+                <span class="stat-number">${errors}</span>
+                <span class="stat-label">Invalid Records</span>
+            </div>
+            <div class="validation-stat info">
+                <span class="stat-number">${total}</span>
+                <span class="stat-label">Total Records</span>
+            </div>
+        </div>
+        ${errors > 0 ? `
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--danger-light); border-radius: var(--radius); border-left: 4px solid var(--danger);">
+                <p style="font-size: 0.875rem; color: var(--danger); margin: 0;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    ${errors} record(s) have errors. Please fix them before importing.
+                </p>
+            </div>
+        ` : `
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--success-light); border-radius: var(--radius); border-left: 4px solid var(--success);">
+                <p style="font-size: 0.875rem; color: var(--success); margin: 0;">
+                    <i class="fa-solid fa-check-circle"></i>
+                    All ${total} record(s) are valid and ready for import!
+                </p>
+            </div>
+        `}
+    `;
+}
+
+// --- Helper Functions ---
+function getFieldMapping() {
+    const mapping = {};
+    
+    // Combine BOTH required and optional fields so no data gets left behind during import!
+    const allFields = [
+        'student_id_number', 'first_name', 'last_name', 'email', 'program',
+        'middle_name', 'phone_number', 'year_graduated', 'date_of_birth', 'sex'
+    ];
+    
+    allFields.forEach(field => {
+        const select = document.getElementById(`map-${field}`);
+        // Only map it if the user (or the auto-detect) actually selected a column
+        if (select && select.value !== '') {
+            mapping[field] = select.value;
+        }
+    });
+    
+    return mapping;
+}
+
+function findFieldByColumn(column) {
+    const mapping = getFieldMapping();
+    for (const [field, col] of Object.entries(mapping)) {
+        if (col === column) return field;
+    }
+    return null;
+}
+
+// --- Navigation Functions ---
+function backToUpload() {
+    document.getElementById('uploadStep').style.display = 'block';
+    document.getElementById('previewStep').style.display = 'none';
+    document.getElementById('bulkImportStatus').textContent = 'Returned to upload.';
+    document.getElementById('bulkImportStatus').style.color = 'var(--gray-500)';
+}
+
+// --- Render Pagination Controls ---
+function renderPaginationControls() {
+    const container = document.getElementById('paginationControls');
+    if (!container) return;
+    
+    const total = importedData.length;
+    const totalPages = Math.ceil(total / pageSize);
+    
+    // Don't show pagination if all records are shown or only 1 page
+    if (pageSize >= total || totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Previous button
+    html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>
+        <i class="fa-solid fa-chevron-left"></i>
+    </button>`;
+    
+    // Page numbers
+    const maxVisible = 7;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(1)">1</button>`;
+        if (startPage > 2) {
+            html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-secondary'}" onclick="goToPage(${i})">
+            ${i}
+        </button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
+        }
+        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+    }
+    
+    // Next button
+    html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>
+        <i class="fa-solid fa-chevron-right"></i>
+    </button>`;
+    
+    // Page info
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, total);
+    html += `<span style="font-size: 0.8125rem; color: var(--gray-500); margin-left: 0.5rem;">
+        ${start}-${end} of ${total}
+    </span>`;
+    
+    container.innerHTML = html;
+}
+
+
+// --- Change Page Size ---
+function changePageSize() {
+    const select = document.getElementById('pageSizeSelect');
+    const value = parseInt(select.value);
+    
+    if (value === 0) {
+        // Show all records
+        pageSize = importedData.length || 25;
+        currentPage = 1;
+    } else {
+        pageSize = value;
+        currentPage = 1;
+    }
+    
+    renderPreviewTable(importedData);
+    renderPaginationControls();
+    validateAllRows();
+}
+
+// --- Validate and Import ---
+async function validateAndImport() {
+    // Double-check all rows are valid
+    const total = importedData.length;
+    let allValid = true;
+    let invalidCount = 0;
+    
+    for (let i = 0; i < total; i++) {
+        if (!validationResults[i]?.valid) {
+            allValid = false;
+            invalidCount++;
+        }
+    }
+    
+    if (!allValid) {
+        showAlert(`Please fix ${invalidCount} error(s) before importing.`, 'error');
+        return;
+    }
+    
+    // Confirm with user
+    if (!confirm(`Ready to import ${total} alumni records. Continue?`)) {
+        return;
+    }
+    
+    const status = document.getElementById('bulkImportStatus');
+    const importBtn = document.getElementById('confirmImportBtn');
+    importBtn.disabled = true;
+    importBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
+    
+    // Get mapping
+    const mapping = getFieldMapping();
+    
+    // Prepare data for server - send the actual importedData with the mapping
+    const payload = {
+        data: importedData,
+        mapping: mapping,
+        _token: getCsrfToken()
+    };
+    
+    try {
+        const response = await fetch('/admin/alumni/process-bulk', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const { results } = result;
+            
+            let message = `Import complete! ✅ ${results.successful} successful, ❌ ${results.failed} failed.`;
+            
+            if (results.duplicates && results.duplicates.length > 0) {
+                message += `\n⚠️ ${results.duplicates.length} duplicates skipped.`;
+            }
+            
+            if (results.warnings && results.warnings.length > 0) {
+                message += `\n⚠️ ${results.warnings.length} warnings.`;
+            }
+            
+            if (results.errors && results.errors.length > 0) {
+                const errorList = results.errors.slice(0, 5).join('\n');
+                message += `\n\nErrors:\n${errorList}`;
+                if (results.errors.length > 5) {
+                    message += `\n...and ${results.errors.length - 5} more errors.`;
+                }
+            }
+            
+            status.innerHTML = message.replace(/\n/g, '<br>');
+            status.style.color = results.failed > 0 ? 'var(--warning)' : 'var(--success)';
+            
+            if (results.successful > 0) {
+                showAlert(`Successfully imported ${results.successful} alumni!`, 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else if (results.failed > 0) {
+                showAlert('Import completed but no records were added. Check errors above.', 'warning');
+            }
+        } else {
+            status.textContent = 'Error: ' + (result.message || 'Unknown error occurred.');
+            status.style.color = 'var(--danger)';
+            showAlert('Import failed: ' + result.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Import error:', error);
+        status.textContent = 'Error: ' + error.message;
+        status.style.color = 'var(--danger)';
+        showAlert('An error occurred during import.', 'error');
+    } finally {
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<i class="fa-solid fa-check"></i> Import All';
+    }
+}
+
+// --- Go to Page ---
+function goToPage(page) {
+    const totalPages = Math.ceil(importedData.length / pageSize);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderPreviewTable(importedData);
+    renderPaginationControls();
+    validateAllRows();
+}
+
+// --- Update Import Progress ---
+function updateImportProgress(current, total) {
+    const status = document.getElementById('bulkImportStatus');
+    const percentage = Math.round((current / total) * 100);
+    status.textContent = `Importing... ${current}/${total} (${percentage}%)`;
+    status.style.color = 'var(--info)';
+}
+
+// --- Clear All Errors ---
+function clearAllErrors() {
+    document.querySelectorAll('.error-row').forEach(tr => {
+        tr.classList.remove('error-row');
+    });
+    document.querySelectorAll('.editable-cell.error').forEach(input => {
+        input.classList.remove('error');
+    });
+    showAlert('Error indicators cleared.', 'info');
+}
+
+// --- Helper: Get CSRF Token ---
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+// --- Override the file input change event ---
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('bulkImportFile');
+    const previewBtn = document.getElementById('previewBtn');
+    const status = document.getElementById('bulkImportStatus');
+    
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            const fileName = e.target.files[0].name;
+            status.textContent = `Selected: ${fileName}`;
+            status.style.color = 'var(--success)';
+            previewBtn.disabled = false;
+            
+            // Enable preview button and auto-preview if file is selected
+            setTimeout(() => {
+                previewBtn.click();
+            }, 500);
+        }
+    });
+});
 
     </script>
 </body>

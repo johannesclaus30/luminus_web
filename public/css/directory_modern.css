@@ -2089,3 +2089,418 @@ html, body {
 .alert-toast.warning .alert-icon {
     color: var(--warning);
 }
+
+/* Bulk Import - Enhanced Preview Styles */
+.bulk-step {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.preview-header h4 {
+    font-size: 1.125rem;
+    color: var(--nu-blue);
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.preview-header h4 i {
+    color: var(--nu-gold);
+}
+
+/* Editable Table Styles */
+.editable-table {
+    font-size: 0.875rem;
+}
+
+.editable-table thead th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    background: var(--nu-blue);
+    color: white;
+    z-index: 10;
+    border-bottom: 2px solid var(--nu-blue-dark);
+    white-space: nowrap;
+}
+
+.editable-table tbody td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: middle;
+}
+
+.editable-table tbody tr:hover {
+    background-color: var(--gray-50);
+}
+
+.editable-table tbody tr.error-row {
+    background-color: var(--danger-light) !important;
+}
+
+.editable-table tbody tr.error-row td {
+    border-bottom-color: var(--danger);
+}
+
+.editable-table tbody tr.error-row:hover {
+    background-color: #fecaca !important;
+}
+
+.editable-table tbody td input[type="text"],
+.editable-table tbody td input[type="email"],
+.editable-table tbody td input[type="date"] {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-family: inherit;
+    background: transparent;
+    transition: all var(--transition);
+    min-width: 80px;
+}
+
+.editable-table tbody td input:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    background: var(--white);
+    box-shadow: 0 0 0 3px var(--nu-blue-soft);
+}
+
+.editable-table tbody td input.error {
+    border-color: var(--danger);
+    background: var(--danger-light);
+}
+
+.editable-table tbody td input.success {
+    border-color: var(--success);
+    background: var(--success-light);
+}
+
+.editable-table tbody td .error-message {
+    font-size: 0.7rem;
+    color: var(--danger);
+    display: block;
+    margin-top: 0.125rem;
+    font-weight: 500;
+}
+
+.editable-table .row-number {
+    font-weight: 600;
+    color: var(--gray-400);
+    text-align: center;
+    font-size: 0.75rem;
+    width: 40px;
+    min-width: 40px;
+}
+
+.editable-table .row-status {
+    width: 32px;
+    min-width: 32px;
+    text-align: center;
+}
+
+.editable-table .row-status i {
+    font-size: 1rem;
+}
+
+.editable-table .row-status .fa-check-circle {
+    color: var(--success);
+}
+
+.editable-table .row-status .fa-times-circle {
+    color: var(--danger);
+}
+
+.editable-table .row-status .fa-exclamation-triangle {
+    color: var(--warning);
+}
+
+/* Validation Summary */
+.validation-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.validation-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-200);
+}
+
+.validation-stat .stat-number {
+    font-weight: 700;
+    font-size: 1.125rem;
+}
+
+.validation-stat .stat-label {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+}
+
+.validation-stat.success .stat-number { color: var(--success); }
+.validation-stat.error .stat-number { color: var(--danger); }
+.validation-stat.warning .stat-number { color: var(--warning); }
+.validation-stat.info .stat-number { color: var(--info); }
+
+/* Mapping Controls */
+#mappingControls select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-family: inherit;
+    background: var(--white);
+    transition: all var(--transition);
+}
+
+#mappingControls select:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    box-shadow: 0 0 0 3px var(--nu-blue-soft);
+}
+
+#mappingControls .mapping-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+#mappingControls .mapping-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+    .editable-table {
+        font-size: 0.75rem;
+    }
+    
+    .editable-table thead th,
+    .editable-table tbody td {
+        padding: 0.375rem 0.5rem;
+    }
+    
+    .editable-table tbody td input[type="text"],
+    .editable-table tbody td input[type="email"],
+    .editable-table tbody td input[type="date"] {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.375rem;
+        min-width: 60px;
+    }
+    
+    .preview-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+    
+    .preview-header > div:last-child {
+        flex-wrap: wrap;
+    }
+}
+
+/* Animation for validation updates */
+@keyframes highlightRow {
+    0% { background-color: var(--info-light); }
+    100% { background-color: transparent; }
+}
+
+.highlight-row {
+    animation: highlightRow 1s ease-out;
+}
+
+/* ========================================
+   ENHANCED MODAL SIZE FOR BULK IMPORT
+   ======================================== */
+
+/* Make the modal larger for bulk import */
+.modal-content-wrapper {
+    max-width: 1200px !important; /* Increased from 720px */
+    max-height: 92vh !important;  /* Increased from 85vh */
+}
+
+/* When bulk import tab is active, make it even larger */
+.modal-section[data-modal-section="bulk"].modal-section-active ~ .modal-content-wrapper,
+.modal-tab[data-modal-tab="bulk"].active ~ .modal-content-wrapper {
+    max-width: 95% !important;
+}
+
+/* Or target the bulk section directly */
+.modal-section[data-modal-section="bulk"] .modal-content-wrapper {
+    max-width: 1200px !important;
+}
+
+/* Make the preview table taller */
+.preview-table-wrapper {
+    max-height: 600px !important;
+}
+
+.preview-table-wrapper > div:last-child {
+    max-height: 500px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .modal-content-wrapper {
+        max-width: 95% !important;
+        max-height: 90vh !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .modal-content-wrapper {
+        max-width: 98% !important;
+        max-height: 85vh !important;
+        padding: 0.5rem !important;
+    }
+    
+    .bulk-import-panel {
+        padding: 1rem !important;
+    }
+}
+
+/* ========================================
+   ENHANCED MODAL FOR BULK IMPORT
+   ======================================== */
+
+/* Make modal larger when bulk import is active */
+.modal-content-wrapper {
+    max-width: 900px;
+    max-height: 90vh;
+}
+
+/* When bulk tab is active, make it even larger */
+.modal-tab[data-modal-tab="bulk"].active ~ .modal-content-wrapper {
+    max-width: 1200px;
+}
+
+/* Target the bulk import modal specifically */
+#createModal .modal-content-wrapper {
+    max-width: 95%;
+    max-height: 92vh;
+    width: 1400px;
+}
+
+/* Make the table container taller */
+.preview-table-wrapper > div:last-child {
+    max-height: 550px !important;
+}
+
+/* Better spacing for the preview header */
+.preview-header {
+    padding: 0.5rem 0 1rem 0;
+}
+
+/* Pagination controls styling */
+#paginationControls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    flex-wrap: wrap;
+}
+
+#paginationControls .btn-sm {
+    min-width: 36px;
+    padding: 0.25rem 0.5rem;
+}
+
+#paginationControls .btn-primary {
+    background: var(--nu-blue);
+    color: white;
+    border-color: var(--nu-blue);
+}
+
+#paginationControls .btn-primary:hover {
+    background: var(--nu-blue-dark);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #createModal .modal-content-wrapper {
+        max-width: 98%;
+        max-height: 95vh;
+        padding: 0.25rem;
+    }
+    
+    .preview-table-wrapper > div:last-child {
+        max-height: 350px !important;
+    }
+    
+    .editable-table {
+        font-size: 0.75rem;
+    }
+    
+    .editable-table thead th,
+    .editable-table tbody td {
+        padding: 0.25rem 0.375rem;
+    }
+}
+
+/* ========================================
+   FIX: Bulk Import Table Space & Scrollbar
+   ======================================== */
+
+.table-scroll-container {
+    /* Allow horizontal and vertical scrolling */
+    overflow: auto !important; 
+    
+    /* Keep a max-height so a huge file doesn't break the modal */
+    max-height: 400px !important; 
+    
+    /* Let the height shrink to fit the content! (Fixes the massive gap) */
+    min-height: auto !important; 
+    
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    
+    /* Ensure there is breathing room below the table before the pagination/summary */
+    margin-bottom: 1rem; 
+}
+
+/* Ensure the table forces horizontal scrolling when there are many columns */
+.editable-table {
+    width: 100%;
+    /* Forces the table to expand to its true width, triggering the scrollbar */
+    min-width: max-content !important; 
+    border-collapse: collapse;
+}
+
+/* Ensure cells don't unnecessarily wrap text to keep the layout clean */
+.editable-table th, 
+.editable-table td {
+    white-space: nowrap; 
+}
