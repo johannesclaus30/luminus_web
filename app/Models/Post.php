@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes; 
 
 class Post extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes; // ✅ RESTORE SoftDeletes HERE
 
     protected $table = 'posts';
 
@@ -19,10 +20,14 @@ class Post extends Model
         'moderation_status',
         'visibility',
         'is_draft',
+        'is_hidden',
     ];
 
     protected $casts = [
         'is_draft' => 'boolean',
+        'is_hidden' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     /**
@@ -63,5 +68,29 @@ class Post extends Model
     public function reposts(): HasMany
     {
         return $this->hasMany(Repost::class);
+    }
+
+    /**
+     * Get the reports for this post.
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(PostReport::class);
+    }
+
+    /**
+     * Scope a query to only include approved posts.
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('moderation_status', 'approved');
+    }
+
+    /**
+     * Scope a query to only include visible posts (not hidden).
+     */
+    public function scopeVisible($query)
+    {
+        return $query->where('is_hidden', false);
     }
 }

@@ -303,6 +303,21 @@ Route::prefix('admin')->group(function () {
         // Process bulk import with validated data
         Route::post('/alumni/process-bulk', [AdminController::class, 'processBulkImport'])
             ->name('admin.alumni.process-bulk');
+
+        // ============================================
+        // MODERATION & REPORT ROUTES (Add these)
+        // ============================================
+
+        // Moderation Routes
+        Route::post('/moderate/post', [AdminDashboardController::class, 'moderatePost']);
+        Route::post('/moderate/comment', [AdminDashboardController::class, 'moderateComment']);
+        Route::post('/restrict-user', [AdminDashboardController::class, 'restrictUser']);
+        Route::get('/posts/{id}', [AdminDashboardController::class, 'viewPost']);
+        Route::get('/comments/{id}', [AdminDashboardController::class, 'viewComment']);
+        Route::get('/reports/post/{id}', [AdminDashboardController::class, 'getPostReports']);
+        Route::get('/reports/comment/{id}', [AdminDashboardController::class, 'getCommentReports']);
+        Route::post('/moderate/bulk-posts', [AdminDashboardController::class, 'bulkModeratePosts']);
+        Route::post('/moderate/bulk-comments', [AdminDashboardController::class, 'bulkModerateComments']);
     });
 });
 
