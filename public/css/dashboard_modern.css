@@ -546,6 +546,7 @@ body {
     box-shadow: var(--shadow);
     border: 1px solid var(--gray-200);
     transition: all var(--transition);
+    margin-bottom: 1.5rem;
 }
 
 .dash-card:hover {
@@ -1991,4 +1992,454 @@ body {
 
 .modal-loading i {
     font-size: 2rem;
+}
+
+/* ========================================
+   MAP STYLES - IMPROVED & FIXED
+   ======================================== */
+
+#alumniMap {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    min-height: 400px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+/* Fix for Leaflet container sizing */
+#alumniMap .leaflet-container {
+    z-index: 1;
+    height: 100% !important;
+    width: 100% !important;
+}
+
+/* Ensure Leaflet controls are properly styled */
+#alumniMap .leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+    margin: 12px !important;
+}
+
+#alumniMap .leaflet-control-zoom a {
+    background: white !important;
+    color: var(--nu-blue) !important;
+    border: none !important;
+    border-bottom: 1px solid var(--gray-200) !important;
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 16px !important;
+    transition: all 0.2s ease;
+}
+
+#alumniMap .leaflet-control-zoom a:hover {
+    background: var(--nu-blue) !important;
+    color: white !important;
+}
+
+#alumniMap .leaflet-control-zoom a:last-child {
+    border-bottom: none !important;
+}
+
+/* Improved popup styling */
+#alumniMap .alumni-popup .leaflet-popup-content-wrapper {
+    border-radius: 12px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+
+#alumniMap .alumni-popup .leaflet-popup-content {
+    margin: 0 !important;
+    font-family: 'Poppins', sans-serif;
+    min-width: 220px;
+    max-width: 300px;
+    padding: 0 !important;
+}
+
+#alumniMap .alumni-popup .leaflet-popup-tip {
+    background: var(--white) !important;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05) !important;
+}
+
+/* Custom marker with glow effect */
+#alumniMap .custom-marker {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    transition: filter 0.3s ease;
+}
+
+#alumniMap .custom-marker:hover {
+    filter: drop-shadow(0 4px 12px rgba(50, 65, 140, 0.4));
+}
+
+#alumniMap .custom-marker div {
+    transition: transform 0.3s ease;
+}
+
+#alumniMap .custom-marker:hover div {
+    transform: scale(1.15);
+}
+
+/* Custom marker animation - only apply if not in a cluster */
+#alumniMap .custom-marker:not(.marker-cluster) {
+    animation: markerFloat 3s ease-in-out infinite;
+}
+
+@keyframes markerFloat {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* Marker cluster improvements - HIGHER SPECIFICITY */
+.marker-cluster,
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+    background: transparent !important;
+}
+
+.marker-cluster div,
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+    background: linear-gradient(135deg, #32418C 0%, #253069 100%) !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 44px !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    border: 3px solid #FBD117 !important;
+    box-shadow: 0 4px 15px rgba(50, 65, 140, 0.3) !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.marker-cluster div:hover,
+.marker-cluster-small div:hover,
+.marker-cluster-medium div:hover,
+.marker-cluster-large div:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 25px rgba(50, 65, 140, 0.4) !important;
+}
+
+.marker-cluster-small div {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 11px !important;
+    border-width: 2px !important;
+}
+
+.marker-cluster-medium div {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 14px !important;
+    border-width: 3px !important;
+}
+
+.marker-cluster-large div {
+    width: 54px !important;
+    height: 54px !important;
+    font-size: 18px !important;
+    border-width: 3px !important;
+}
+
+/* Override Leaflet's default cluster background */
+.marker-cluster span,
+.marker-cluster-small span,
+.marker-cluster-medium span,
+.marker-cluster-large span {
+    background: transparent !important;
+}
+
+/* Popup inner content styling */
+.map-popup-content {
+    padding: 16px 18px;
+    min-width: 200px;
+}
+
+.map-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.map-popup-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--nu-gold);
+    flex-shrink: 0;
+}
+
+.map-popup-avatar-placeholder {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--nu-blue) 0%, var(--nu-blue-light) 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.map-popup-name {
+    font-weight: 600;
+    color: var(--gray-800);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.map-popup-region {
+    color: var(--gray-500);
+    font-size: 0.8rem;
+    margin: 2px 0 0 0;
+}
+
+.map-popup-type {
+    color: var(--gray-400);
+    font-size: 0.7rem;
+    margin: 0;
+}
+
+.map-popup-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--gray-200);
+}
+
+.map-popup-actions .btn-popup {
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-popup-primary {
+    background: var(--nu-blue);
+    color: white;
+}
+
+.btn-popup-primary:hover {
+    background: var(--nu-blue-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(50, 65, 140, 0.3);
+}
+
+.btn-popup-gold {
+    background: var(--nu-gold);
+    color: var(--nu-blue-dark);
+}
+
+.btn-popup-gold:hover {
+    background: var(--nu-gold-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(251, 209, 23, 0.3);
+}
+
+/* Map loading state */
+.map-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    gap: 1rem;
+}
+
+.map-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--gray-200);
+    border-top-color: var(--nu-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Fix for map tiles loading */
+#alumniMap .map-tiles {
+    filter: saturate(1.1) contrast(1.05);
+}
+
+/* Responsive map */
+@media (max-width: 768px) {
+    #alumniMap {
+        min-height: 300px;
+        height: 300px !important;
+    }
+    
+    .map-popup-content {
+        padding: 12px 14px;
+        min-width: 170px;
+    }
+    
+    .map-popup-avatar,
+    .map-popup-avatar-placeholder {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .map-popup-name {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #alumniMap {
+        min-height: 250px;
+        height: 250px !important;
+    }
+    
+    .map-popup-actions {
+        flex-direction: column;
+    }
+    
+    .map-popup-actions .btn-popup {
+        justify-content: center;
+    }
+}
+
+/* Fix for Leaflet attribution */
+#alumniMap .leaflet-control-attribution {
+    font-size: 9px !important;
+    background: rgba(255,255,255,0.8) !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+}
+
+
+/* Instead, use this to ensure proper tile loading */
+.leaflet-tile {
+    visibility: inherit !important;
+}
+
+/* Ensure the map container has proper dimensions when visible */
+.tab-content.active #alumniMap {
+    height: 400px !important;
+    min-height: 400px !important;
+}
+
+/* Fix for when map is in a hidden tab initially */
+.tab-content:not(.active) #alumniMap {
+    display: none;
+}
+
+/* Fix for marker interactivity */
+.custom-marker {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+.custom-marker .marker-inner {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease;
+}
+
+.custom-marker .marker-inner:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 15px rgba(50, 65, 140, 0.5) !important;
+}
+
+/* Ensure Leaflet markers are clickable */
+.leaflet-marker-icon {
+    pointer-events: auto !important;
+}
+
+.leaflet-interactive {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Ensure popup links are clickable */
+.leaflet-popup-content-wrapper {
+    pointer-events: auto !important;
+}
+
+.leaflet-popup-content {
+    pointer-events: auto !important;
+}
+
+.leaflet-popup-content a,
+.leaflet-popup-content button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Map container interaction */
+#alumniMap {
+    pointer-events: auto !important;
+    cursor: grab !important;
+}
+
+#alumniMap:active {
+    cursor: grabbing !important;
+}
+
+/* Ensure marker cluster is interactive */
+.marker-cluster {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+.marker-cluster div {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Fix z-index issues */
+.leaflet-pane {
+    z-index: auto;
+}
+
+.leaflet-marker-pane {
+    z-index: 600 !important;
+}
+
+.leaflet-popup-pane {
+    z-index: 700 !important;
+}
+
+.leaflet-tooltip-pane {
+    z-index: 650 !important;
+}
+
+/* Hover effect for markers */
+.leaflet-marker-icon:hover {
+    z-index: 1000 !important;
 }

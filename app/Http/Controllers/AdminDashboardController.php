@@ -15,6 +15,7 @@ use App\Models\EventRegistration;
 use App\Models\Address;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 
 class AdminDashboardController extends Controller
@@ -367,6 +368,109 @@ class AdminDashboardController extends Controller
             ],
         ];
 
+      // In your controller's index method, replace the alumniLocations section with this:
+
+// Get all alumni locations with deduplication (one marker per alumni)
+$alumniLocations = DB::table('alumnis')
+    ->select(
+        'alumnis.id',
+        'alumnis.first_name',
+        'alumnis.last_name',
+        'alumnis.alumni_photo',
+        'addresses.latitude',
+        'addresses.longitude',
+        'addresses.address_type',
+        'addresses.region',
+        'addresses.province',
+        'addresses.municipality',
+        'addresses.barangay'
+    )
+    ->join('addresses', 'alumnis.id', '=', 'addresses.alumni_id')
+    ->whereNotNull('addresses.latitude')
+    ->whereNotNull('addresses.longitude')
+    ->where('addresses.latitude', '!=', 0)
+    ->where('addresses.longitude', '!=', 0)
+    ->where('alumnis.verification_status', 'verified')
+    ->where('alumnis.account_status', 1)
+    ->whereBetween('addresses.latitude', [-90, 90])
+    ->whereBetween('addresses.longitude', [-180, 180])
+    // Remove duplicate addresses for the same alumni (keep the first one)
+    ->orderBy('alumnis.id')
+    ->orderBy('addresses.id')
+    ->get()
+    // Group by alumni_id to ensure one marker per alumni
+    ->groupBy('id')
+    ->map(function($group) {
+        $first = $group->first();
+        return (object) [
+            'id' => (int)$first->id,
+            'first_name' => $first->first_name,
+            'last_name' => $first->last_name,
+            'alumni_photo' => $first->alumni_photo,
+            'latitude' => (float)$first->latitude,
+            'longitude' => (float)$first->longitude,
+            'address_type' => $first->address_type,
+            'region' => $first->region,
+            'province' => $first->province,
+            'municipality' => $first->municipality,
+            'barangay' => $first->barangay,
+        ];
+    })
+    ->values(); // Reset array keys
+
+// Debug: Log the number of alumni locations found
+\Log::info('Alumni locations count: ' . $alumniLocations->count());
+
+// Add detailed debug for each location
+$debugLocations = [];
+foreach ($alumniLocations as $location) {
+    $debugLocations[] = [
+        'id' => $location->id,
+        'name' => $location->first_name . ' ' . $location->last_name,
+        'latitude' => $location->latitude,
+        'longitude' => $location->longitude,
+    ];
+}
+\Log::info('Location details:', $debugLocations);
+
+if ($alumniLocations->count() === 0) {
+    // Debug: Check if there are any addresses with coordinates
+    $totalAddresses = DB::table('addresses')->count();
+    $addressesWithCoords = DB::table('addresses')
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->where('latitude', '!=', 0)
+        ->where('longitude', '!=', 0)
+        ->count();
+    
+    $verifiedAlumniWithCoords = DB::table('addresses')
+        ->join('alumnis', 'addresses.alumni_id', '=', 'alumnis.id')
+        ->whereNotNull('addresses.latitude')
+        ->whereNotNull('addresses.longitude')
+        ->where('addresses.latitude', '!=', 0)
+        ->where('addresses.longitude', '!=', 0)
+        ->where('alumnis.verification_status', 'verified')
+        ->where('alumnis.account_status', 1)
+        ->distinct('alumnis.id')
+        ->count();
+    
+    \Log::info("Total addresses: {$totalAddresses}");
+    \Log::info("Addresses with coordinates: {$addressesWithCoords}");
+    \Log::info("Verified alumni with coordinates: {$verifiedAlumniWithCoords}");
+    
+    // Check if there are any addresses with valid coordinates range
+    $validRangeCount = DB::table('addresses')
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->where('latitude', '!=', 0)
+        ->where('longitude', '!=', 0)
+        ->whereBetween('latitude', [-90, 90])
+        ->whereBetween('longitude', [-180, 180])
+        ->count();
+    
+    \Log::info("Addresses with valid coordinate range: {$validRangeCount}");
+}
+
         return view('admin_dashboard', compact(
             'reportedPosts',
             'reportedComments',
@@ -393,7 +497,8 @@ class AdminDashboardController extends Controller
             'chartData',
             'alumniByProgram',
             'alumniByYear',
-            'frequentViolators'  // ✅ This is now correctly included
+            'frequentViolators',
+            'alumniLocations'
         ));
     }
 
@@ -733,5 +838,60 @@ class AdminDashboardController extends Controller
             'results' => $results,
             'message' => "Processed {$results['success']} comments successfully, {$results['failed']} failed"
         ]);
+    }
+
+    public function fetchCoordinates($barangay = null, $municipality = null, $province = null, $region = null, $zipCode = null)
+    {
+        $baseUrl = 'https://nominatim.openstreetmap.org/search';
+
+        // Build progressive search queries from most specific to broad
+        $attempts = [
+            // 1. Street / Barangay + Municipality + Province + Region
+            implode(', ', array_filter([$barangay, $municipality, $province, $region, $zipCode])),
+
+            // 2. Municipality/City + Province/State
+            implode(', ', array_filter([$municipality, $province])),
+
+            // 3. Municipality/City + Region/Country
+            implode(', ', array_filter([$municipality, $region])),
+
+            // 4. Province/State or Region alone
+            implode(', ', array_filter([$province, $region]))
+        ];
+
+        // Remove duplicates and empty strings
+        $attempts = array_unique(array_filter($attempts));
+
+        foreach ($attempts as $query) {
+            $cleanQuery = trim($query);
+            if (empty($cleanQuery)) continue;
+
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'LumiNUs-Alumni-Portal/1.0 (contact@luminus.edu.ph)'
+                ])->timeout(5)->get($baseUrl, [
+                    'q' => $cleanQuery,
+                    'format' => 'json',
+                    'limit' => 1,
+                    // 'countrycodes' parameter removed to allow global searches
+                ]);
+
+                $data = $response->json();
+
+                if (!empty($data) && isset($data[0]['lat']) && isset($data[0]['lon'])) {
+                    return [
+                        'latitude' => (float)$data[0]['lat'],
+                        'longitude' => (float)$data[0]['lon']
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Log::warning("Geocoding failed for query '{$cleanQuery}': " . $e->getMessage());
+            }
+        }
+
+        return [
+            'latitude' => 0,
+            'longitude' => 0
+        ];
     }
 }

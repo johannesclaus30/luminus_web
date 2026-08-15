@@ -19,6 +19,15 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Leaflet.js for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Add after Leaflet CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.0/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.0/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.0/dist/leaflet.markercluster.js"></script>
+
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <!-- Export libraries -->
@@ -454,6 +463,24 @@
                         </div>
                     </div>
 
+                     <!-- ========== NEW: ALUMNI LOCATION MAP ========== -->
+                    <div class="dash-card mb-20">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                                Alumni Location Map
+                            </h3>
+                            <div class="card-actions">
+                                <span class="badge-count">{{ isset($alumniLocations) ? $alumniLocations->count() : 0 }} Alumni Located</span>
+                            </div>
+                        </div>
+                        <div id="alumniMap" style="height: 400px; width: 100%; border-radius: var(--radius-lg);"></div>
+                        <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--gray-500); text-align: center;">
+                            <i class="fa-solid fa-info-circle"></i> 
+                            Hover over markers to see alumni names. Click for more details.
+                        </div>
+                    </div>
+
                     <!-- User Stats -->
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -865,31 +892,6 @@
         });
     });
 
-    // ========== TAB NAVIGATION ==========
-    function showTab(tabName) {
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        const targetTab = document.getElementById('tab-' + tabName);
-        if (targetTab) {
-            targetTab.classList.add('active');
-        }
-        
-        const clickedBtn = document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
-        if (clickedBtn) {
-            clickedBtn.classList.add('active');
-        }
-
-        // Refresh charts when tab becomes visible
-        setTimeout(() => {
-            const charts = Chart.instances;
-            charts.forEach(chart => chart.resize());
-        }, 100);
-    }
 
     // ========== CHART DATA ==========
     const chartData = @json($chartData);
@@ -1346,8 +1348,19 @@
     // ========== INITIALIZE ON PAGE LOAD ==========
     document.addEventListener('DOMContentLoaded', function() {
         initCharts();
-
-        // Resize charts on window resize
+        
+        // Initialize map if users tab is active by default
+        const usersTab = document.getElementById('tab-users');
+        if (usersTab && usersTab.classList.contains('active')) {
+            // Use requestAnimationFrame to ensure DOM is fully rendered
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    initAlumniMap();
+                }, 300);
+            });
+        }
+        
+        // Resize charts and map on window resize
         let resizeTimer;
         window.addEventListener('resize', function() {
             clearTimeout(resizeTimer);
@@ -1355,6 +1368,9 @@
                 Object.values(charts).forEach(chart => {
                     if (chart && chart.resize) chart.resize();
                 });
+                if (alumniMap && mapInitialized) {
+                    alumniMap.invalidateSize();
+                }
             }, 200);
         });
     });
@@ -1732,6 +1748,380 @@
     html += `</div>`;
     body.innerHTML = html;
 }
+// ========== ALUMNI LOCATION MAP ==========
+let alumniMap = null;
+let mapInitialized = false;
+
+function isElementVisible(el) {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && 
+           style.visibility !== 'hidden' && 
+           rect.width > 0 && 
+           rect.height > 0;
+}
+
+function initAlumniMap() {
+    if (mapInitialized) {
+        console.log('Map already initialized');
+        return;
+    }
+    
+    const mapContainer = document.getElementById('alumniMap');
+    if (!mapContainer) {
+        console.warn('Map container not found');
+        return;
+    }
+
+    if (!isElementVisible(mapContainer)) {
+        console.warn('Map container is not visible');
+        return;
+    }
+
+    mapContainer.innerHTML = '';
+
+    try {
+        // Get the data - ensure it's properly parsed
+        let alumniLocations = @json($alumniLocations ?? []);
+        
+        // If it's a string, parse it
+        if (typeof alumniLocations === 'string') {
+            alumniLocations = JSON.parse(alumniLocations);
+        }
+        
+        // Ensure it's an array
+        if (!Array.isArray(alumniLocations)) {
+            alumniLocations = [];
+        }
+        
+        console.log('Parsed alumni locations:', alumniLocations);
+        console.log('Number of locations:', alumniLocations.length);
+        
+        if (!alumniLocations || alumniLocations.length === 0) {
+            mapContainer.innerHTML = `
+                <div class="map-loading">
+                    <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; color: var(--gray-400);"></i>
+                    <p style="color: var(--gray-500); font-weight: 500;">No alumni location data available</p>
+                    <p style="color: var(--gray-400); font-size: 0.875rem; max-width: 300px; text-align: center;">
+                        Alumni need to add their address information with valid coordinates
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Filter and validate locations with detailed logging
+        const validLocations = alumniLocations.filter((alumni, index) => {
+            // Log raw values
+            console.log(`Processing location ${index}:`, {
+                id: alumni.id,
+                name: `${alumni.first_name} ${alumni.last_name}`,
+                raw_lat: alumni.latitude,
+                raw_lng: alumni.longitude,
+                lat_type: typeof alumni.latitude,
+                lng_type: typeof alumni.longitude
+            });
+            
+            const lat = parseFloat(alumni.latitude);
+            const lng = parseFloat(alumni.longitude);
+            
+            const isValid = !isNaN(lat) && !isNaN(lng) && 
+                           lat !== 0 && lng !== 0 &&
+                           lat >= -90 && lat <= 90 &&
+                           lng >= -180 && lng <= 180 &&
+                           alumni.latitude !== null && 
+                           alumni.longitude !== null &&
+                           alumni.latitude !== '' && 
+                           alumni.longitude !== '';
+            
+            console.log(`Location ${index} validation:`, {
+                name: `${alumni.first_name} ${alumni.last_name}`,
+                lat: lat,
+                lng: lng,
+                isValid: isValid,
+                values: { lat, lng }
+            });
+            
+            return isValid;
+        });
+
+        console.log('Valid locations count:', validLocations.length);
+        
+        if (validLocations.length > 0) {
+            console.log('Sample valid location:', validLocations[0]);
+            console.log('All valid locations:', validLocations.map(l => ({
+                name: `${l.first_name} ${l.last_name}`,
+                lat: parseFloat(l.latitude),
+                lng: parseFloat(l.longitude)
+            })));
+        }
+
+        if (validLocations.length === 0) {
+            mapContainer.innerHTML = `
+                <div class="map-loading">
+                    <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; color: var(--gray-400);"></i>
+                    <p style="color: var(--gray-500); font-weight: 500;">No valid location data available</p>
+                    <p style="color: var(--gray-400); font-size: 0.875rem; max-width: 300px; text-align: center;">
+                        Please check that alumni have valid coordinates (latitude and longitude)
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Set explicit dimensions
+        mapContainer.style.height = '400px';
+        mapContainer.style.width = '100%';
+
+        // Initialize map with global-friendly settings
+        alumniMap = L.map('alumniMap', {
+            center: [12.8797, 121.7740], // Default center
+            zoom: 5,
+            minZoom: 2,                  // Prevents zooming out into infinite grey space
+            worldCopyJump: true,         // Seamless scrolling across the International Date Line
+            maxBoundsViscosity: 1.0
+        });
+
+        // Tile Layer with continuous world rendering
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19,
+            noWrap: false
+        }).addTo(alumniMap);
+
+        const alumniIcon = L.divIcon({
+            className: '', // Keep this empty to drop external classes
+            html: `<div style="
+                background: #32418C; 
+                width: 30px; 
+                height: 30px; 
+                border-radius: 50%; 
+                border: 3px solid #FBD117; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                color: white; 
+                cursor: pointer; 
+                box-shadow: 0 2px 10px rgba(50,65,140,0.3);
+                margin: 0 !important;  /* Forces the icon to ignore global margins */
+                padding: 0 !important; /* Forces the icon to ignore global padding */
+            ">
+                <i class="fa-solid fa-user" style="font-size: 12px; margin: 0; padding: 0;"></i>
+            </div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15], // Exactly centers the 30x30 div on the coordinate
+            popupAnchor: [0, -15] // Places the popup tail just above the circle
+        });
+
+        // Create a feature group
+        const markerGroup = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true
+        }).addTo(alumniMap);
+
+        // Add markers
+        let addedCount = 0;
+        const markers = [];
+        
+        validLocations.forEach((alumni) => {
+            const lat = parseFloat(alumni.latitude);
+            const lng = parseFloat(alumni.longitude);
+            
+            if (isNaN(lat) || isNaN(lng)) {
+                console.warn('Skipping invalid coordinates for:', alumni.first_name, alumni.last_name);
+                return;
+            }
+            
+            addedCount++;
+            console.log(`Adding marker for ${alumni.first_name} ${alumni.last_name} at [${lat}, ${lng}]`);
+
+            const popupContent = `
+                <div style="padding: 12px; min-width: 220px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        ${alumni.alumni_photo ? 
+                            `<img src="${alumni.alumni_photo}" style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; object-fit: cover;">` :
+                            `<div style="width: 40px; height: 40px; border-radius: 50%; background: #32418C; color: white; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold;">
+                                ${alumni.first_name.charAt(0)}${alumni.last_name.charAt(0)}
+                            </div>`
+                        }
+                        <div>
+                            <strong style="display: block; font-size: 14px;">${alumni.first_name} ${alumni.last_name}</strong>
+                            <small style="color: #666; font-size: 12px;">
+                                <i class="fa-solid fa-location-dot"></i> 
+                                ${alumni.region || 'Location not specified'}
+                            </small>
+                        </div>
+                    </div>
+                    ${alumni.province || alumni.municipality || alumni.barangay ? `
+                        <div style="font-size: 12px; color: #555; margin-bottom: 8px; padding: 4px 8px; background: #f5f5f5; border-radius: 4px;">
+                            ${[alumni.barangay, alumni.municipality, alumni.province].filter(Boolean).join(', ')}
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; gap: 8px; border-top: 1px solid #eee; padding-top: 8px;">
+                        <a href="/admin/alumni/${alumni.id}/view" style="flex: 1; text-align: center; padding: 6px; background: #32418C; color: white; text-decoration: none; border-radius: 4px; font-size: 12px;">
+                            <i class="fa-solid fa-eye"></i> View
+                        </a>
+                        <a href="/admin/messages?chat=${alumni.id}" style="flex: 1; text-align: center; padding: 6px; background: #FBD117; color: #32418C; text-decoration: none; border-radius: 4px; font-size: 12px;">
+                            <i class="fa-solid fa-comment"></i> Message
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            const marker = L.marker([lat, lng], { 
+                icon: alumniIcon,
+                interactive: true
+            });
+            
+        // 1. Enable autoClose so only one popup shows at a time
+            marker.bindPopup(popupContent, {
+                maxWidth: 280,
+                minWidth: 220,
+                closeButton: true,
+                autoClose: true, 
+                closeOnClick: true
+            });
+
+            markers.push(marker);
+            markerGroup.addLayer(marker);
+        });
+
+        console.log(`Added ${addedCount} markers to map`);
+
+        mapInitialized = true;
+        
+        // Fit bounds
+        if (addedCount > 0) {
+            try {
+                const bounds = markerGroup.getBounds();
+                if (bounds && bounds.isValid()) {
+                    alumniMap.fitBounds(bounds.pad(0.15));
+                } else {
+                    const first = validLocations[0];
+                    if (first) {
+                        alumniMap.setView([parseFloat(first.latitude), parseFloat(first.longitude)], 10);
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not fit bounds:', e);
+            }
+        }
+
+        // Force resize
+        setTimeout(() => {
+            if (alumniMap) {
+                alumniMap.invalidateSize();
+            }
+        }, 500);
+
+    } catch (error) {
+        console.error('Error initializing map:', error);
+        mapContainer.innerHTML = `
+            <div class="map-loading">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: red;"></i>
+                <p>Error loading map: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+// ========== TAB NAVIGATION ==========
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Deselect all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show the selected tab
+    const targetTab = document.getElementById('tab-' + tabName);
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    // Highlight the clicked button
+    const clickedBtn = document.querySelector(`.tab-btn[onclick*="${tabName}"]`);
+    if (clickedBtn) {
+        clickedBtn.classList.add('active');
+    }
+
+    // Refresh charts and handle map
+    setTimeout(() => {
+        // Refresh charts
+        Object.values(charts).forEach(chart => {
+            if (chart && chart.resize) {
+                chart.resize();
+            }
+        });
+        
+        // Handle map initialization for users tab
+        if (tabName === 'users') {
+            if (!mapInitialized) {
+                // Initialize map if not already done
+                initAlumniMap();
+            } else if (alumniMap) {
+                // If map exists, invalidate size to ensure proper display
+                setTimeout(() => {
+                    alumniMap.invalidateSize();
+                }, 100);
+            }
+        }
+    }, 200);
+}
+
+// ========== INITIALIZE ON PAGE LOAD ==========
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    
+    // Initialize map if users tab is active by default
+    const usersTab = document.getElementById('tab-users');
+    if (usersTab && usersTab.classList.contains('active')) {
+        // Small delay to ensure DOM is fully rendered
+        setTimeout(() => {
+            initAlumniMap();
+        }, 500);
+    }
+    
+    // Add event listener for tab changes using MutationObserver
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                const usersTab = document.getElementById('tab-users');
+                if (usersTab && usersTab.classList.contains('active') && !mapInitialized) {
+                    setTimeout(() => {
+                        initAlumniMap();
+                    }, 300);
+                }
+            }
+        });
+    });
+    
+    // Observe the users tab for class changes
+    if (usersTab) {
+        observer.observe(usersTab, { attributes: true });
+    }
+    
+    // Resize charts and map on window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            Object.values(charts).forEach(chart => {
+                if (chart && chart.resize) chart.resize();
+            });
+            if (alumniMap && mapInitialized) {
+                alumniMap.invalidateSize();
+            }
+        }, 200);
+    });
+});
+
     </script>
 
 </body>
