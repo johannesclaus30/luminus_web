@@ -359,20 +359,27 @@ class AdminController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+  public function show(string $id)
     {
         $alumnus = Alumni::with([
             'addresses',
-            'employments',  // Add this
-            'skills',       // Add this
-            'tracerResponses', // Add this
-            'eventRegistrations.event', // Add this (eager load the event data)
-            'followers',    // Add this
-            'following',    // Add this
-            'posts.images', // Add this (posts with their images)
-            'posts.comments', // Add this (post comments)
-            'posts.reactions' // Add this (post reactions)
+            'employments',
+            'skills',
+            'tracerResponses',
+            'eventRegistrations.event',
+            'followers',
+            'following',
+            'posts.images',
+            'posts.comments',
+            'posts.reactions'
         ])->findOrFail($id);
+        
+        // Process posts to add full image URLs
+        $alumnus->posts->each(function($post) {
+            $post->images->each(function($image) {
+                $image->full_url = $this->getSupabaseStorageUrl($image->image_path);
+            });
+        });
         
         return view('directory.show', compact('alumnus'));
     }
@@ -2113,6 +2120,158 @@ protected function parseDate($dateString)
     
     // Return as is if no format matches
     return $dateString;
+}
+
+/**
+ * Get the full Supabase storage URL for a given path
+ */
+protected function getSupabaseStorageUrl($path)
+{
+    if (empty($path)) {
+        return null;
+    }
+    
+    // If it's already a full URL, return as is
+    if (preg_match('/^https?:\/\//i', $path)) {
+        return $path;
+    }
+    
+    // Remove leading slashes for consistency
+    $path = ltrim($path, '/');
+    
+    // Get Supabase URL from config
+    $supabaseUrl = config('filesystems.disks.s3.url', '');
+    
+    if (empty($supabaseUrl)) {
+        // Fallback: construct from env
+        $supabaseUrl = rtrim(config('services.supabase.url', ''), '/') . '/storage/v1/object/public/luminus_assets/';
+    } else {
+        // Use the S3 URL (which should point to your Supabase bucket)
+        $supabaseUrl = rtrim($supabaseUrl, '/') . '/';
+    }
+    
+    return $supabaseUrl . $path;
+}
+
+public function getPostInteractions(Request $request, $postId)
+{
+    try {
+        $post = \App\Models\Post::with([
+            'reactions.alumni',
+            'comments.alumni',
+            'reposts.alumni'
+        ])->findOrFail($postId);
+        
+        $type = $request->input('type', 'likes');
+        $data = [];
+        $total = 0;
+        
+        // Helper function to get profile photo URL
+        $getProfilePhotoUrl = function($alumnus) {
+            if (!$alumnus) return null;
+            
+            $photoPath = trim((string) ($alumnus->alumni_photo ?: $alumnus->card_photo));
+            if (empty($photoPath)) return null;
+            
+            if (preg_match('/^https?:\/\//i', $photoPath)) {
+                return $photoPath;
+            } elseif (str_starts_with($photoPath, '/storage/')) {
+                return $photoPath;
+            } elseif (str_starts_with($photoPath, 'storage/')) {
+                return '/' . $photoPath;
+            } elseif (str_starts_with($photoPath, '/')) {
+                return $photoPath;
+            } elseif (trim((string) config('filesystems.disks.s3.url')) !== '') {
+                return rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($photoPath, '/');
+            } else {
+                return asset('storage/' . ltrim($photoPath, '/'));
+            }
+        };
+        
+        switch ($type) {
+            case 'likes':
+                $data = $post->reactions
+                    ->sortByDesc('created_at')
+                    ->map(function($reaction) use ($getProfilePhotoUrl) {
+                        return [
+                            'id' => $reaction->alumni->id ?? null,
+                            'first_name' => $reaction->alumni->first_name ?? 'Unknown',
+                            'last_name' => $reaction->alumni->last_name ?? '',
+                            'profile_photo' => $getProfilePhotoUrl($reaction->alumni),
+                            'created_at' => $reaction->created_at ? $reaction->created_at->toISOString() : null,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+                $total = $post->reactions->count();
+                break;
+                
+            case 'comments':
+                $data = $post->comments
+                    ->sortByDesc('created_at')
+                    ->map(function($comment) use ($getProfilePhotoUrl) {
+                        return [
+                            'id' => $comment->alumni->id ?? null,
+                            'first_name' => $comment->alumni->first_name ?? 'Unknown',
+                            'last_name' => $comment->alumni->last_name ?? '',
+                            'profile_photo' => $getProfilePhotoUrl($comment->alumni),
+                            'comment' => $comment->comment,
+                            'created_at' => $comment->created_at ? $comment->created_at->toISOString() : null,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+                $total = $post->comments->count();
+                break;
+                
+            case 'reposts':
+                $data = $post->reposts
+                    ->sortByDesc('created_at')
+                    ->map(function($repost) use ($getProfilePhotoUrl) {
+                        return [
+                            'id' => $repost->alumni->id ?? null,
+                            'first_name' => $repost->alumni->first_name ?? 'Unknown',
+                            'last_name' => $repost->alumni->last_name ?? '',
+                            'profile_photo' => $getProfilePhotoUrl($repost->alumni),
+                            'caption' => $repost->caption,
+                            'created_at' => $repost->created_at ? $repost->created_at->toISOString() : null,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+                $total = $post->reposts->count();
+                break;
+                
+            default:
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid interaction type. Allowed: likes, comments, reposts.'
+                ], 400);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'total' => $total,
+            'type' => $type,
+        ]);
+        
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Post not found.'
+        ], 404);
+    } catch (\Exception $e) {
+        \Log::error('Error fetching post interactions: ' . $e->getMessage(), [
+            'post_id' => $postId,
+            'type' => $request->input('type', 'likes'),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to load interactions. Please try again.'
+        ], 500);
+    }
 }
 
 }

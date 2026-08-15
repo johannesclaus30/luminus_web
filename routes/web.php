@@ -71,6 +71,14 @@ Route::prefix('admin')->group(function () {
         Route::delete('/alumni/{id}', [AdminController::class, 'destroy'])
             ->name('admin.alumni.destroy');
 
+            // 🆕 Post Interactions Route - ADD THIS HERE
+        Route::get('/posts/{post}/interactions', [AdminController::class, 'getPostInteractions'])
+            ->name('admin.posts.interactions');
+
+        // Alumni Management - Reset Password, Restrict, Export
+        Route::post('/alumni/{id}/reset-password', [AdminController::class, 'resetAlumniPassword'])
+            ->name('admin.alumni.reset-password');
+
         // Alumni Management - Reset Password, Restrict, Export
         Route::post('/alumni/{id}/reset-password', [AdminController::class, 'resetAlumniPassword'])
             ->name('admin.alumni.reset-password');

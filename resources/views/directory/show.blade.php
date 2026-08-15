@@ -14,6 +14,8 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
     <!-- Stylesheets -->
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/admin-fixed-navbar.css">
@@ -130,6 +132,806 @@
         @media (max-width: 768px) {
             .two-col-grid { grid-template-columns: 1fr; }
             .three-col-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ========================================
+        ENHANCED POST SECTION STYLES
+        ======================================== */
+
+        /* Post Card Container */
+        .post-item {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e8edf4;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+
+        .post-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .post-item:hover {
+            border-color: #c5d0e0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        /* Post Header with Alumni Info */
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #32418C, #4a59a3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .post-author-info {
+            flex: 1;
+        }
+
+        .post-author-name {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.95rem;
+        }
+
+        .post-author-name i {
+            color: #3b82f6;
+            font-size: 0.75rem;
+            margin-left: 4px;
+        }
+
+        .post-timestamp {
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+
+        .post-timestamp i {
+            margin-right: 4px;
+        }
+
+        /* Post Caption */
+        .post-caption {
+            color: #1e293b;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            padding: 0 4px;
+        }
+
+        /* Image Grid - Enhanced */
+        .post-images {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+            margin-bottom: 16px;
+        }
+
+        /* Dynamic grid based on image count */
+        .post-images.grid-1 {
+            grid-template-columns: 1fr;
+        }
+
+        .post-images.grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .post-images.grid-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .post-images.grid-4 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .post-images.grid-5 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .post-images.grid-6 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .post-images img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #e8edf4;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .post-images img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border-color: #32418C;
+        }
+
+        /* For single images */
+        .post-images.grid-1 img {
+            height: 380px;
+        }
+
+        /* For 4 images - first image larger */
+        .post-images.grid-4 img:first-child {
+            grid-column: 1 / -1;
+            height: 280px;
+        }
+
+        /* For 5 images */
+        .post-images.grid-5 img:first-child {
+            grid-column: 1 / -1;
+            height: 260px;
+        }
+
+        /* For 6 images - top row 3, bottom row 3 */
+        .post-images.grid-6 img {
+            height: 180px;
+        }
+
+        /* Post Meta Actions */
+        .post-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 0 8px 0;
+            border-top: 1px solid #f0f2f5;
+            margin-top: 4px;
+        }
+
+        .post-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .post-action-btn:hover {
+            background: #f1f5f9;
+            color: #32418C;
+        }
+
+        .post-action-btn i {
+            font-size: 1rem;
+        }
+
+        .post-action-btn .count {
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        /* Post Status Badges */
+        .post-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .post-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .post-badge.visibility {
+            background: #e8edf4;
+            color: #475569;
+        }
+
+        .post-badge.visibility.public {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .post-badge.visibility.private {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .post-badge.moderation {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .post-badge.moderation.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .post-badge.moderation.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .post-badge.moderation.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Comments Section - Enhanced */
+        .post-comments {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #f0f2f5;
+        }
+
+        .post-comments-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: #475569;
+            font-size: 0.85rem;
+        }
+
+        .post-comments-header i {
+            color: #32418C;
+        }
+
+        .post-comment {
+            display: flex;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .post-comment:last-child {
+            margin-bottom: 0;
+        }
+
+        .post-comment:hover {
+            background: #f1f5f9;
+        }
+
+        .post-comment-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .post-comment-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .post-comment-body {
+            flex: 1;
+        }
+
+        .post-comment-author {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.85rem;
+        }
+
+        .post-comment-text {
+            color: #475569;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-top: 2px;
+        }
+
+        .post-comment-time {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        .post-comment-time i {
+            margin-right: 3px;
+        }
+
+        .more-comments-link {
+            display: inline-block;
+            color: #32418C;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            background: #e8edf4;
+            border-radius: 8px;
+            margin-top: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .more-comments-link:hover {
+            background: #d1d9e6;
+        }
+
+        /* No Posts State */
+        .no-posts {
+            text-align: center;
+            padding: 50px 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 2px dashed #e8edf4;
+        }
+
+        .no-posts i {
+            font-size: 3rem;
+            color: #cbd5e1;
+            display: block;
+            margin-bottom: 16px;
+        }
+
+        .no-posts p {
+            font-size: 1rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .post-item {
+                padding: 16px;
+                border-radius: 10px;
+            }
+            
+            .post-images.grid-1 img {
+                height: 240px;
+            }
+            
+            .post-images.grid-2,
+            .post-images.grid-3,
+            .post-images.grid-4,
+            .post-images.grid-5,
+            .post-images.grid-6 {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .post-images img {
+                height: 150px;
+            }
+            
+            .post-images.grid-4 img:first-child,
+            .post-images.grid-5 img:first-child {
+                height: 180px;
+            }
+            
+            .post-images.grid-6 img {
+                height: 140px;
+            }
+            
+            .post-actions {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .post-action-btn {
+                font-size: 0.8rem;
+                padding: 4px 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .post-images {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .post-images img {
+                height: 200px !important;
+            }
+            
+            .post-images.grid-1 img {
+                height: 220px !important;
+            }
+            
+            .post-images.grid-4 img:first-child,
+            .post-images.grid-5 img:first-child {
+                height: 200px !important;
+            }
+            
+            .post-item {
+                padding: 12px;
+            }
+            
+            .post-header {
+                gap: 10px;
+            }
+            
+            .post-avatar {
+                width: 34px;
+                height: 34px;
+                font-size: 13px;
+            }
+        }
+
+        /* ========================================
+        INTERACTIONS MODAL STYLES
+        ======================================== */
+
+        .interactions-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .interactions-modal.active {
+            display: flex;
+        }
+
+        .interactions-modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            animation: fadeInOverlay 0.3s ease;
+        }
+
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .interactions-modal-content {
+            position: relative;
+            background: #ffffff;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUpModal 0.3s ease;
+        }
+
+        @keyframes slideUpModal {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .interactions-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e8edf4;
+            flex-shrink: 0;
+        }
+
+        .interactions-modal-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .interactions-modal-title i {
+            color: #32418C;
+            font-size: 1.2rem;
+        }
+
+        .interactions-count {
+            font-weight: 400;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .interactions-modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f1f5f9;
+            border-radius: 50%;
+            color: #64748b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+        }
+
+        .interactions-modal-close:hover {
+            background: #fee2e2;
+            color: #dc2626;
+            transform: rotate(90deg);
+        }
+
+        .interactions-modal-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* Tabs */
+        .interactions-tabs {
+            display: flex;
+            border-bottom: 1px solid #e8edf4;
+            padding: 0 20px;
+            flex-shrink: 0;
+            background: #f8fafc;
+        }
+
+        .interactions-tab {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-family: inherit;
+        }
+
+        .interactions-tab:hover {
+            color: #475569;
+            background: rgba(50, 65, 140, 0.05);
+        }
+
+        .interactions-tab.active {
+            color: #32418C;
+            border-bottom-color: #32418C;
+        }
+
+        .interactions-tab i {
+            font-size: 0.9rem;
+        }
+
+        /* Panels */
+        .interactions-panels {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .interactions-panel {
+            display: none;
+            height: 100%;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .interactions-panel.active {
+            display: block;
+        }
+
+        .interactions-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .interactions-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .interactions-panel::-webkit-scrollbar-thumb {
+            background: #d1d9e6;
+            border-radius: 10px;
+        }
+
+        .interactions-panel::-webkit-scrollbar-thumb:hover {
+            background: #b0c0d0;
+        }
+
+        /* List Items */
+        .interactions-list {
+            padding: 4px 8px;
+        }
+
+        .interactions-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .interactions-item:hover {
+            background: #f1f5f9;
+        }
+
+        .interactions-item-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #32418C, #4a59a3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .interactions-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .interactions-item-name {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.95rem;
+        }
+
+        .interactions-item-detail {
+            color: #64748b;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 1px;
+        }
+
+        .interactions-item-detail i {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        .interactions-item-time {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .interactions-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+        }
+
+        .interactions-empty i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 12px;
+            color: #cbd5e1;
+        }
+
+        .interactions-empty p {
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .interactions-loading {
+            text-align: center;
+            padding: 30px 20px;
+            color: #94a3b8;
+        }
+
+        .interactions-loading i {
+            margin-right: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .interactions-modal-content {
+                width: 95%;
+                max-height: 90vh;
+                border-radius: 12px;
+            }
+            
+            .interactions-modal-header {
+                padding: 16px 18px;
+            }
+            
+            .interactions-modal-title {
+                font-size: 1rem;
+            }
+            
+            .interactions-tabs {
+                padding: 0 12px;
+            }
+            
+            .interactions-tab {
+                padding: 10px 12px;
+                font-size: 0.8rem;
+            }
+            
+            .interactions-item {
+                padding: 8px 12px;
+            }
+            
+            .interactions-item-avatar {
+                width: 34px;
+                height: 34px;
+                font-size: 12px;
+            }
+            
+            .interactions-item-name {
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Update post avatar to support images */
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #32418C, #4a59a3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .post-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
         }
     </style>
 </head>
@@ -486,60 +1288,201 @@
                     </div>
                 </div>
 
-                <!-- Posts Section -->
+                <!-- Posts Section - Enhanced -->
                 <div class="profile-card">
                     <h3 class="section-title">
                         <i class="fa-solid fa-newspaper"></i>
                         Alumni Posts
+                        <span style="font-size: 0.8rem; font-weight: 400; color: #94a3b8; margin-left: 8px;">
+                            ({{ $alumnus->posts->count() }} posts)
+                        </span>
                     </h3>
                     
                     @if($alumnus->posts->isNotEmpty())
                         @foreach($alumnus->posts->sortByDesc('created_at') as $post)
                             <div class="post-item">
+                                <!-- Post Header with Alumni Info -->
+                                <div class="post-header">
+                                    @php
+                                        // Get the alumni's profile photo URL
+                                        $alumniPhotoPath = trim((string) ($alumnus->alumni_photo ?: $alumnus->card_photo));
+                                        $hasPhoto = !empty($alumniPhotoPath);
+                                        
+                                        if ($hasPhoto) {
+                                            if (preg_match('/^https?:\/\//i', $alumniPhotoPath)) {
+                                                $alumniPhotoUrl = $alumniPhotoPath;
+                                            } elseif (str_starts_with($alumniPhotoPath, '/storage/')) {
+                                                $alumniPhotoUrl = $alumniPhotoPath;
+                                            } elseif (str_starts_with($alumniPhotoPath, 'storage/')) {
+                                                $alumniPhotoUrl = '/' . $alumniPhotoPath;
+                                            } elseif (str_starts_with($alumniPhotoPath, '/')) {
+                                                $alumniPhotoUrl = $alumniPhotoPath;
+                                            } elseif (trim((string) config('filesystems.disks.s3.url')) !== '') {
+                                                $alumniPhotoUrl = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($alumniPhotoPath, '/');
+                                            } else {
+                                                $alumniPhotoUrl = asset('storage/' . ltrim($alumniPhotoPath, '/'));
+                                            }
+                                        } else {
+                                            $alumniPhotoUrl = null;
+                                        }
+                                        
+                                        $initials = strtoupper(substr($alumnus->first_name, 0, 1)) . strtoupper(substr($alumnus->last_name, 0, 1));
+                                    @endphp
+                                    
+                                    <div class="post-avatar" style="{{ $hasPhoto ? 'padding: 0; overflow: hidden; background: none;' : '' }}">
+                                        @if($hasPhoto)
+                                            <img 
+                                                src="{{ $alumniPhotoUrl }}" 
+                                                alt="{{ $alumnus->first_name }} {{ $alumnus->last_name }}" 
+                                                style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+                                                onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #32418C, #4a59a3)'; this.parentElement.innerHTML='{{ $initials }}';"
+                                            >
+                                        @else
+                                            {{ $initials }}
+                                        @endif
+                                    </div>
+                                    <div class="post-author-info">
+                                        <div class="post-author-name">
+                                            {{ $alumnus->first_name }} {{ $alumnus->last_name }}
+                                            <i class="fa-solid fa-check-circle" style="color: #3b82f6;" title="Verified Alumni"></i>
+                                        </div>
+                                        <div class="post-timestamp">
+                                            <i class="fa-regular fa-calendar"></i>
+                                            {{ $post->created_at ? date('M d, Y \a\t h:i A', strtotime($post->created_at)) : 'N/A' }}
+                                        </div>
+                                    </div>
+                                    <div class="post-badges">
+                                        <span class="post-badge visibility {{ $post->visibility ?? 'public' }}">
+                                            <i class="fa-solid fa-{{ ($post->visibility ?? 'public') == 'public' ? 'globe' : 'lock' }}"></i>
+                                            {{ ucfirst($post->visibility ?? 'public') }}
+                                        </span>
+                                        <span class="post-badge moderation {{ $post->moderation_status ?? 'pending' }}">
+                                            <i class="fa-solid fa-{{ ($post->moderation_status ?? 'pending') == 'approved' ? 'check' : 'clock' }}"></i>
+                                            {{ ucfirst($post->moderation_status ?? 'pending') }}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Post Caption -->
                                 @if($post->caption)
                                     <div class="post-caption">{{ $post->caption }}</div>
                                 @endif
                                 
+                                <!-- Post Images - Dynamic Grid -->
                                 @if($post->images->isNotEmpty())
-                                    <div class="post-images">
+                                    @php
+                                        $imageCount = $post->images->count();
+                                        $gridClass = 'grid-' . min($imageCount, 6);
+                                    @endphp
+                                    <div class="post-images {{ $gridClass }}">
                                         @foreach($post->images as $image)
-                                            <img src="{{ $image->image_path }}" alt="Post image" onerror="this.style.display='none'">
+                                            @php
+                                                $imagePath = ltrim($image->image_path, '/');
+                                                $supabaseUrl = config('filesystems.disks.s3.url', '');
+                                                if (empty($supabaseUrl)) {
+                                                    $supabaseUrl = rtrim(config('services.supabase.url', ''), '/') . '/storage/v1/object/public/luminus_assets/';
+                                                } else {
+                                                    $supabaseUrl = rtrim($supabaseUrl, '/') . '/';
+                                                }
+                                                $imageUrl = $supabaseUrl . $imagePath;
+                                            @endphp
+                                            <img 
+                                                src="{{ $imageUrl }}" 
+                                                alt="Post image" 
+                                                loading="lazy"
+                                                onerror="this.style.display='none'"
+                                                onclick="window.open(this.src, '_blank')"
+                                            >
                                         @endforeach
                                     </div>
                                 @endif
                                 
-                                <div class="post-meta">
-                                    <span><i class="fa-regular fa-calendar"></i> {{ $post->created_at ? date('M d, Y h:i A', strtotime($post->created_at)) : 'N/A' }}</span>
-                                    <span><i class="fa-regular fa-heart"></i> {{ $post->reactions->count() }} reactions</span>
-                                    <span><i class="fa-regular fa-comment"></i> {{ $post->comments->count() }} comments</span>
-                                    <span>
-                                        <span class="status-badge active" style="font-size: 0.75rem; padding: 2px 10px;">
-                                            <i class="fa-solid fa-eye"></i> {{ ucfirst($post->visibility ?? 'public') }}
-                                        </span>
-                                    </span>
-                                    <span>
-                                        <span class="status-badge {{ $post->moderation_status == 'approved' ? 'active' : 'pending' }}" style="font-size: 0.75rem; padding: 2px 10px;">
-                                            <i class="fa-solid fa-{{ $post->moderation_status == 'approved' ? 'check' : 'clock' }}"></i>
-                                            {{ ucfirst($post->moderation_status ?? 'pending') }}
-                                        </span>
+                                <!-- Post Actions -->
+                                <div class="post-actions">
+                                    <button class="post-action-btn" onclick="openInteractionsModal({{ $post->id }}, 'likes')" title="View likes">
+                                        <i class="fa-regular fa-heart"></i>
+                                        <span class="count">{{ $post->reactions->count() }}</span>
+                                    </button>
+                                    <button class="post-action-btn" onclick="openInteractionsModal({{ $post->id }}, 'comments')" title="View comments">
+                                        <i class="fa-regular fa-comment"></i>
+                                        <span class="count">{{ $post->comments->count() }}</span>
+                                    </button>
+                                    <button class="post-action-btn" onclick="openInteractionsModal({{ $post->id }}, 'reposts')" title="View reposts">
+                                        <i class="fa-solid fa-retweet"></i>
+                                        <span class="count">{{ $post->reposts()->count() }}</span>
+                                    </button>
+                                    <span style="margin-left: auto; font-size: 0.75rem; color: #94a3b8;">
+                                        <i class="fa-regular fa-eye"></i> 
+                                        {{ $post->visibility ?? 'public' }}
                                     </span>
                                 </div>
                                 
+                                <!-- Comments Section -->
                                 @if($post->comments->isNotEmpty())
                                     <div class="post-comments">
-                                        <strong style="font-size: 0.9rem; color: #475569;">Recent Comments:</strong>
+                                        <div class="post-comments-header">
+                                            <i class="fa-regular fa-comment-dots"></i>
+                                            Recent Comments
+                                            <span style="font-weight: 400; color: #94a3b8; font-size: 0.75rem;">
+                                                ({{ $post->comments->count() }} total)
+                                            </span>
+                                        </div>
+                                        
                                         @foreach($post->comments->take(3) as $comment)
+                                            @php
+                                                // Get commenter's profile photo
+                                                $commenterPhotoPath = trim((string) ($comment->alumni->alumni_photo ?? $comment->alumni->card_photo ?? ''));
+                                                $commenterHasPhoto = !empty($commenterPhotoPath);
+                                                $commenterPhotoUrl = null;
+                                                
+                                                if ($commenterHasPhoto) {
+                                                    if (preg_match('/^https?:\/\//i', $commenterPhotoPath)) {
+                                                        $commenterPhotoUrl = $commenterPhotoPath;
+                                                    } elseif (str_starts_with($commenterPhotoPath, '/storage/')) {
+                                                        $commenterPhotoUrl = $commenterPhotoPath;
+                                                    } elseif (str_starts_with($commenterPhotoPath, 'storage/')) {
+                                                        $commenterPhotoUrl = '/' . $commenterPhotoPath;
+                                                    } elseif (str_starts_with($commenterPhotoPath, '/')) {
+                                                        $commenterPhotoUrl = $commenterPhotoPath;
+                                                    } elseif (trim((string) config('filesystems.disks.s3.url')) !== '') {
+                                                        $commenterPhotoUrl = rtrim((string) config('filesystems.disks.s3.url'), '/') . '/' . ltrim($commenterPhotoPath, '/');
+                                                    } else {
+                                                        $commenterPhotoUrl = asset('storage/' . ltrim($commenterPhotoPath, '/'));
+                                                    }
+                                                }
+                                                
+                                                $commenterInitials = strtoupper(substr($comment->alumni->first_name ?? 'U', 0, 1)) . strtoupper(substr($comment->alumni->last_name ?? '', 0, 1));
+                                            @endphp
                                             <div class="post-comment">
-                                                <strong>{{ $comment->alumni->first_name ?? 'Unknown' }} {{ $comment->alumni->last_name ?? '' }}</strong>
-                                                {{ $comment->comment }}
-                                                <span style="color: #94a3b8; font-size: 0.8rem;">
-                                                    ({{ $comment->created_at ? date('M d, Y', strtotime($comment->created_at)) : 'N/A' }})
-                                                </span>
+                                                <div class="post-comment-avatar" style="{{ $commenterHasPhoto ? 'padding: 0; overflow: hidden; background: none;' : '' }}">
+                                                    @if($commenterHasPhoto && $commenterPhotoUrl)
+                                                        <img 
+                                                            src="{{ $commenterPhotoUrl }}" 
+                                                            alt="{{ $comment->alumni->first_name ?? 'User' }}" 
+                                                            style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+                                                            onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #6366f1, #8b5cf6)'; this.parentElement.innerHTML='{{ $commenterInitials }}';"
+                                                        >
+                                                    @else
+                                                        {{ $commenterInitials }}
+                                                    @endif
+                                                </div>
+                                                <div class="post-comment-body">
+                                                    <div class="post-comment-author">
+                                                        {{ $comment->alumni->first_name ?? 'Unknown' }} {{ $comment->alumni->last_name ?? '' }}
+                                                    </div>
+                                                    <div class="post-comment-text">{{ $comment->comment }}</div>
+                                                    <div class="post-comment-time">
+                                                        <i class="fa-regular fa-clock"></i>
+                                                        {{ $comment->created_at ? date('M d, Y \a\t h:i A', strtotime($comment->created_at)) : 'N/A' }}
+                                                    </div>
+                                                </div>
                                             </div>
                                         @endforeach
+                                        
                                         @if($post->comments->count() > 3)
-                                            <div style="color: #64748b; font-size: 0.85rem; margin-top: 5px;">
-                                                And {{ $post->comments->count() - 3 }} more comments...
+                                            <div class="more-comments-link" onclick="openInteractionsModal({{ $post->id }}, 'comments')" style="cursor: pointer;">
+                                                <i class="fa-regular fa-comment-dots"></i>
+                                                View all {{ $post->comments->count() }} comments
                                             </div>
                                         @endif
                                     </div>
@@ -547,9 +1490,9 @@
                             </div>
                         @endforeach
                     @else
-                        <div class="no-data">
-                            <i class="fa-solid fa-newspaper"></i>
-                            <p>No posts from this alumni.</p>
+                        <div class="no-posts">
+                            <i class="fa-regular fa-newspaper"></i>
+                            <p>No posts from this alumni yet.</p>
                         </div>
                     @endif
                 </div>
@@ -576,6 +1519,68 @@
         <i class="alert-icon fa-solid fa-circle-check"></i>
         <span class="alert-message"></span>
         <button class="alert-close" onclick="hideAlert()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Post Interactions Modal -->
+    <div id="interactionsModal" class="interactions-modal" style="display: none;">
+        <div class="interactions-modal-overlay" onclick="closeInteractionsModal()"></div>
+        <div class="interactions-modal-content">
+            <div class="interactions-modal-header">
+                <div class="interactions-modal-title">
+                    <i class="fa-regular fa-heart"></i>
+                    <span id="interactionsModalTitle">Interactions</span>
+                    <span class="interactions-count" id="interactionsCount">(0)</span>
+                </div>
+                <button class="interactions-modal-close" onclick="closeInteractionsModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="interactions-modal-body">
+                <!-- Tabs -->
+                <div class="interactions-tabs">
+                    <button class="interactions-tab active" data-tab="likes" onclick="switchInteractionTab('likes')">
+                        <i class="fa-regular fa-heart"></i> Likes
+                    </button>
+                    <button class="interactions-tab" data-tab="comments" onclick="switchInteractionTab('comments')">
+                        <i class="fa-regular fa-comment"></i> Comments
+                    </button>
+                    <button class="interactions-tab" data-tab="reposts" onclick="switchInteractionTab('reposts')">
+                        <i class="fa-solid fa-retweet"></i> Reposts
+                    </button>
+                </div>
+                
+                <!-- Content Panels -->
+                <div class="interactions-panels">
+                    <!-- Likes Panel -->
+                    <div class="interactions-panel active" id="likesPanel">
+                        <div class="interactions-list" id="likesList">
+                            <!-- Dynamically populated -->
+                            <div class="interactions-loading">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading likes...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comments Panel -->
+                    <div class="interactions-panel" id="commentsPanel">
+                        <div class="interactions-list" id="commentsList">
+                            <div class="interactions-loading">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading comments...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Reposts Panel -->
+                    <div class="interactions-panel" id="repostsPanel">
+                        <div class="interactions-list" id="repostsList">
+                            <div class="interactions-loading">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading reposts...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Leaflet JavaScript -->
@@ -677,6 +1682,214 @@
                 }, 500);
             @endif
         });
+
+        // ========================================
+// INTERACTIONS MODAL FUNCTIONS
+// ========================================
+
+let currentPostId = null;
+let currentTab = 'likes';
+
+function openInteractionsModal(postId, tab = 'likes') {
+    currentPostId = postId;
+    currentTab = tab;
+    
+    const modal = document.getElementById('interactionsModal');
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // Set title
+    const titleMap = {
+        'likes': 'Likes',
+        'comments': 'Comments',
+        'reposts': 'Reposts'
+    };
+    document.getElementById('interactionsModalTitle').textContent = titleMap[tab] || 'Interactions';
+    
+    // Switch tab
+    switchInteractionTab(tab);
+    
+    // Load data
+    loadInteractions(postId, tab);
+}
+
+function closeInteractionsModal() {
+    const modal = document.getElementById('interactionsModal');
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    currentPostId = null;
+}
+
+function switchInteractionTab(tab) {
+    currentTab = tab;
+    
+    // Update tabs
+    document.querySelectorAll('.interactions-tab').forEach(t => {
+        t.classList.remove('active');
+        if (t.dataset.tab === tab) {
+            t.classList.add('active');
+        }
+    });
+    
+    // Update panels
+    document.querySelectorAll('.interactions-panel').forEach(p => {
+        p.classList.remove('active');
+    });
+    document.getElementById(tab + 'Panel').classList.add('active');
+    
+    // Update title
+    const titleMap = {
+        'likes': 'Likes',
+        'comments': 'Comments',
+        'reposts': 'Reposts'
+    };
+    document.getElementById('interactionsModalTitle').textContent = titleMap[tab] || 'Interactions';
+    
+    // Load data if we have a post ID
+    if (currentPostId) {
+        loadInteractions(currentPostId, tab);
+    }
+}
+
+function loadInteractions(postId, type) {
+    const listId = type + 'List';
+    const list = document.getElementById(listId);
+    
+    // Show loading
+    list.innerHTML = `
+        <div class="interactions-loading">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading ${type}...
+        </div>
+    `;
+    
+    // Make AJAX request
+    fetch(`/admin/posts/${postId}/interactions?type=${type}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            renderInteractions(listId, data.data, type);
+            document.getElementById('interactionsCount').textContent = `(${data.total || 0})`;
+        } else {
+            list.innerHTML = `
+                <div class="interactions-empty">
+                    <i class="fa-regular fa-circle-xmark"></i>
+                    <p>${data.message || 'Failed to load interactions.'}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading interactions:', error);
+        list.innerHTML = `
+            <div class="interactions-empty">
+                <i class="fa-regular fa-circle-xmark"></i>
+                <p>Error loading ${type}. Please try again.</p>
+            </div>
+        `;
+    });
+}
+
+function renderInteractions(listId, items, type) {
+    const list = document.getElementById(listId);
+    
+    if (!items || items.length === 0) {
+        const iconMap = {
+            'likes': 'fa-regular fa-heart',
+            'comments': 'fa-regular fa-comment',
+            'reposts': 'fa-solid fa-retweet'
+        };
+        list.innerHTML = `
+            <div class="interactions-empty">
+                <i class="${iconMap[type] || 'fa-regular fa-circle'}" style="font-size: 2.5rem;"></i>
+                <p>No ${type} yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    items.forEach(item => {
+        const initials = (item.first_name?.[0] || '?') + (item.last_name?.[0] || '');
+        const fullName = `${item.first_name || 'Unknown'} ${item.last_name || ''}`.trim();
+        const timeAgo = item.created_at ? timeAgoHelper(item.created_at) : '';
+        
+        // Check if user has a profile photo
+        let avatarHtml = '';
+        if (item.profile_photo) {
+            avatarHtml = `<img src="${item.profile_photo}" alt="${fullName}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            avatarHtml = initials.toUpperCase();
+        }
+        
+        let detailHtml = '';
+        if (type === 'comments' && item.comment) {
+            detailHtml = `<div class="interactions-item-detail"><i class="fa-regular fa-comment"></i> ${escapeHtml(item.comment)}</div>`;
+        } else if (type === 'reposts' && item.caption) {
+            detailHtml = `<div class="interactions-item-detail"><i class="fa-regular fa-retweet"></i> ${escapeHtml(item.caption)}</div>`;
+        }
+        
+        html += `
+            <div class="interactions-item">
+                <div class="interactions-item-avatar" style="${item.profile_photo ? 'padding: 0; overflow: hidden; background: none;' : ''}">
+                    ${avatarHtml}
+                </div>
+                <div class="interactions-item-info">
+                    <div class="interactions-item-name">${escapeHtml(fullName)}</div>
+                    ${detailHtml}
+                </div>
+                ${timeAgo ? `<div class="interactions-item-time">${timeAgo}</div>` : ''}
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+}
+
+function timeAgoHelper(dateString) {
+    const now = new Date();
+    const past = new Date(dateString);
+    const diffMs = now - past;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return diffMins + 'm ago';
+    if (diffHours < 24) return diffHours + 'h ago';
+    if (diffDays < 7) return diffDays + 'd ago';
+    return past.toLocaleDateString();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Close modal on ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('interactionsModal').style.display === 'flex') {
+        closeInteractionsModal();
+    }
+});
+
+// Close modal on overlay click
+document.querySelector('.interactions-modal-overlay')?.addEventListener('click', closeInteractionsModal);
+    
     </script>
 </body>
 </html>
