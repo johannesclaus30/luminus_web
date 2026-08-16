@@ -17,6 +17,36 @@
     <link rel="stylesheet" href="/css/events_modern.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <link rel="icon" type="image/png" href="/assets/logos/LumiNUs_Icon.png">
+
+        <style>
+        .venue-suggestions {
+            position: absolute;
+            z-index: 9999 !important;
+            top: calc(100% + 2px);
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border: 2px solid var(--nu-blue);
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-height: 260px;
+            overflow-y: auto;
+            margin-top: 0;
+            padding: 0;
+        }
+
+        .venue-suggestions.hidden-section {
+            display: none !important;
+        }
+
+        /* Ensure the next form group doesn't overlap */
+        .form-group + .form-group {
+            margin-top: 0;
+            position: relative;
+            z-index: 1; /* Lower z-index than the suggestions container */
+        }
+
+    </style>
 </head>
 <body>
     
@@ -582,12 +612,16 @@
                 const row = document.createElement('div');
                 row.className = 'venue-suggestion-item';
                 row.textContent = item.display_name;
-                row.dataset.lat = item.lat; row.dataset.lon = item.lon; row.dataset.name = item.display_name;
+                row.dataset.lat = item.lat; 
+                row.dataset.lon = item.lon; 
+                row.dataset.name = item.display_name;
                 row.addEventListener('mousedown', (event) => {
                     event.preventDefault();
                     venueAddressField.value = item.display_name;
-                    venueNameField.value = venueNameField.value.trim() || item.display_name;
-                    venueSuggestions.classList.add('hidden-section'); venueSuggestions.innerHTML = '';
+                    // REMOVED: auto-fill for venue name - admin types it manually
+                    // venueNameField.value = venueNameField.value.trim() || item.display_name;
+                    venueSuggestions.classList.add('hidden-section'); 
+                    venueSuggestions.innerHTML = '';
                     setVenuePoint(parseFloat(item.lat), parseFloat(item.lon), false);
                     venueStatus.textContent = 'Venue selected from suggestions.';
                 });
@@ -639,6 +673,7 @@
                         if (!results.length) { venueStatus.textContent = 'No map result found.'; return; }
                         const place = results[0];
                         venueAddressField.value = place.display_name;
+                        // REMOVE any venue name auto-fill here too
                         venueStatus.textContent = 'Map updated from typed address.';
                         setVenuePoint(parseFloat(place.lat), parseFloat(place.lon), false);
                     }).catch(() => { venueStatus.textContent = 'Address lookup failed.'; });

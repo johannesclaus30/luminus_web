@@ -1495,6 +1495,8 @@ textarea.form-control {
     border: 2px solid var(--gray-300);
     overflow: hidden;
     background: var(--gray-200);
+    z-index: 1;
+    position: relative;
 }
 
 .venue-status {
@@ -1504,19 +1506,25 @@ textarea.form-control {
     font-style: italic;
 }
 
-/* Venue Suggestions Dropdown */
+#venueAddressGroup {
+    position: relative;
+    z-index: 1000;
+}
+
 .venue-suggestions {
     position: absolute;
-    z-index: 10;
-    width: 100%;
+    z-index: 9999 !important;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
     background: var(--white);
     border: 2px solid var(--nu-blue);
-    border-top: none;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    max-height: 220px;
+    box-shadow: var(--shadow-lg);
+    max-height: 260px;
     overflow-y: auto;
-    margin-top: -2px;
+    margin-top: 0;
+    padding: 0;
 }
 
 .venue-input-wrap {
@@ -2260,4 +2268,120 @@ textarea.form-control {
 .gallery-thumb.placeholder i {
     font-size: 1.75rem;
     color: var(--gray-400);
+}
+
+/* ========================================
+   VENUE ADDRESS SEARCH SUGGESTIONS
+   ======================================== */
+
+/* Make form group position relative for absolute positioning of suggestions */
+.form-group {
+    position: relative;
+    z-index: 100
+}
+
+/* Suggestions dropdown container */
+.venue-suggestions {
+    position: absolute;
+    z-index: 1000;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border: 2px solid var(--nu-blue);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 0;
+    padding: 0;
+}
+
+.venue-suggestions.hidden-section {
+    display: none !important;
+}
+
+#venueNameGroup {
+    position: relative;
+    z-index: 1;
+}
+
+/* Each suggestion item */
+.venue-suggestion-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-100);
+    transition: all 0.15s ease;
+    font-family: 'Poppins', sans-serif;
+}
+
+.venue-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.venue-suggestion-item:hover {
+    background: var(--nu-blue-soft);
+    color: var(--nu-blue);
+}
+
+.venue-suggestion-item:active {
+    background: var(--nu-blue);
+    color: var(--white);
+}
+
+/* Custom scrollbar for suggestions */
+.venue-suggestions::-webkit-scrollbar {
+    width: 6px;
+}
+
+.venue-suggestions::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 0 0 var(--radius-lg) 0;
+}
+
+.venue-suggestions::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: var(--radius-full);
+}
+
+.venue-suggestions::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+/* Loading state */
+.venue-suggestions .venue-suggestion-item.loading {
+    color: var(--gray-500);
+    font-style: italic;
+    text-align: center;
+    padding: 12px 14px;
+}
+
+/* No results state */
+.venue-suggestions .venue-suggestion-item.no-results {
+    color: var(--gray-500);
+    text-align: center;
+    padding: 12px 14px;
+    cursor: default;
+}
+
+.venue-suggestions .venue-suggestion-item.no-results:hover {
+    background: transparent;
+}
+
+/* Venue Address input when suggestions are visible */
+.form-control:focus + .venue-suggestions,
+.form-control:focus ~ .venue-suggestions {
+    border-color: var(--nu-blue);
+}
+
+/* Ensure the status text is visible */
+.venue-status {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    font-style: italic;
+    min-height: 24px;
+    padding: 4px 0;
 }
