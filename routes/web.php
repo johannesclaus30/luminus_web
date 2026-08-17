@@ -46,8 +46,6 @@ Route::prefix('admin')->group(function () {
 
         Route::delete('/settings/admin/{id}', [AdminController::class, 'deleteAdmin'])
             ->name('admin.settings.delete-admin');
-
-
         
         // ✅ Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])
@@ -63,6 +61,19 @@ Route::prefix('admin')->group(function () {
         Route::post('/alumni', [AdminController::class, 'storeAlumni'])
             ->name('admin.alumni.store');
 
+        // ✅ FIXED: Badge count routes (NO duplicate /admin)
+        Route::get('/alumni/archived-count', function() {
+            return response()->json([
+                'count' => \App\Models\Alumni::onlyTrashed()->count()
+            ]);
+        })->middleware('auth:admin');
+
+        Route::get('/alumni/restricted-count', function() {
+            return response()->json([
+                'count' => \App\Models\Alumni::whereNull('deleted_at')->where('account_status', 0)->count()
+            ]);
+        })->middleware('auth:admin');
+
         // Alumni CRUD
         Route::get('/alumni/{id}/edit', [AdminController::class, 'editAlumni'])
             ->name('admin.alumni.edit');
@@ -70,6 +81,26 @@ Route::prefix('admin')->group(function () {
             ->name('admin.alumni.update');
         Route::delete('/alumni/{id}', [AdminController::class, 'destroy'])
             ->name('admin.alumni.destroy');
+
+        // Alumni Management Routes (Add these inside the admin.auth middleware group)
+        Route::post('/alumni/{id}/archive', [AdminController::class, 'archiveAlumni'])
+            ->name('admin.alumni.archive');
+
+        Route::post('/alumni/{id}/restore', [AdminController::class, 'restoreAlumni'])
+            ->name('admin.alumni.restore');
+
+        Route::delete('/alumni/{id}/permanent-delete', [AdminController::class, 'permanentlyDeleteAlumni'])
+            ->name('admin.alumni.permanent-delete');
+
+        Route::get('/directory/archived', [AdminController::class, 'archivedAlumni'])
+            ->name('admin.directory.archived');
+
+        Route::get('/directory/restricted', [AdminController::class, 'restrictedAlumni'])
+            ->name('admin.directory.restricted');
+
+        // Get restriction reasons (optional, for API)
+        Route::get('/alumni/restriction-reasons', [AdminController::class, 'getRestrictionReasons'])
+            ->name('admin.alumni.restriction-reasons');
 
             // 🆕 Post Interactions Route - ADD THIS HERE
         Route::get('/posts/{post}/interactions', [AdminController::class, 'getPostInteractions'])

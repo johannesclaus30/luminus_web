@@ -2606,3 +2606,1263 @@ html, body {
         height: 200px;
     }
 }
+
+/* ========================================
+   ACCOUNT MANAGEMENT QUICK ACCESS
+   Enhanced with Animations & Effects
+   ======================================== */
+
+.account-quick-links {
+    margin-bottom: 2rem;
+    animation: slideDown 0.5s ease-out;
+}
+
+.account-quick-links > div {
+    background: #ffffff !important; /* Force white */
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--gray-200);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle gradient accent line at the top */
+.account-quick-links > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--nu-blue), var(--nu-gold), var(--nu-blue));
+    background-size: 200% 100%;
+    animation: shimmerGradient 3s ease-in-out infinite;
+}
+
+@keyframes shimmerGradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* Label styling */
+.account-quick-links .quick-links-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 0.5rem;
+}
+
+.account-quick-links .quick-links-label i {
+    color: var(--nu-blue);
+    font-size: 1rem;
+}
+
+/* Individual link buttons */
+.account-quick-links .btn-sm-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+/* Archived Link */
+.account-quick-links .btn-sm-link.archived {
+    background: #fef3c7 !important; /* warning-light */
+    color: #d97706 !important; /* warning */
+    border-color: #f59e0b !important; /* warning */
+}
+
+.account-quick-links .btn-sm-link.archived:hover {
+    background: #f59e0b !important; /* warning */
+    color: #ffffff !important;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.account-quick-links .btn-sm-link.archived:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Restricted Link */
+.account-quick-links .btn-sm-link.restricted {
+    background: #fee2e2 !important; /* danger-light */
+    color: #dc2626 !important; /* danger */
+    border-color: #ef4444 !important; /* danger */
+}
+
+.account-quick-links .btn-sm-link.restricted:hover {
+    background: #dc2626 !important; /* danger */
+    color: #ffffff !important;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+}
+
+.account-quick-links .btn-sm-link.restricted:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Badge counters inside buttons */
+.account-quick-links .btn-sm-link .badge-count {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.6;
+    transition: all var(--transition);
+}
+
+.account-quick-links .btn-sm-link.archived .badge-count {
+    background: #f59e0b !important; /* warning */
+    color: #ffffff !important;
+}
+
+.account-quick-links .btn-sm-link.archived:hover .badge-count {
+    background: #ffffff !important;
+    color: #f59e0b !important;
+}
+
+.account-quick-links .btn-sm-link.restricted .badge-count {
+    background: #ef4444 !important; /* danger */
+    color: #ffffff !important;
+}
+
+.account-quick-links .btn-sm-link.restricted:hover .badge-count {
+    background: #ffffff !important;
+    color: #ef4444 !important;
+}
+
+/* Icon bounce on hover */
+.account-quick-links .btn-sm-link i {
+    transition: transform 0.3s ease;
+}
+
+.account-quick-links .btn-sm-link:hover i {
+    transform: scale(1.2) rotate(-5deg);
+}
+
+/* Pulse animation for badge when count > 0 */
+.account-quick-links .btn-sm-link .badge-count.has-items {
+    animation: pulseBadge 2s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Slide down animation */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover glow effect on the container */
+.account-quick-links > div:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--nu-blue-light);
+}
+
+/* Glow effect when there are items */
+.account-quick-links .btn-sm-link.archived .badge-count.has-items {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.account-quick-links .btn-sm-link.restricted .badge-count.has-items {
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .account-quick-links > div {
+        padding: 0.625rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .account-quick-links .quick-links-label {
+        margin-right: 0;
+        margin-bottom: 0.25rem;
+        justify-content: center;
+    }
+    
+    .account-quick-links .btn-sm-link {
+        justify-content: center;
+        padding: 0.5rem 1rem;
+    }
+}
+
+/* ========================================
+   ENHANCED ARCHIVED & RESTRICTED CARDS
+   ======================================== */
+
+/* Status Badge - Top of card */
+.alumni-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.alumni-status-badge.archived {
+    background: linear-gradient(135deg, #fef3c7, #fffbeb);
+    color: #d97706;
+    border-bottom-color: #fcd34d;
+}
+
+.alumni-status-badge.restricted {
+    background: linear-gradient(135deg, #fee2e2, #fef2f2);
+    color: #dc2626;
+    border-bottom-color: #fca5a5;
+}
+
+.alumni-status-badge .badge-time {
+    font-size: 0.7rem;
+    font-weight: 400;
+    opacity: 0.7;
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-full);
+}
+
+/* Archived Date Styling */
+.meta-item.archived-date {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.meta-item.archived-date i {
+    color: #d97706;
+}
+
+/* Restricted Date Styling */
+.meta-item.restricted-date {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.meta-item.restricted-date i {
+    color: #dc2626;
+}
+
+/* Enhanced Restriction Info */
+.restriction-info {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    border-left: 4px solid #dc2626;
+    transition: all var(--transition);
+}
+
+.restriction-info:hover {
+    background: var(--white);
+    box-shadow: var(--shadow-sm);
+}
+
+.restriction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.restriction-header .reason-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.restriction-header .restricted-by {
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.restriction-info .reason-text {
+    margin: 0.25rem 0;
+}
+
+.restriction-info .reason-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.restriction-info .comment-text {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-style: italic;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px dashed var(--gray-200);
+    position: relative;
+}
+
+.restriction-info .comment-text i {
+    color: var(--gray-400);
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.restriction-info .comment-text .fa-quote-left {
+    margin-right: 0.375rem;
+}
+
+.restriction-info .comment-text .fa-quote-right {
+    margin-left: 0.375rem;
+}
+
+/* Action Buttons with Tooltips */
+.alumni-actions {
+    position: relative;
+}
+
+.btn-action {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-action .action-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.8);
+    background: var(--gray-800);
+    color: var(--white);
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+}
+
+.btn-action .action-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--gray-800);
+}
+
+.btn-action:hover .action-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Restore Button */
+.btn-restore {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+.btn-restore:hover {
+    background: #065f46;
+    color: #ffffff;
+    border-color: #065f46;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(6, 95, 70, 0.3);
+}
+
+/* Unrestrict Button */
+.btn-unrestrict {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+.btn-unrestrict:hover {
+    background: #1e40af;
+    color: #ffffff;
+    border-color: #1e40af;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+}
+
+/* Permanent Delete Button */
+.btn-permanent-delete {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+}
+
+.btn-permanent-delete:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Footer Variations */
+.alumni-card-footer.archived-footer {
+    border-top-color: #fcd34d;
+    background: linear-gradient(135deg, #fffbeb, var(--gray-50));
+}
+
+.alumni-card-footer.restricted-footer {
+    border-top-color: #fca5a5;
+    background: linear-gradient(135deg, #fef2f2, var(--gray-50));
+}
+
+/* Card Hover Effects */
+.alumni-card.archived-card:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.15);
+}
+
+.alumni-card.restricted-card:hover {
+    border-color: #ef4444;
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.15);
+}
+
+/* Empty State Variations */
+.empty-icon.archived-empty {
+    background: linear-gradient(135deg, #fbd117, #818a09);
+}
+
+.empty-icon.restricted-empty {
+    background: linear-gradient(135deg, #fbd117, #818a09);
+}
+
+/* Status Dot Variations */
+.status-dot.archived {
+    background: #f59e0b;
+    box-shadow: 0 0 0 3px #fef3c7;
+}
+
+.status-dot.restricted {
+    background: #ef4444;
+    box-shadow: 0 0 0 3px #fee2e2;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    .restriction-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .alumni-status-badge .badge-time {
+        font-size: 0.65rem;
+    }
+    
+    .btn-action .action-tooltip {
+        display: none;
+    }
+}
+
+/* Animation for cards */
+.archived-card, .restricted-card {
+    animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.archived-card:nth-child(1) { animation-delay: 0.05s; }
+.archived-card:nth-child(2) { animation-delay: 0.1s; }
+.archived-card:nth-child(3) { animation-delay: 0.15s; }
+.archived-card:nth-child(4) { animation-delay: 0.2s; }
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Empty State Icon Sizes */
+.empty-icon .fa-solid {
+    font-size: 3rem; /* Default size */
+}
+
+.empty-icon .fa-solid.fa-box-open {
+    font-size: 3rem; /* Slightly smaller for box icon */
+}
+
+.empty-icon .fa-solid.fa-users {
+    font-size: 3rem; /* Keep users icon as is */
+}
+
+/* Or make both smaller */
+.empty-icon .fa-solid {
+    font-size: 2rem; /* Smaller overall */
+}
+
+/* ========================================
+   RESTRICTION REASON MODAL - ENHANCED WITH ANIMATIONS
+   ======================================== */
+
+/* Override modal max-width for restriction modal */
+#restrictReasonModal .modal-content-wrapper {
+    max-width: 550px;
+}
+
+/* Modal card entrance animation */
+#restrictReasonModal.active .modal-card {
+    animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Form control styling inside modals */
+#restrictReasonModal .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    font-family: 'Poppins', sans-serif;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    color: var(--gray-800);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#restrictReasonModal .form-control:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    box-shadow: 0 0 0 4px var(--nu-blue-soft);
+    transform: translateY(-1px);
+}
+
+#restrictReasonModal .form-control:hover {
+    border-color: var(--gray-300);
+}
+
+#restrictReasonModal .form-control option {
+    padding: 0.5rem;
+}
+
+/* Textarea specific */
+#restrictReasonModal textarea.form-control {
+    resize: vertical;
+    min-height: 80px;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Form group spacing with animation */
+#restrictReasonModal .form-group {
+    margin-bottom: 1.25rem;
+    animation: fadeInUp 0.4s ease-out backwards;
+}
+
+#restrictReasonModal .form-group:nth-child(1) { animation-delay: 0.05s; }
+#restrictReasonModal .form-group:nth-child(2) { animation-delay: 0.1s; }
+#restrictReasonModal .form-group:nth-child(3) { animation-delay: 0.15s; }
+
+#restrictReasonModal .form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+    transition: color 0.3s ease;
+}
+
+#restrictReasonModal .form-group label .text-danger {
+    color: var(--danger);
+}
+
+/* Custom reason group */
+#customReasonGroup {
+    margin-top: 0.5rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+#customReasonGroup input {
+    border-color: var(--nu-blue-light);
+}
+
+#customReasonGroup input:focus {
+    border-color: var(--nu-blue);
+}
+
+/* Modal actions with animations */
+#restrictReasonModal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.875rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--gray-100);
+    animation: fadeInUp 0.4s ease-out backwards;
+    animation-delay: 0.2s;
+}
+
+#restrictReasonModal .modal-actions .btn {
+    min-width: 120px;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Cancel button hover effect */
+#restrictReasonModal .modal-actions .btn-secondary {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#restrictReasonModal .modal-actions .btn-secondary:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Restrict/Unrestrict button - Enhanced */
+#restrictReasonModal .modal-actions .btn-warning,
+#restrictReasonModal .modal-actions .btn-success {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ripple effect on button click */
+#restrictReasonModal .modal-actions .btn-warning::after,
+#restrictReasonModal .modal-actions .btn-success::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+#restrictReasonModal .modal-actions .btn-warning:active::after,
+#restrictReasonModal .modal-actions .btn-success:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Restrict button (Warning - Dark Red-Orange) */
+#restrictReasonModal .modal-actions .btn-warning {
+    background: #c0392b !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+#restrictReasonModal .modal-actions .btn-warning:hover {
+    background: #a93226 !important;
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 6px 20px rgba(192, 57, 43, 0.4);
+}
+
+/* Unrestrict button (Success - Dark Green) */
+#restrictReasonModal .modal-actions .btn-success {
+    background: #059669 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+#restrictReasonModal .modal-actions .btn-success:hover {
+    background: #047857 !important;
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+}
+
+/* Modal header icon color - Match the new darker red */
+#restrictReasonModal .modal-title i {
+    color: #c0392b;
+    animation: pulseIcon 2s ease-in-out infinite;
+}
+
+/* Form note styling with entrance animation */
+#restrictReasonModal .form-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--info-light);
+    border-left: 4px solid var(--info);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    margin: 1.5rem 0 0;
+    line-height: 1.5;
+    animation: fadeInUp 0.4s ease-out backwards;
+    animation-delay: 0.25s;
+    transition: all 0.3s ease;
+}
+
+#restrictReasonModal .form-note:hover {
+    background: #d1e7ff;
+    transform: translateX(4px);
+}
+
+#restrictReasonModal .form-note i {
+    color: var(--info);
+    font-size: 1.125rem;
+    margin-top: 2px;
+}
+
+/* Modal close button animation */
+#restrictReasonModal .modal-close {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#restrictReasonModal .modal-close:hover {
+    transform: rotate(90deg) scale(1.1);
+}
+
+/* Modal title animation */
+#restrictReasonModal .modal-title {
+    animation: fadeInRight 0.4s ease-out backwards;
+}
+
+/* ========================================
+   ANIMATIONS - FADE IN, SLIDE, PULSE
+   ======================================== */
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulseIcon {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* ========================================
+   RESPONSIVE - MOBILE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 640px) {
+    #restrictReasonModal .modal-actions {
+        flex-direction: column-reverse;
+    }
+    
+    #restrictReasonModal .modal-actions .btn {
+        width: 100%;
+    }
+    
+    #restrictReasonModal .modal-content-wrapper {
+        max-width: 98%;
+        padding: 0.5rem;
+    }
+    
+    #manageRestrictBtn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ========================================
+   BUTTON ANIMATIONS FOR MANAGE MODAL
+   ======================================== */
+
+/* Restrict button in manage modal - Dark Red-Orange */
+#manageRestrictBtn {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+    background: #c0392b !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 600;
+}
+
+#manageRestrictBtn:hover {
+    transform: translateY(-2px) scale(1.02);
+    background: #a93226 !important;
+    box-shadow: 0 6px 20px rgba(192, 57, 43, 0.4);
+}
+
+#manageRestrictBtn:active {
+    transform: scale(0.95);
+}
+
+/* When account is restricted - Unrestrict button (Green) */
+#manageRestrictBtn.btn-success {
+    background: #059669 !important;
+    color: #ffffff !important;
+}
+
+#manageRestrictBtn.btn-success:hover {
+    background: #047857 !important;
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+}
+
+/* Archive button hover effect - Keep gold/yellow */
+.btn-warning[onclick="prepareArchive()"] {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+.btn-warning[onclick="prepareArchive()"]:hover {
+    transform: translateY(-2px) scale(1.02);
+    background: #d97706 !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+/* Reset password button hover */
+.btn-primary[onclick="prepareResetPassword()"] {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-primary[onclick="prepareResetPassword()"]:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+/* ========================================
+   ALUMNI TYPE BADGES
+   ======================================== */
+
+.alumni-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.alumni-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all var(--transition);
+}
+
+.alumni-type-badge i {
+    font-size: 0.7rem;
+}
+
+/* SHS Badge - Gold/Amber */
+.alumni-type-badge.shs {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.alumni-type-badge.shs:hover {
+    background: #f59e0b;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* College Badge - NU Blue */
+.alumni-type-badge.college {
+    background: #e8ebf7;
+    color: #32418c;
+    border: 1px solid #32418c;
+}
+
+.alumni-type-badge.college:hover {
+    background: #32418c;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(50, 65, 140, 0.3);
+}
+
+/* Unknown Badge - Gray */
+.alumni-type-badge.unknown {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.alumni-type-badge.unknown:hover {
+    background: #6b7280;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+/* Badge with icon animation */
+.alumni-type-badge i {
+    transition: transform 0.3s ease;
+}
+
+.alumni-type-badge:hover i {
+    transform: scale(1.2) rotate(-5deg);
+}
+
+/* ========================================
+   MANAGE MODAL ENHANCED ANIMATIONS
+   ======================================== */
+
+/* Modal entrance animation - Slide up with bounce */
+#manageModal.active .modal-card {
+    animation: manageModalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes manageModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Modal exit animation - Slide down with fade */
+#manageModal.closing .modal-card {
+    animation: manageModalSlideOut 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes manageModalSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+}
+
+/* Manage Modal overlay fade */
+#manageModal.active {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+#manageModal.closing {
+    animation: modalFadeOut 0.3s ease-in forwards;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(6px);
+    }
+}
+
+@keyframes modalFadeOut {
+    from {
+        opacity: 1;
+        backdrop-filter: blur(6px);
+    }
+    to {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+}
+
+/* Close button enhanced animation */
+#manageModal .modal-close {
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+#manageModal .modal-close:hover {
+    transform: rotate(90deg) scale(1.15);
+    background: var(--danger);
+    color: var(--white);
+    border-color: var(--danger);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+/* Ripple effect on close button */
+#manageModal .modal-close::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+#manageModal .modal-close:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* Manage action items entrance animation */
+#manageModal .manage-action-item {
+    animation: actionItemFadeIn 0.4s ease-out backwards;
+}
+
+#manageModal .manage-action-item:nth-child(1) { animation-delay: 0.05s; }
+#manageModal .manage-action-item:nth-child(2) { animation-delay: 0.1s; }
+#manageModal .manage-action-item:nth-child(3) { animation-delay: 0.15s; }
+
+@keyframes actionItemFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Manage action item hover with glow */
+#manageModal .manage-action-item {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+#manageModal .manage-action-item:hover {
+    border-color: var(--nu-blue-light);
+    transform: translateX(4px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Glow effect on hover */
+#manageModal .manage-action-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, var(--nu-blue-soft), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: var(--radius-lg);
+    pointer-events: none;
+}
+
+#manageModal .manage-action-item:hover::before {
+    opacity: 1;
+}
+
+/* Action icons with bounce on hover */
+#manageModal .manage-action-icon {
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#manageModal .manage-action-item:hover .manage-action-icon {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+/* Action buttons inside manage modal */
+#manageModal .manage-action-item .btn {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+#manageModal .manage-action-item .btn:hover {
+    transform: translateY(-3px) scale(1.03);
+}
+
+/* Button ripple effect */
+#manageModal .manage-action-item .btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+}
+
+#manageModal .manage-action-item .btn:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Restrict button - Red-Orange (Dark) */
+#manageModal .manage-action-item .btn-warning {
+    background: #c0392b !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+#manageModal .manage-action-item .btn-warning:hover {
+    background: #a93226 !important;
+    box-shadow: 0 6px 20px rgba(192, 57, 43, 0.4) !important;
+}
+
+/* Unrestrict button - Dark Green */
+#manageModal .manage-action-item .btn-success {
+    background: #059669 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+#manageModal .manage-action-item .btn-success:hover {
+    background: #047857 !important;
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4) !important;
+}
+
+/* Archive button - Gold */
+#manageModal .manage-action-item .btn-warning[onclick="prepareArchive()"] {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+}
+
+#manageModal .manage-action-item .btn-warning[onclick="prepareArchive()"]:hover {
+    background: #d97706 !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Reset password button - Blue */
+#manageModal .manage-action-item .btn-primary {
+    background: var(--info) !important;
+    color: #ffffff !important;
+}
+
+#manageModal .manage-action-item .btn-primary:hover {
+    background: #2563eb !important;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Close animation for manage modal */
+#manageModal .modal-content-wrapper {
+    animation: modalContentPulse 0.3s ease-out;
+}
+
+@keyframes modalContentPulse {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Manage modal header animation */
+#manageModal .modal-header {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle shimmer on header */
+#manageModal .modal-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--nu-gold), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Responsive adjustments for manage modal animations */
+@media (max-width: 640px) {
+    #manageModal .manage-action-item {
+        animation: actionItemFadeInMobile 0.4s ease-out backwards;
+    }
+    
+    #manageModal .manage-action-item:nth-child(1) { animation-delay: 0.05s; }
+    #manageModal .manage-action-item:nth-child(2) { animation-delay: 0.1s; }
+    #manageModal .manage-action-item:nth-child(3) { animation-delay: 0.15s; }
+    
+    @keyframes actionItemFadeInMobile {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}

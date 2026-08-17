@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes; // ← ADD THIS
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Alumni extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes; // ← ADD SoftDeletes
 
     protected $table = 'alumnis';
 
@@ -33,6 +34,12 @@ class Alumni extends Model
         'account_status',
         'is_online',
         'push_token',
+        // ↓ ADD THESE NEW FIELDS ↓
+        'restriction_reason',
+        'restriction_comment',
+        'restricted_by',
+        'restricted_at',
+        'deleted_at', // For soft delete
     ];
 
     protected $hidden = [
@@ -47,6 +54,8 @@ class Alumni extends Model
         'needs_password_change' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'restricted_at' => 'datetime',
+        'deleted_at' => 'datetime', // ← ADD THIS
     ];
 
     /**
@@ -80,8 +89,120 @@ class Alumni extends Model
     }
 
     // ============================================
+    // STATUS CHECK METHODS
+    // ============================================
+
+    /**
+     * Check if the alumni account is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->account_status == 1 && $this->deleted_at === null;
+    }
+
+    /**
+     * Check if the alumni account is restricted.
+     */
+    public function isRestricted(): bool
+    {
+        return $this->account_status == 0 && $this->deleted_at === null;
+    }
+
+    /**
+     * Check if the alumni account is archived (soft deleted).
+     */
+    public function isArchived(): bool
+    {
+        return $this->deleted_at !== null;
+    }
+
+    // ============================================
+    // SCOPE METHODS
+    // ============================================
+
+    /**
+     * Scope a query to only include active alumni.
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereNull('deleted_at')->where('account_status', 1);
+    }
+
+    /**
+     * Scope a query to only include restricted alumni.
+     */
+    public function scopeRestricted($query)
+    {
+        return $query->whereNull('deleted_at')->where('account_status', 0);
+    }
+
+    /**
+     * Scope a query to only include archived alumni.
+     */
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('deleted_at');
+    }
+
+    /**
+     * Scope a query to only include verified alumni.
+     */
+    public function scopeVerified($query): void
+    {
+        $query->where('verification_status', 'verified');
+    }
+
+    /**
+     * Scope a query to only include online alumni.
+     */
+    public function scopeOnline($query): void
+    {
+        $query->where('is_online', true);
+    }
+
+    // ============================================
+    // RESTRICTION REASONS
+    // ============================================
+
+    /**
+     * Get the list of predefined restriction reasons.
+     */
+    public static function getRestrictionReasons(): array
+    {
+        return [
+            'violation' => 'Violation of Community Guidelines',
+            'spam' => 'Spam or Unsolicited Messages',
+            'fake_account' => 'Fake or Misleading Account Information',
+            'harassment' => 'Harassment or Bullying',
+            'inappropriate_content' => 'Posting Inappropriate Content',
+            'unauthorized_access' => 'Unauthorized Access Attempts',
+            'other' => 'Other (Please Specify)',
+        ];
+    }
+
+    /**
+     * Get the human-readable restriction reason label.
+     */
+    public function getRestrictionReasonLabelAttribute(): ?string
+    {
+        if (!$this->restriction_reason) {
+            return null;
+        }
+        $reasons = self::getRestrictionReasons();
+        return $reasons[$this->restriction_reason] ?? $this->restriction_reason;
+    }
+
+    // ============================================
     // RELATIONSHIPS
     // ============================================
+
+    /**
+     * Get the admin who restricted this account.
+     */
+    public function restrictedBy()
+    {
+        return $this->belongsTo(Admin::class, 'restricted_by');
+    }
 
     /**
      * Get the addresses associated with the alumni.
@@ -244,34 +365,6 @@ class Alumni extends Model
     }
 
     // ============================================
-    // SCOPES
-    // ============================================
-
-    /**
-     * Scope a query to only include verified alumni.
-     */
-    public function scopeVerified($query): void
-    {
-        $query->where('verification_status', 'verified');
-    }
-
-    /**
-     * Scope a query to only include active alumni.
-     */
-    public function scopeActive($query): void
-    {
-        $query->where('account_status', 1);
-    }
-
-    /**
-     * Scope a query to only include online alumni.
-     */
-    public function scopeOnline($query): void
-    {
-        $query->where('is_online', true);
-    }
-
-    // ============================================
     // HELPER METHODS
     // ============================================
 
@@ -297,22 +390,6 @@ class Alumni extends Model
     public function isRejected(): bool
     {
         return $this->verification_status === 'rejected';
-    }
-
-    /**
-     * Check if the alumni account is active.
-     */
-    public function isActive(): bool
-    {
-        return $this->account_status == 1;
-    }
-
-    /**
-     * Check if the alumni account is restricted.
-     */
-    public function isRestricted(): bool
-    {
-        return $this->account_status == 0;
     }
 
     /**

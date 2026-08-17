@@ -130,6 +130,27 @@
                 </div>
             </header>
 
+            <!-- Account Management Quick Access -->
+            <div class="account-quick-links">
+                <div>
+                    <span class="quick-links-label">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        Account Management
+                    </span>
+                    
+                    <a href="/admin/directory/archived" class="btn-sm-link archived">
+                        <i class="fa-solid fa-box-archive"></i> 
+                        Archived
+                        <span class="badge-count has-items">{{ \App\Models\Alumni::onlyTrashed()->count() }}</span>
+                    </a>
+                    
+                    <a href="/admin/directory/restricted" class="btn-sm-link restricted">
+                        <i class="fa-solid fa-user-slash"></i> 
+                        Restricted
+                        <span class="badge-count has-items">{{ \App\Models\Alumni::whereNull('deleted_at')->where('account_status', 0)->count() }}</span>
+                    </a>
+                </div>
+            </div>
             <!-- Stats Overview -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -231,7 +252,8 @@
                         $initials = strtoupper(mb_substr($firstName, 0, 1) . mb_substr($lastName, 0, 1));
                     @endphp
                     <article class="alumni-card" 
-                             data-name="{{ strtolower($displayName) }}" 
+                            data-id="{{ $alumnus->id }}"
+                            data-name="{{ strtolower($displayName) }}" 
                              data-email="{{ strtolower($email) }}"
                              data-program="{{ strtolower($program) }}">
                         <div class="alumni-card-wrapper">
@@ -292,36 +314,49 @@
                             
                             <div class="alumni-card-footer">
                                 <div class="alumni-status">
-                                    <span class="status-dot active"></span>
-                                    <span>Active Member</span>
+                                    @if($alumnus->alumni_type == 'shs')
+                                        <span class="alumni-type-badge shs">
+                                            <i class="fa-solid fa-school"></i>
+                                            SHS
+                                        </span>
+                                    @elseif($alumnus->alumni_type == 'college')
+                                        <span class="alumni-type-badge college">
+                                            <i class="fa-solid fa-graduation-cap"></i>
+                                            College
+                                        </span>
+                                    @else
+                                        <span class="alumni-type-badge unknown">
+                                            <i class="fa-solid fa-question-circle"></i>
+                                            Unknown
+                                        </span>
+                                    @endif
                                 </div>
-                                
-                                    <div class="alumni-actions">
-                                        <!-- Message Button - Direct link with alumni ID -->
-                                        <a href="/admin/messages?chat={{ $alumnus->id }}" 
-                                        class="btn-action btn-message" 
-                                        title="Message {{ $displayName }}">
-                                            <i class="fa-solid fa-comment-dots"></i>
-                                        </a>
-                                        
-                                        <!-- View Profile Button -->
-                                        <a href="{{ route('admin.alumni.show', $alumnus->id) }}" 
-                                        class="btn-action btn-edit" 
-                                        title="View Profile">
-                                            <i class="fa-solid fa-eye"></i>
-                                        </a>
-                                        
-                                        <!-- Manage Account Button -->
-                                        <button type="button" 
-                                                class="btn-action btn-info-action manage-btn" 
-                                                data-id="{{ $alumnus->id }}" 
-                                                data-name="{{ addslashes($displayName) }}"
-                                                data-status="{{ $alumnus->account_status ?? 1 }}" 
-                                                title="Manage Account">
-                                            <i class="fa-solid fa-circle-info"></i>
-                                        </button>
-                                    </div>
-
+                                <!-- alumni-actions remains the same -->
+                                <div class="alumni-actions">
+                                    <!-- Message Button -->
+                                    <a href="/admin/messages?chat={{ $alumnus->id }}" 
+                                    class="btn-action btn-message" 
+                                    title="Message {{ $displayName }}">
+                                        <i class="fa-solid fa-comment-dots"></i>
+                                    </a>
+                                    
+                                    <!-- View Profile Button -->
+                                    <a href="{{ route('admin.alumni.show', $alumnus->id) }}" 
+                                    class="btn-action btn-edit" 
+                                    title="View Profile">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                    
+                                    <!-- Manage Account Button -->
+                                    <button type="button" 
+                                            class="btn-action btn-info-action manage-btn" 
+                                            data-id="{{ $alumnus->id }}" 
+                                            data-name="{{ addslashes($displayName) }}"
+                                            data-status="{{ $alumnus->account_status ?? 1 }}" 
+                                            title="Manage Account">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </article>
@@ -641,9 +676,9 @@
     </div>
 
     <!-- Manage Alumni Modal -->
-    <div id="manageModal" class="modal-overlay" aria-hidden="true">
+    <div id="manageModal" class="modal-overlay" aria-hidden="true" inert>
         <div class="modal-content-wrapper">
-            <div class="modal-card" style="max-width: 550px; margin: 0 auto;">
+            <div class="modal-card" style="max-width: 650px; margin: 0 auto;">
                 <div class="modal-header">
                     <div>
                         <h2 class="modal-title">
@@ -661,7 +696,7 @@
                     <input type="hidden" id="manageAccountStatus" value="1">
                     
                     <div class="manage-action-group">
-                        <!-- Reset Password - NOW ACTIVE -->
+                        <!-- Reset Password -->
                         <div class="manage-action-item">
                             <div class="manage-action-icon icon-info">
                                 <i class="fa-solid fa-key"></i>
@@ -675,7 +710,7 @@
                             </button>
                         </div>
 
-                        <!-- Restrict Account - NOW ACTIVE -->
+                        <!-- Restrict/Unrestrict Account -->
                         <div class="manage-action-item" id="restrictActionItem">
                             <div class="manage-action-icon icon-warning" id="restrictActionIcon">
                                 <i class="fa-solid fa-user-slash"></i>
@@ -684,25 +719,113 @@
                                 <h4 id="restrictTitle">Restrict Account</h4>
                                 <p id="restrictDesc">Temporarily suspend access for this alumnus.</p>
                             </div>
-                            <button type="button" class="btn btn-warning" id="manageRestrictBtn" onclick="prepareToggleRestrict()">
+                            <button type="button" class="btn btn-warning" id="manageRestrictBtn" onclick="openRestrictModal()">
                                 <i class="fa-solid fa-lock"></i> Restrict
                             </button>
                         </div>
 
-                        <!-- Delete Account (Already Functional) -->
-                        <div class="manage-action-item danger-zone">
-                            <div class="manage-action-icon icon-danger">
-                                <i class="fa-solid fa-trash-can"></i>
+                        <!-- Archive Account (Replaces Delete) -->
+                        <div class="manage-action-item">
+                            <div class="manage-action-icon icon-archive" style="background: #fef3c7; color: #d97706;">
+                                <i class="fa-solid fa-box-archive"></i>
                             </div>
-                            <div class="manage-action-content danger-text">
-                                <h4>Delete Account</h4>
-                                <p>Permanently remove this alumni record from the system.</p>
+                            <div class="manage-action-content">
+                                <h4>Archive Account</h4>
+                                <p>Soft-delete this account. The alumni will not be able to log in.</p>
                             </div>
-                            <button type="button" class="btn btn-danger" onclick="prepareDelete()">
-                                <i class="fa-solid fa-trash"></i> Delete
+                            <button type="button" class="btn btn-warning" onclick="prepareArchive()">
+                                <i class="fa-solid fa-box-archive"></i> Archive
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restriction Reason Modal -->
+    <div id="restrictReasonModal" class="modal-overlay" aria-hidden="true" inert>
+        <div class="modal-content-wrapper" style="max-width: 550px;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title">
+                            <i class="fa-solid fa-user-slash"></i>
+                            <span id="restrictModalTitle">Restrict Account</span>
+                        </h2>
+                        <p class="modal-subtitle">Provide a reason for restricting <strong id="restrictModalName"></strong>'s account</p>
+                    </div>
+                    <button class="modal-close" onclick="hideRestrictReasonModal()" title="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="restrictForm" onsubmit="executeRestrict(event)">
+                        <input type="hidden" id="restrictAlumniId">
+                        <input type="hidden" id="restrictAction" value="restrict">
+                        
+                        <div class="form-group">
+                            <label for="restrictionReason">Reason for Restriction <span style="color: var(--danger);">*</span></label>
+                            <select id="restrictionReason" class="form-control" required>
+                                <option value="">Select a reason...</option>
+                                <option value="violation">Violation of Community Guidelines</option>
+                                <option value="spam">Spam or Unsolicited Messages</option>
+                                <option value="fake_account">Fake or Misleading Account Information</option>
+                                <option value="harassment">Harassment or Bullying</option>
+                                <option value="inappropriate_content">Posting Inappropriate Content</option>
+                                <option value="unauthorized_access">Unauthorized Access Attempts</option>
+                                <option value="other">Other (Please Specify)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="customReasonGroup" style="display: none;">
+                            <label for="customReason">Please specify:</label>
+                            <input type="text" id="customReason" class="form-control" placeholder="Enter custom reason...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="restrictionComment">Additional Comments <span style="font-weight: 400; color: var(--gray-500);">(Optional)</span></label>
+                            <textarea id="restrictionComment" class="form-control" rows="3" 
+                                    placeholder="Add any additional notes about this restriction..." 
+                                    style="resize: vertical; min-height: 80px;"></textarea>
+                        </div>
+
+                        <div class="form-note" style="margin: 1rem 0 0;">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <div>
+                                <strong>Note:</strong> The reason and comments will be emailed to the alumni and shown when they try to log in.
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" onclick="hideRestrictReasonModal()">Cancel</button>
+                            <button type="submit" class="btn btn-warning" id="restrictConfirmBtn">
+                                <i class="fa-solid fa-lock"></i> <span id="restrictBtnText">Restrict Account</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archive Confirmation Modal -->
+    <div id="archiveConfirmModal" class="modal-overlay" aria-hidden="true" inert>
+        <div class="modal-content-wrapper" style="max-width: 450px;">
+            <div class="confirm-modal-card">
+                <div class="confirm-icon-wrapper" style="background: #fef3c7; color: #d97706;">
+                    <i class="fa-solid fa-box-archive"></i>
+                </div>
+                <h3 class="confirm-title">Archive Account</h3>
+                <p class="confirm-message">
+                    Are you sure you want to archive <strong id="archiveConfirmName"></strong>'s account?
+                    <br><small>The alumni will not be able to log in. You can restore the account later from the Archived Accounts section.</small>
+                </p>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideArchiveConfirm()">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="executeArchive()">
+                        <i class="fa-solid fa-box-archive"></i> Archive
+                    </button>
                 </div>
             </div>
         </div>
@@ -788,1491 +911,1983 @@
     </div>
 
     <script>
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-        }
+    // ========================================
+    // CONSOLE DEBUG - Check if script loads
+    // ========================================
+    console.log('✅ Alumni Directory page JavaScript loaded');
 
-        // Search filter function
-        function filterAlumni() {
-            const q = document.getElementById('searchInput').value.toLowerCase().trim();
-            const cards = document.querySelectorAll('.alumni-card');
-            let visibleCount = 0;
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    // Search filter function
+    function filterAlumni() {
+        const q = document.getElementById('searchInput').value.toLowerCase().trim();
+        const cards = document.querySelectorAll('.alumni-card');
+        let visibleCount = 0;
+        
+        cards.forEach(card => {
+            const name = (card.dataset.name || '').toLowerCase();
+            const email = (card.dataset.email || '').toLowerCase();
+            const program = (card.dataset.program || '').toLowerCase();
+            const visible = !q || name.includes(q) || email.includes(q) || program.includes(q);
             
-            cards.forEach(card => {
-                const name = (card.dataset.name || '').toLowerCase();
-                const email = (card.dataset.email || '').toLowerCase();
-                const program = (card.dataset.program || '').toLowerCase();
-                const visible = !q || name.includes(q) || email.includes(q) || program.includes(q);
-                
-                card.style.display = visible ? 'flex' : 'none';
-                if (visible) visibleCount++;
-            });
-            
-            // Update results count
-            document.getElementById('resultsCount').textContent = 
-                `${visibleCount} result${visibleCount != 1 ? 's' : ''}`;
-            
-            // Show/hide clear button
-            document.getElementById('clearSearch').style.display = q ? 'flex' : 'none';
+            card.style.display = visible ? 'flex' : 'none';
+            if (visible) visibleCount++;
+        });
+        
+        // Update results count
+        document.getElementById('resultsCount').textContent = 
+            `${visibleCount} result${visibleCount != 1 ? 's' : ''}`;
+        
+        // Show/hide clear button
+        document.getElementById('clearSearch').style.display = q ? 'flex' : 'none';
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        filterAlumni();
+        document.getElementById('searchInput').focus();
+    }
+
+    // Modal functions
+    function showModal() {
+        document.getElementById('createModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideModal() {
+        document.getElementById('createModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function switchModalMode(mode) {
+        // Update tabs
+        document.querySelectorAll('[data-modal-tab]').forEach((tab) => {
+            tab.classList.toggle('active', tab.dataset.modalTab === mode);
+        });
+
+        // Update sections
+        document.querySelectorAll('[data-modal-section]').forEach((section) => {
+            section.classList.toggle('modal-section-active', section.dataset.modalSection === mode);
+        });
+    }
+
+    // File upload preview
+    document.getElementById('card_photo')?.addEventListener('change', function(e) {
+        const fileName = e.target.files[0]?.name;
+        const label = this.closest('.file-upload-wrapper')?.querySelector('.file-upload-label');
+        if (label && fileName) {
+            label.textContent = fileName;
+        }
+    });
+
+    // Bulk import file drop zone
+    const dropZone = document.getElementById('fileDropZone');
+    const fileInput = document.getElementById('bulkImportFile');
+    
+    if (dropZone && fileInput) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
 
-        function clearSearch() {
-            document.getElementById('searchInput').value = '';
-            filterAlumni();
-            document.getElementById('searchInput').focus();
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files[0]) {
+                fileInput.files = files;
+                updateFileName(files[0].name);
+            }
         }
 
-        // Modal functions
-        function showModal() {
-            document.getElementById('createModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function hideModal() {
-            document.getElementById('createModal').classList.remove('active');
-            document.body.style.overflow = '';
-        }
-
-
-        function switchModalMode(mode) {
-            // Update tabs
-            document.querySelectorAll('[data-modal-tab]').forEach((tab) => {
-                tab.classList.toggle('active', tab.dataset.modalTab === mode);
-            });
-
-            // Update sections
-            document.querySelectorAll('[data-modal-section]').forEach((section) => {
-                section.classList.toggle('modal-section-active', section.dataset.modalSection === mode);
-            });
-        }
-
-        // File upload preview
-        document.getElementById('card_photo')?.addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name;
-            const label = this.closest('.file-upload-wrapper')?.querySelector('.file-upload-label');
-            if (label && fileName) {
-                label.textContent = fileName;
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileName(e.target.files[0].name);
             }
         });
 
-        // Bulk import file drop zone
-        const dropZone = document.getElementById('fileDropZone');
-        const fileInput = document.getElementById('bulkImportFile');
+        function updateFileName(name) {
+            const status = document.getElementById('bulkImportStatus');
+            if (status) {
+                status.textContent = `Selected: ${name}`;
+                status.style.color = 'var(--success)';
+            }
+        }
+    }
+
+    // Bulk import logic
+    function normalizeBulkRow(row) {
+        const findKey = (obj, possibleKeys) => {
+            for (const key of possibleKeys) {
+                if (obj[key] !== undefined) return obj[key];
+                const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+                if (found) return obj[found];
+            }
+            return '';
+        };
+
+        return {
+            first_name: findKey(row, ['First Name', 'first_name', 'FirstName']).trim(),
+            middle_name: findKey(row, ['Middle Name', 'middle_name', 'MiddleName']).trim(),
+            last_name: findKey(row, ['Last Name', 'last_name', 'LastName']).trim(),
+            student_id_number: findKey(row, ['Student ID', 'student_id_number', 'StudentID', 'Student ID Number']).trim(),
+            program: findKey(row, ['Strand', 'program', 'Program', 'Department']).trim(),
+            email: findKey(row, ['Personal Email', 'Official Email', 'email', 'Email', 'E-mail']).trim(),
+            phone_number: findKey(row, ['Mobile No', 'phone_number', 'MobileNo', 'Mobile Number', 'Phone']).trim(),
+            year_graduated: findKey(row, ['Graduation Period', 'year_graduated', 'GraduationPeriod', 'Year Graduated']).trim(),
+            date_of_birth: '',
+            sex: findKey(row, ['Sex', 'sex', 'Gender']).trim(),
+        };
+    }
+
+    async function createAlumniRecord(record) {
+        const formData = new FormData();
+        formData.append('_token', '{{ csrf_token() }}');
         
-        if (dropZone && fileInput) {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
+        Object.keys(record).forEach(key => {
+            if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
+                formData.append(key, record[key]);
             }
+        });
 
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
-            });
+        const response = await fetch('{{ route('admin.alumni.store') }}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            body: formData,
+        });
 
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
-            });
+        const payload = await response.json().catch(() => null);
 
-            dropZone.addEventListener('drop', handleDrop, false);
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                if (files[0]) {
-                    fileInput.files = files;
-                    updateFileName(files[0].name);
-                }
+        if (!response.ok) {
+            let errorMessage = 'Unable to import record.';
+            if (payload?.errors) {
+                const errorList = [];
+                Object.entries(payload.errors).forEach(([field, messages]) => {
+                    errorList.push(`${field}: ${messages.join(', ')}`);
+                });
+                errorMessage = errorList.join(' | ');
+            } else if (payload?.message) {
+                errorMessage = payload.message;
             }
-
-            fileInput.addEventListener('change', function(e) {
-                if (e.target.files[0]) {
-                    updateFileName(e.target.files[0].name);
-                }
-            });
-
-            function updateFileName(name) {
-                const status = document.getElementById('bulkImportStatus');
-                if (status) {
-                    status.textContent = `Selected: ${name}`;
-                    status.style.color = 'var(--success)';
-                }
-            }
+            throw new Error(errorMessage);
         }
 
-        // Bulk import logic (same as original, adapted)
-        function normalizeBulkRow(row) {
-            const findKey = (obj, possibleKeys) => {
-                for (const key of possibleKeys) {
-                    if (obj[key] !== undefined) return obj[key];
-                    const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
-                    if (found) return obj[found];
-                }
-                return '';
-            };
+        return payload;
+    }
 
-            return {
-                first_name: findKey(row, ['First Name', 'first_name', 'FirstName']).trim(),
-                middle_name: findKey(row, ['Middle Name', 'middle_name', 'MiddleName']).trim(),
-                last_name: findKey(row, ['Last Name', 'last_name', 'LastName']).trim(),
-                student_id_number: findKey(row, ['Student ID', 'student_id_number', 'StudentID', 'Student ID Number']).trim(),
-                program: findKey(row, ['Strand', 'program', 'Program', 'Department']).trim(),
-                email: findKey(row, ['Personal Email', 'Official Email', 'email', 'Email', 'E-mail']).trim(),
-                phone_number: findKey(row, ['Mobile No', 'phone_number', 'MobileNo', 'Mobile Number', 'Phone']).trim(),
-                year_graduated: findKey(row, ['Graduation Period', 'year_graduated', 'GraduationPeriod', 'Year Graduated']).trim(),
-                date_of_birth: '',
-                sex: findKey(row, ['Sex', 'sex', 'Gender']).trim(),
-            };
+    // Alert toast system
+    function showAlert(message, type = 'success') {
+        const toast = document.getElementById('alertToast');
+        const icon = toast.querySelector('.alert-icon');
+        const msg = toast.querySelector('.alert-message');
+        
+        const icons = {
+            success: 'fa-circle-check',
+            error: 'fa-circle-exclamation',
+            info: 'fa-circle-info',
+            warning: 'fa-circle-exclamation'
+        };
+        const colors = {
+            success: 'var(--success)',
+            error: 'var(--danger)',
+            info: 'var(--info)',
+            warning: 'var(--warning)'
+        };
+        
+        icon.className = `alert-icon fa-solid ${icons[type] || icons.success}`;
+        toast.style.borderColor = colors[type] || colors.success;
+        msg.textContent = message;
+        
+        toast.classList.add('show');
+        
+        setTimeout(() => hideAlert(), 4000);
+    }
+
+    function hideAlert() {
+        document.getElementById('alertToast').classList.remove('show');
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('createModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideModal();
+    });
+
+    // Close delete confirm modal when clicking outside
+    document.getElementById('deleteConfirmModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideDeleteConfirm();
+    });
+
+    // Close sidebar on nav item click (mobile)
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) {
+                toggleMobileMenu();
+            }
+        });
+    });
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 1024) {
+                document.getElementById('adminSidebar')?.classList.remove('mobile-open');
+                document.getElementById('mobileOverlay')?.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }, 250);
+    });
+
+    // Initialize search clear button visibility
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const clearBtn = document.getElementById('clearSearch');
+        if (searchInput && clearBtn) {
+            clearBtn.style.display = searchInput.value ? 'flex' : 'none';
         }
+    });
 
-        async function createAlumniRecord(record) {
-            const formData = new FormData();
-            formData.append('_token', '{{ csrf_token() }}');
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideModal();
+            hideManageModal();
+            hideDeleteConfirm();
+            hideAlert();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            document.getElementById('searchInput')?.focus();
+        }
+    });
+
+    // Safely handle clicks on manage buttons
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.manage-btn');
+        if (btn) {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            const status = btn.dataset.status || 1;
+            openManageModal(id, name, status);
+        }
+    });
+
+    // ========================================
+    // MANAGE MODAL - ENHANCED WITH AJAX
+    // ========================================
+    let currentManageAlumniId = null;
+    let currentManageAlumniName = '';
+    let currentManageAccountStatus = 1;
+
+    function openManageModal(id, name, status) {
+        const accountStatus = status !== undefined ? parseInt(status) : 1;
+        
+        currentManageAlumniId = id;
+        currentManageAlumniName = name;
+        currentManageAccountStatus = accountStatus;
+        
+        document.getElementById('manageAlumniId').value = id;
+        document.getElementById('manageAlumniName').textContent = name;
+        document.getElementById('manageAccountStatus').value = accountStatus;
+        
+        updateRestrictButton(accountStatus);
+        
+        const modal = document.getElementById('manageModal');
+        // Remove closing class if it exists
+        modal.classList.remove('closing');
+        modal.classList.add('active');
+        modal.removeAttribute('inert');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideManageModal() {
+        const modal = document.getElementById('manageModal');
+        if (modal) {
+            // Add closing class for exit animation
+            modal.classList.add('closing');
             
-            Object.keys(record).forEach(key => {
-                if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
-                    formData.append(key, record[key]);
-                }
-            });
+            // Wait for animation to complete before removing
+            setTimeout(() => {
+                modal.classList.remove('active');
+                modal.classList.remove('closing');
+                modal.setAttribute('inert', '');
+                document.body.style.overflow = '';
+                currentManageAlumniId = null;
+            }, 300); // Match the animation duration (0.3s)
+        }
+    }
 
-            const response = await fetch('{{ route('admin.alumni.store') }}', {
+    function updateRestrictButton(status) {
+        const isRestricted = status == 0;
+        const restrictTitle = document.getElementById('restrictTitle');
+        const restrictDesc = document.getElementById('restrictDesc');
+        const restrictBtn = document.getElementById('manageRestrictBtn');
+        const restrictIcon = document.getElementById('restrictActionIcon');
+        
+        if (isRestricted) {
+            restrictTitle.textContent = 'Unrestrict Account';
+            restrictDesc.textContent = 'Restore access for this alumnus.';
+            restrictBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
+            restrictBtn.className = 'btn btn-success';
+            restrictIcon.innerHTML = '<i class="fa-solid fa-user-check"></i>';
+        } else {
+            restrictTitle.textContent = 'Restrict Account';
+            restrictDesc.textContent = 'Temporarily suspend access for this alumnus.';
+            restrictBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
+            restrictBtn.className = 'btn btn-warning';
+            restrictIcon.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+        }
+    }
+
+    // ========================================
+    // ARCHIVE ACCOUNT - AJAX VERSION
+    // ========================================
+    function prepareArchive() {
+        const id = document.getElementById('manageAlumniId').value;
+        const name = document.getElementById('manageAlumniName').textContent;
+        
+        document.getElementById('archiveConfirmName').textContent = name;
+        hideManageModal();
+        
+        const modal = document.getElementById('archiveConfirmModal');
+        modal.classList.add('active');
+        modal.removeAttribute('inert');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideArchiveConfirm() {
+        const modal = document.getElementById('archiveConfirmModal');
+        modal.classList.remove('active');
+        modal.setAttribute('inert', '');
+        document.body.style.overflow = '';
+    }
+
+    async function executeArchive() {
+        const id = document.getElementById('manageAlumniId').value;
+        
+        try {
+            const response = await fetch(`/admin/alumni/${id}/archive`, {
                 method: 'POST',
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                },
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            hideArchiveConfirm();
+            
+            if (data.success) {
+                showAlert(data.message, 'success');
+                // Remove the card from the DOM
+                removeAlumniCard(id);
+                // Update stats
+                updateDirectoryStats();
+                // Update both badges
+                updateArchivedBadge();
+                updateRestrictedBadge();
+            } else {
+                showAlert(data.message || 'Failed to archive account.', 'error');
+            }
+        } catch (error) {
+            console.error('Archive error:', error);
+            hideArchiveConfirm();
+            showAlert('An error occurred while archiving the account.', 'error');
+        }
+    }
+
+    // ========================================
+    // RESET PASSWORD - AJAX VERSION
+    // ========================================
+    function prepareResetPassword() {
+        const id = document.getElementById('manageAlumniId').value;
+        const name = document.getElementById('manageAlumniName').textContent;
+        
+        document.getElementById('resetConfirmName').textContent = name;
+        hideManageModal();
+        
+        const modal = document.getElementById('resetPasswordConfirmModal');
+        modal.classList.add('active');
+        modal.removeAttribute('inert');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideResetPasswordConfirm() {
+        const modal = document.getElementById('resetPasswordConfirmModal');
+        modal.classList.remove('active');
+        modal.setAttribute('inert', '');
+        document.body.style.overflow = '';
+    }
+
+    async function executeResetPassword() {
+        const id = document.getElementById('manageAlumniId').value;
+        
+        try {
+            const response = await fetch(`/admin/alumni/${id}/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            hideResetPasswordConfirm();
+            
+            if (data.success) {
+                showAlert(data.message, 'success');
+            } else {
+                showAlert(data.message || 'Failed to reset password.', 'error');
+            }
+        } catch (error) {
+            console.error('Reset password error:', error);
+            hideResetPasswordConfirm();
+            showAlert('An error occurred while resetting the password.', 'error');
+        }
+    }
+
+    // ========================================
+    // DELETE CONFIRMATION
+    // ========================================
+    let pendingDeleteId = null;
+
+    function prepareDelete() {
+        const id = document.getElementById('manageAlumniId').value;
+        const name = document.getElementById('manageAlumniName').textContent;
+        
+        pendingDeleteId = id;
+        document.getElementById('confirmAlumniName').textContent = name;
+        
+        hideManageModal();
+        
+        const modal = document.getElementById('deleteConfirmModal');
+        modal.classList.add('active');
+        modal.removeAttribute('inert');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideDeleteConfirm() {
+        const modal = document.getElementById('deleteConfirmModal');
+        modal.classList.remove('active');
+        modal.setAttribute('inert', '');
+        document.body.style.overflow = '';
+        pendingDeleteId = null;
+    }
+
+    async function executeDelete() {
+        if (!pendingDeleteId) return;
+
+        const formData = new FormData();
+        formData.append('_method', 'DELETE');
+        formData.append('_token', '{{ csrf_token() }}');
+
+        try {
+            const response = await fetch(`/admin/alumni/${pendingDeleteId}`, {
+                method: 'POST',
                 body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
             });
 
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                // Extract validation errors
-                let errorMessage = 'Unable to import record.';
-                if (payload?.errors) {
-                    const errorList = [];
-                    Object.entries(payload.errors).forEach(([field, messages]) => {
-                        errorList.push(`${field}: ${messages.join(', ')}`);
-                    });
-                    errorMessage = errorList.join(' | ');
-                } else if (payload?.message) {
-                    errorMessage = payload.message;
-                }
-                throw new Error(errorMessage);
+            if (response.ok) {
+                hideDeleteConfirm();
+                showAlert('Alumni account deleted successfully.', 'success');
+                // Remove the card from the DOM
+                removeAlumniCard(pendingDeleteId);
+                // Update stats
+                updateDirectoryStats();
+                // Update both badges (just in case)
+                updateArchivedBadge();
+                updateRestrictedBadge();
+            } else {
+                const data = await response.json().catch(() => null);
+                showAlert(data?.message || 'Failed to delete account.', 'error');
+                hideDeleteConfirm();
             }
+        } catch (error) {
+            console.error('Delete error:', error);
+            showAlert('An error occurred.', 'error');
+            hideDeleteConfirm();
+        }
+    }
 
-            return payload;
+    // ========================================
+    // DOM MANIPULATION HELPERS
+    // ========================================
+
+    // Remove an alumni card from the DOM with animation
+    function removeAlumniCard(alumniId, useAnimation = true) {
+        console.log('🗑️ Removing card with ID:', alumniId);
+        const cards = document.querySelectorAll(`.alumni-card[data-id="${alumniId}"]`);
+        console.log(`📊 Found ${cards.length} cards to remove`);
+        
+        cards.forEach(card => {
+            if (useAnimation) {
+                // Add fade-out animation
+                card.style.transition = 'all 0.3s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                card.style.height = card.offsetHeight + 'px';
+                card.style.overflow = 'hidden';
+                
+                setTimeout(() => {
+                    if (card.parentNode) {
+                        card.remove();
+                        console.log('✅ Card removed from DOM');
+                    }
+                }, 300);
+            } else {
+                if (card.parentNode) {
+                    card.remove();
+                    console.log('✅ Card removed from DOM (no animation)');
+                }
+            }
+        });
+    }
+    // Update directory statistics
+    function updateDirectoryStats() {
+        const totalCards = document.querySelectorAll('.alumni-card').length;
+        const statValues = document.querySelectorAll('.stat-value');
+        if (statValues.length > 0) {
+            statValues[0].textContent = totalCards;
+        }
+        
+        // Update results count
+        const resultsCount = document.getElementById('resultsCount');
+        if (resultsCount) {
+            resultsCount.textContent = `${totalCards} result${totalCards != 1 ? 's' : ''}`;
+        }
+    }
+
+    // ========================================
+    // ENHANCED BULK IMPORT WITH PREVIEW
+    // ========================================
+
+    let importedData = [];
+    let currentPage = 1;
+    let pageSize = 25;
+    let columnMapping = {};
+    let validationResults = {};
+    let fileHeaders = [];
+
+    function downloadTemplate() {
+        const headers = [
+            'Student ID', 'First Name', 'Middle Name', 'Last Name',
+            'Email', 'Phone Number', 'Program', 'Graduation Year',
+            'Date of Birth', 'Sex'
+        ];
+        
+        const sample = [
+            '2020-00001', 'Jane', 'Dela', 'Cruz',
+            'jane.cruz@email.com', '09123456789', 'BS Computer Science',
+            '2024-06-01', '2000-01-15', 'Female'
+        ];
+        
+        const BOM = '\uFEFF';
+        const csvContent = BOM + headers.join(',') + '\n' + sample.join(',') + '\n';
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'alumni_import_template.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        
+        showAlert('Template downloaded successfully!', 'success');
+    }
+
+    async function previewFile() {
+        const fileInput = document.getElementById('bulkImportFile');
+        const file = fileInput?.files[0];
+        const status = document.getElementById('bulkImportStatus');
+        
+        if (!file) {
+            showAlert('Please select a file first.', 'error');
+            return;
         }
 
-        async function handleBulkImport() {
-            const fileInput = document.getElementById('bulkImportFile');
-            const status = document.getElementById('bulkImportStatus');
-            const file = fileInput?.files[0];
+        status.textContent = 'Reading file...';
+        status.style.color = 'var(--warning)';
 
-            if (!file) {
-                showAlert('Please choose a CSV or Excel file first.', 'error');
-                return;
-            }
-
-            status.textContent = 'Reading file...';
-            status.style.color = 'var(--warning)';
-
-            if (!window.XLSX) {
-                status.textContent = 'Excel parsing library is unavailable.';
-                return;
-            }
-
-            try {
-                const buffer = await file.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-                
-                let headerRowIndex = -1;
-                for (let i = 0; i < rawData.length; i++) {
-                    const row = rawData[i] || [];
-                    const rowString = row.join(' ').toLowerCase();
-                    if (rowString.includes('student id') && rowString.includes('last name')) {
-                        headerRowIndex = i;
-                        break;
-                    }
-                }
-
-                if (headerRowIndex === -1) {
-                    status.textContent = 'Error: Could not find headers. Ensure file has "Student ID" and "Last Name" columns.';
-                    status.style.color = 'var(--danger)';
-                    return;
-                }
-
-                const rows = XLSX.utils.sheet_to_json(sheet, { 
-                    range: headerRowIndex, 
-                    defval: '', 
-                    raw: false,
-                    dateNF: 'yyyy-mm-dd'
-                });
-
-                const records = rows
-                    .map(normalizeBulkRow)
-                    .filter((record) => record.first_name && record.last_name && record.student_id_number);
-
-                if (!records.length) {
-                    status.textContent = 'No valid alumni records found.';
-                    status.style.color = 'var(--danger)';
-                    return;
-                }
-
-                                let created = 0;
-                let failed = 0;
-                const errors = [];
-
-                status.textContent = `Importing ${records.length} record(s)...`;
-
-                for (const record of records) {
-                    try {
-                        await createAlumniRecord(record);
-                        created += 1;
-                    } catch (error) {
-                        failed += 1;
-                        errors.push(`${record.first_name} ${record.last_name} (${record.student_id_number}): ${error.message}`);
-                        console.error("Failed to import:", record.student_id_number, error.message);
-                    }
-                }
-
-                // Show detailed results
-                if (errors.length > 0) {
-                    status.innerHTML = `✓ Import complete: ${created} created, ${failed} failed.<br><small style="color: var(--danger); font-size: 0.8rem;">${errors.slice(0, 3).join('<br>')}${errors.length > 3 ? '<br>...and ' + (errors.length - 3) + ' more errors' : ''}</small>`;
-                    status.style.color = failed > created ? 'var(--danger)' : 'var(--warning)';
-                } else {
-                    status.textContent = `✓ Import complete: ${created} created successfully.`;
-                    status.style.color = 'var(--success)';
-                }
-
-                if (created > 0) {
-                    setTimeout(() => window.location.reload(), 1500);
-                }
-
-            } catch (error) {
-                console.error('Import error:', error);
-                status.textContent = 'Error: ' + error.message;
+        try {
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+            
+            if (!rawData || rawData.length < 2) {
+                status.textContent = 'Error: File is empty or contains only headers.';
                 status.style.color = 'var(--danger)';
+                return;
+            }
+
+            let headerRowIndex = -1;
+            for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+                const row = rawData[i] || [];
+                const rowString = row.join(' ').toLowerCase();
+                const hasStudentId = rowString.includes('student id') || rowString.includes('studentid');
+                const hasLastName = rowString.includes('last name') || rowString.includes('lastname');
+                const hasFirstName = rowString.includes('first name') || rowString.includes('firstname');
+                const hasEmail = rowString.includes('email') || rowString.includes('e-mail');
+                
+                if (hasStudentId && hasLastName && hasFirstName && hasEmail) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            if (headerRowIndex === -1) {
+                status.textContent = 'Error: Could not find required headers.';
+                status.style.color = 'var(--danger)';
+                return;
+            }
+
+            const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
+            const dataRows = [];
+            
+            for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                const row = rawData[i] || [];
+                if (row.every(cell => !cell || String(cell).trim() === '')) continue;
+                
+                const rowData = {};
+                headers.forEach((header, index) => {
+                    const value = row[index] || '';
+                    rowData[header] = typeof value === 'string' ? value.trim() : String(value).trim();
+                });
+                dataRows.push(rowData);
+            }
+
+            if (dataRows.length === 0) {
+                status.textContent = 'Error: No data rows found after headers.';
+                status.style.color = 'var(--danger)';
+                return;
+            }
+
+            importedData = dataRows;
+            fileHeaders = headers;
+            
+            document.getElementById('uploadStep').style.display = 'none';
+            document.getElementById('previewStep').style.display = 'block';
+            document.getElementById('bulkImportStatus').textContent = `Loaded ${dataRows.length} records for preview.`;
+            document.getElementById('bulkImportStatus').style.color = 'var(--success)';
+            
+            renderPreviewTable(dataRows);
+            renderColumnMapping(headers);
+            validateAllRows();
+            
+        } catch (error) {
+            console.error('Preview error:', error);
+            status.textContent = 'Error reading file: ' + error.message;
+            status.style.color = 'var(--danger)';
+        }
+    }
+
+    function renderPreviewTable(data) {
+        const table = document.getElementById('previewTable');
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        
+        const columnsToShow = fileHeaders;
+        
+        const headerRow = document.createElement('tr');
+        
+        const numTh = document.createElement('th');
+        numTh.textContent = '#';
+        numTh.style.width = '50px';
+        numTh.style.minWidth = '50px';
+        numTh.style.maxWidth = '50px';
+        numTh.style.textAlign = 'center';
+        numTh.style.position = 'sticky';
+        numTh.style.left = '0';
+        numTh.style.zIndex = '11';
+        numTh.style.background = 'var(--nu-blue)';
+        headerRow.appendChild(numTh);
+        
+        const statusTh = document.createElement('th');
+        statusTh.textContent = 'Status';
+        statusTh.style.width = '70px';
+        statusTh.style.minWidth = '70px';
+        statusTh.style.maxWidth = '70px';
+        statusTh.style.textAlign = 'center';
+        statusTh.style.position = 'sticky';
+        statusTh.style.left = '50px';
+        statusTh.style.zIndex = '11';
+        statusTh.style.background = 'var(--nu-blue)';
+        headerRow.appendChild(statusTh);
+        
+        columnsToShow.forEach((col) => {
+            const th = document.createElement('th');
+            th.textContent = col;
+            th.dataset.column = col;
+            th.style.minWidth = '150px';
+            th.style.maxWidth = '300px';
+            th.style.position = 'sticky';
+            th.style.top = '0';
+            th.style.background = 'var(--nu-blue)';
+            th.style.zIndex = '10';
+            headerRow.appendChild(th);
+        });
+        
+        thead.appendChild(headerRow);
+        
+        const total = data.length;
+        const totalPages = Math.ceil(total / pageSize);
+        
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const start = (currentPage - 1) * pageSize;
+        const end = Math.min(start + pageSize, total);
+        const pageData = data.slice(start, end);
+        
+        pageData.forEach((row, index) => {
+            const actualIndex = start + index;
+            const tr = document.createElement('tr');
+            tr.dataset.rowIndex = actualIndex;
+            tr.id = `row-${actualIndex}`;
+            
+            const numTd = document.createElement('td');
+            numTd.className = 'row-number';
+            numTd.textContent = actualIndex + 1;
+            numTd.style.position = 'sticky';
+            numTd.style.left = '0';
+            numTd.style.zIndex = '5';
+            numTd.style.background = 'var(--white)';
+            tr.appendChild(numTd);
+            
+            const statusTd = document.createElement('td');
+            statusTd.className = 'row-status';
+            statusTd.id = `status-${actualIndex}`;
+            statusTd.style.position = 'sticky';
+            statusTd.style.left = '50px';
+            statusTd.style.zIndex = '5';
+            statusTd.style.background = 'var(--white)';
+            statusTd.innerHTML = '<i class="fa-regular fa-hourglass-half" style="color: var(--gray-400);"></i>';
+            tr.appendChild(statusTd);
+            
+            columnsToShow.forEach(col => {
+                const td = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = row[col] || '';
+                input.dataset.column = col;
+                input.dataset.rowIndex = actualIndex;
+                input.className = 'editable-cell';
+                input.placeholder = 'Enter value...';
+                input.id = `cell-${actualIndex}-${col}`;
+                input.style.width = '100%';
+                input.style.minWidth = '120px';
+                
+                input.addEventListener('input', function() {
+                    handleCellEdit(this, actualIndex, col);
+                });
+                
+                input.addEventListener('blur', function() {
+                    validateSingleRow(actualIndex);
+                });
+                
+                td.appendChild(input);
+                tr.appendChild(td);
+            });
+            
+            tbody.appendChild(tr);
+        });
+        
+        let countText = `Showing ${start + 1}-${end} of ${total} records`;
+        if (totalPages > 1) {
+            countText += ` (Page ${currentPage} of ${totalPages})`;
+        }
+        document.getElementById('recordCount').textContent = countText;
+        
+        renderPaginationControls();
+    }
+
+    function renderColumnMapping(headers) {
+        const container = document.getElementById('mappingControls');
+        container.innerHTML = '';
+        
+        const requiredFields = {
+            'student_id_number': 'Student ID *',
+            'first_name': 'First Name *',
+            'last_name': 'Last Name *',
+            'email': 'Email *',
+            'program': 'Program *'
+        };
+        
+        const optionalFields = {
+            'middle_name': 'Middle Name',
+            'phone_number': 'Phone Number',
+            'year_graduated': 'Graduation Year',
+            'date_of_birth': 'Date of Birth',
+            'sex': 'Sex'
+        };
+        
+        const allFields = { ...requiredFields, ...optionalFields };
+        
+        Object.entries(allFields).forEach(([field, label]) => {
+            const div = document.createElement('div');
+            div.className = 'mapping-item';
+            
+            const labelEl = document.createElement('label');
+            labelEl.className = 'mapping-label';
+            labelEl.textContent = label;
+            div.appendChild(labelEl);
+            
+            const select = document.createElement('select');
+            select.id = `map-${field}`;
+            select.dataset.field = field;
+            
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '-- Select Column --';
+            select.appendChild(defaultOption);
+            
+            headers.forEach(header => {
+                const option = document.createElement('option');
+                option.value = header;
+                option.textContent = header;
+                
+                const headerLower = header.toLowerCase();
+                const fieldLower = field.toLowerCase();
+                if (headerLower.includes(fieldLower.replace('_', ' ')) || 
+                    headerLower === fieldLower ||
+                    headerLower.replace(' ', '_') === fieldLower) {
+                    option.selected = true;
+                }
+                
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', function() {
+                columnMapping[this.dataset.field] = this.value;
+                renderPreviewTable(importedData);
+                validateAllRows();
+            });
+            
+            div.appendChild(select);
+            container.appendChild(div);
+        });
+    }
+
+    function handleCellEdit(input, rowIndex, column) {
+        const value = input.value;
+        importedData[rowIndex][column] = value;
+        
+        input.classList.remove('error', 'success');
+        const errorMsg = input.parentElement.querySelector('.error-message');
+        if (errorMsg) errorMsg.remove();
+    }
+
+    function validateSingleRow(rowIndex) {
+        const row = importedData[rowIndex];
+        if (!row) return;
+        
+        const errors = [];
+        const mappedFields = getFieldMapping();
+        
+        const required = ['student_id_number', 'first_name', 'last_name', 'email', 'program'];
+        required.forEach(field => {
+            const col = mappedFields[field];
+            if (!col) {
+                errors.push(`Missing mapping for ${field}`);
+                return;
+            }
+            const value = row[col] || '';
+            if (!value.trim()) {
+                errors.push(`${field.replace('_', ' ')} is required`);
+            }
+        });
+        
+        if (mappedFields.email && row[mappedFields.email]) {
+            const email = row[mappedFields.email];
+            if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+                errors.push('Invalid email format');
             }
         }
-
-        // Export function (placeholder)
-        function exportAlumni() {
-            showAlert('Export feature coming soon!', 'info');
-        }
-
-        // Alert toast system
-        function showAlert(message, type = 'success') {
-            const toast = document.getElementById('alertToast');
-            const icon = toast.querySelector('.alert-icon');
-            const msg = toast.querySelector('.alert-message');
+        
+        const statusTd = document.getElementById(`status-${rowIndex}`);
+        const tr = statusTd?.closest('tr');
+        const inputs = tr?.querySelectorAll('.editable-cell');
+        
+        if (errors.length > 0) {
+            statusTd.innerHTML = '<i class="fa-solid fa-times-circle"></i>';
+            tr?.classList.add('error-row');
+            tr?.classList.remove('success-row');
             
-            // Set icon and color based on type
-            const icons = {
-                success: 'fa-circle-check',
-                error: 'fa-circle-exclamation',
-                info: 'fa-circle-info',
-                warning: 'fa-circle-exclamation'
-            };
-            const colors = {
-                success: 'var(--success)',
-                error: 'var(--danger)',
-                info: 'var(--info)',
-                warning: 'var(--warning)'
-            };
-            
-            icon.className = `alert-icon fa-solid ${icons[type] || icons.success}`;
-            toast.style.borderColor = colors[type] || colors.success;
-            msg.textContent = message;
-            
-            toast.classList.add('show');
-            
-            // Auto hide after 4 seconds
-            setTimeout(() => hideAlert(), 4000);
-        }
-
-        function hideAlert() {
-            document.getElementById('alertToast').classList.remove('show');
-        }
-
-        // Close modal when clicking outside
-        document.getElementById('createModal')?.addEventListener('click', function(e) {
-            if (e.target === this) hideModal();
-        });
-
-        // Close delete confirm modal when clicking outside
-        document.getElementById('deleteConfirmModal')?.addEventListener('click', function(e) {
-            if (e.target === this) hideDeleteConfirm();
-        });
-
-        // Close sidebar on nav item click (mobile)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                if (window.innerWidth <= 1024) {
-                    toggleMobileMenu();
+            inputs?.forEach(input => {
+                const col = input.dataset.column;
+                const field = findFieldByColumn(col);
+                if (field && required.includes(field)) {
+                    if (!input.value.trim()) {
+                        input.classList.add('error');
+                    }
                 }
             });
-        });
+        } else {
+            statusTd.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
+            tr?.classList.remove('error-row');
+            tr?.classList.add('success-row');
+            
+            inputs?.forEach(input => {
+                input.classList.remove('error');
+            });
+        }
+        
+        validationResults[rowIndex] = { errors, valid: errors.length === 0 };
+    }
 
-        // Handle window resize
-        let resizeTimer;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(function() {
-                if (window.innerWidth > 1024) {
-                    document.getElementById('adminSidebar')?.classList.remove('mobile-open');
-                    document.getElementById('mobileOverlay')?.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }, 250);
-        });
+    function validateAllRows() {
+        const total = importedData.length;
+        let validCount = 0;
+        let errorCount = 0;
+        
+        for (let i = 0; i < total; i++) {
+            validateSingleRow(i);
+            if (validationResults[i]?.valid) {
+                validCount++;
+            } else {
+                errorCount++;
+            }
+        }
+        
+        updateValidationSummary(validCount, errorCount, total);
+        
+        const importBtn = document.getElementById('confirmImportBtn');
+        if (errorCount === 0 && validCount > 0) {
+            importBtn.disabled = false;
+            importBtn.style.opacity = '1';
+        } else {
+            importBtn.disabled = true;
+            importBtn.style.opacity = '0.6';
+        }
+    }
 
-        // Initialize search clear button visibility
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.getElementById('searchInput');
-            const clearBtn = document.getElementById('clearSearch');
-            if (searchInput && clearBtn) {
-                clearBtn.style.display = searchInput.value ? 'flex' : 'none';
+    function updateValidationSummary(valid, errors, total) {
+        const summary = document.getElementById('validationSummary');
+        summary.style.display = 'block';
+        
+        summary.innerHTML = `
+            <h5 style="margin: 0 0 0.75rem 0; color: var(--nu-blue);">
+                <i class="fa-solid fa-clipboard-check"></i> Validation Summary
+            </h5>
+            <div class="validation-summary-grid">
+                <div class="validation-stat success">
+                    <span class="stat-number">${valid}</span>
+                    <span class="stat-label">Valid Records</span>
+                </div>
+                <div class="validation-stat error">
+                    <span class="stat-number">${errors}</span>
+                    <span class="stat-label">Invalid Records</span>
+                </div>
+                <div class="validation-stat info">
+                    <span class="stat-number">${total}</span>
+                    <span class="stat-label">Total Records</span>
+                </div>
+            </div>
+            ${errors > 0 ? `
+                <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--danger-light); border-radius: var(--radius); border-left: 4px solid var(--danger);">
+                    <p style="font-size: 0.875rem; color: var(--danger); margin: 0;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        ${errors} record(s) have errors. Please fix them before importing.
+                    </p>
+                </div>
+            ` : `
+                <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--success-light); border-radius: var(--radius); border-left: 4px solid var(--success);">
+                    <p style="font-size: 0.875rem; color: var(--success); margin: 0;">
+                        <i class="fa-solid fa-check-circle"></i>
+                        All ${total} record(s) are valid and ready for import!
+                    </p>
+                </div>
+            `}
+        `;
+    }
+
+    function getFieldMapping() {
+        const mapping = {};
+        const allFields = [
+            'student_id_number', 'first_name', 'last_name', 'email', 'program',
+            'middle_name', 'phone_number', 'year_graduated', 'date_of_birth', 'sex'
+        ];
+        
+        allFields.forEach(field => {
+            const select = document.getElementById(`map-${field}`);
+            if (select && select.value !== '') {
+                mapping[field] = select.value;
             }
         });
+        
+        return mapping;
+    }
 
-        // Close manage modal when clicking outside
+    function findFieldByColumn(column) {
+        const mapping = getFieldMapping();
+        for (const [field, col] of Object.entries(mapping)) {
+            if (col === column) return field;
+        }
+        return null;
+    }
+
+    function backToUpload() {
+        document.getElementById('uploadStep').style.display = 'block';
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('bulkImportStatus').textContent = 'Returned to upload.';
+        document.getElementById('bulkImportStatus').style.color = 'var(--gray-500)';
+    }
+
+    function renderPaginationControls() {
+        const container = document.getElementById('paginationControls');
+        if (!container) return;
+        
+        const total = importedData.length;
+        const totalPages = Math.ceil(total / pageSize);
+        
+        if (pageSize >= total || totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        let html = '';
+        
+        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>`;
+        
+        const maxVisible = 7;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+        
+        if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
+        }
+        
+        if (startPage > 1) {
+            html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-secondary'}" onclick="goToPage(${i})">
+                ${i}
+            </button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
+            }
+            html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>`;
+        
+        const start = (currentPage - 1) * pageSize + 1;
+        const end = Math.min(currentPage * pageSize, total);
+        html += `<span style="font-size: 0.8125rem; color: var(--gray-500); margin-left: 0.5rem;">
+            ${start}-${end} of ${total}
+        </span>`;
+        
+        container.innerHTML = html;
+    }
+
+    function changePageSize() {
+        const select = document.getElementById('pageSizeSelect');
+        const value = parseInt(select.value);
+        
+        if (value === 0) {
+            pageSize = importedData.length || 25;
+            currentPage = 1;
+        } else {
+            pageSize = value;
+            currentPage = 1;
+        }
+        
+        renderPreviewTable(importedData);
+        renderPaginationControls();
+        validateAllRows();
+    }
+
+    function goToPage(page) {
+        const totalPages = Math.ceil(importedData.length / pageSize);
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        renderPreviewTable(importedData);
+        renderPaginationControls();
+        validateAllRows();
+    }
+
+    async function validateAndImport() {
+        const total = importedData.length;
+        let allValid = true;
+        let invalidCount = 0;
+        
+        for (let i = 0; i < total; i++) {
+            if (!validationResults[i]?.valid) {
+                allValid = false;
+                invalidCount++;
+            }
+        }
+        
+        if (!allValid) {
+            showAlert(`Please fix ${invalidCount} error(s) before importing.`, 'error');
+            return;
+        }
+        
+        if (!confirm(`Ready to import ${total} alumni records. Continue?`)) {
+            return;
+        }
+        
+        const status = document.getElementById('bulkImportStatus');
+        const importBtn = document.getElementById('confirmImportBtn');
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
+        
+        const mapping = getFieldMapping();
+        
+        const payload = {
+            data: importedData,
+            mapping: mapping,
+            _token: getCsrfToken()
+        };
+        
+        try {
+            const response = await fetch('/admin/alumni/process-bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const { results } = result;
+                
+                let message = `Import complete! ✅ ${results.successful} successful, ❌ ${results.failed} failed.`;
+                
+                if (results.duplicates && results.duplicates.length > 0) {
+                    message += `\n⚠️ ${results.duplicates.length} duplicates skipped.`;
+                }
+                
+                if (results.warnings && results.warnings.length > 0) {
+                    message += `\n⚠️ ${results.warnings.length} warnings.`;
+                }
+                
+                if (results.errors && results.errors.length > 0) {
+                    const errorList = results.errors.slice(0, 5).join('\n');
+                    message += `\n\nErrors:\n${errorList}`;
+                    if (results.errors.length > 5) {
+                        message += `\n...and ${results.errors.length - 5} more errors.`;
+                    }
+                }
+                
+                status.innerHTML = message.replace(/\n/g, '<br>');
+                status.style.color = results.failed > 0 ? 'var(--warning)' : 'var(--success)';
+                
+                if (results.successful > 0) {
+                    showAlert(`Successfully imported ${results.successful} alumni!`, 'success');
+                    // Reload the page to show new alumni
+                    setTimeout(() => window.location.reload(), 2000);
+                } else if (results.failed > 0) {
+                    showAlert('Import completed but no records were added. Check errors above.', 'warning');
+                }
+            } else {
+                status.textContent = 'Error: ' + (result.message || 'Unknown error occurred.');
+                status.style.color = 'var(--danger)';
+                showAlert('Import failed: ' + result.message, 'error');
+            }
+            
+        } catch (error) {
+            console.error('Import error:', error);
+            status.textContent = 'Error: ' + error.message;
+            status.style.color = 'var(--danger)';
+            showAlert('An error occurred during import.', 'error');
+        } finally {
+            importBtn.disabled = false;
+            importBtn.innerHTML = '<i class="fa-solid fa-check"></i> Import All';
+        }
+    }
+
+    function clearAllErrors() {
+        document.querySelectorAll('.error-row').forEach(tr => {
+            tr.classList.remove('error-row');
+        });
+        document.querySelectorAll('.editable-cell.error').forEach(input => {
+            input.classList.remove('error');
+        });
+        showAlert('Error indicators cleared.', 'info');
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+
+    // ========================================
+    // EXPORT FUNCTIONALITY
+    // ========================================
+    function exportAlumni() {
+        const exportBtn = document.querySelector('.btn-secondary .fa-download')?.closest('button');
+        if (exportBtn) {
+            exportBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exporting...';
+            exportBtn.disabled = true;
+        }
+        
+        const link = document.createElement('a');
+        link.href = '{{ route('admin.alumni.export') }}';
+        link.download = 'alumni_export_' + new Date().toISOString().split('T')[0] + '.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => {
+            if (exportBtn) {
+                exportBtn.innerHTML = '<i class="fa-solid fa-download"></i> Export';
+                exportBtn.disabled = false;
+            }
+        }, 2000);
+        
+        showAlert('Exporting alumni data...', 'info');
+    }
+
+    // ========================================
+    // REDIRECT TO MESSAGES
+    // ========================================
+    function redirectToMessages(alumniId, alumniName) {
+        sessionStorage.setItem('openChat', JSON.stringify({
+            id: alumniId,
+            name: alumniName,
+            timestamp: Date.now()
+        }));
+        
+        window.location.href = '/admin/messages';
+    }
+
+    // ========================================
+    // CLOSE MODALS ON OVERLAY CLICK
+    // ========================================
     document.getElementById('manageModal')?.addEventListener('click', function(e) {
         if (e.target === this) hideManageModal();
     });
 
+    document.getElementById('archiveConfirmModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideArchiveConfirm();
+    });
+
+    document.getElementById('resetPasswordConfirmModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideResetPasswordConfirm();
+    });
+
+    document.getElementById('restrictReasonModal')?.addEventListener('click', function(e) {
+        if (e.target === this) hideRestrictReasonModal();
+    });
+
+    // ========================================
+    // FILE INPUT AUTO-PREVIEW
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('bulkImportFile');
+        const previewBtn = document.getElementById('previewBtn');
+        const status = document.getElementById('bulkImportStatus');
         
-        // Change to:
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                hideModal();
-                hideManageModal(); // Added this
-                hideAlert();
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                document.getElementById('searchInput')?.focus();
-            }
-        });
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files[0]) {
+                    const fileName = e.target.files[0].name;
+                    if (status) {
+                        status.textContent = `Selected: ${fileName}`;
+                        status.style.color = 'var(--success)';
+                    }
+                    if (previewBtn) {
+                        previewBtn.disabled = false;
+                        setTimeout(() => {
+                            previewBtn.click();
+                        }, 500);
+                    }
+                }
+            });
+        }
+    });
 
-        // Safely handle clicks on the 'i' button without breaking HTML quotes
-        document.addEventListener('click', function(e) {
-            // Check if the clicked element (or its parent) is our manage button
-            const btn = e.target.closest('.manage-btn');
-            
-            if (btn) {
-                const id = btn.dataset.id;
-                const name = btn.dataset.name;
-                const status = btn.dataset.status || 1; // Get status from data attribute
-                openManageModal(id, name, status);
-            }
-        });
-
-                // --- Delete Alumni Functions ---
+    // ========================================
+    // HANDLE SUCCESS MESSAGES FROM SERVER
+    // ========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        @if(session('success'))
+            showAlert('{{ session('success') }}', 'success');
+        @endif
         
-        // Variable to hold the ID temporarily
-        let pendingDeleteId = null;
+        @if(session('error'))
+            showAlert('{{ session('error') }}', 'error');
+        @endif
 
-        // --- Delete Confirmation Functions ---
-        function prepareDelete() {
-            const id = document.getElementById('manageAlumniId').value;
-            const name = document.getElementById('manageAlumniName').textContent;
-            
-            pendingDeleteId = id;
-            document.getElementById('confirmAlumniName').textContent = name;
-            
-            hideManageModal();
-            document.getElementById('deleteConfirmModal').classList.add('active');
-        }
-
-        function hideDeleteConfirm() {
-            document.getElementById('deleteConfirmModal').classList.remove('active');
-            document.body.style.overflow = '';
-            pendingDeleteId = null;
-        }
-
-        // 3. This is the actual deletion logic (called by the "Delete" button in the confirm modal)
-        async function executeDelete() {
-            if (!pendingDeleteId) return;
-
-            const formData = new FormData();
-            formData.append('_method', 'DELETE');
-            formData.append('_token', '{{ csrf_token() }}');
-
-            try {
-                const response = await fetch(`/admin/alumni/${pendingDeleteId}`, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    hideDeleteConfirm();
-                    showAlert('Alumni account deleted successfully.', 'success');
-                    setTimeout(() => window.location.reload(), 1500);
-                } else {
-                    const data = await response.json().catch(() => null);
-                    showAlert(data?.message || 'Failed to delete account.', 'error');
-                    hideDeleteConfirm();
+        // Add data-id and data-alumni-type attributes to cards
+        document.querySelectorAll('.alumni-card').forEach(card => {
+            const manageBtn = card.querySelector('.manage-btn');
+            if (manageBtn) {
+                const id = manageBtn.dataset.id;
+                if (id) {
+                    card.dataset.id = id;
                 }
-            } catch (error) {
-                console.error('Delete error:', error);
-                showAlert('An error occurred.', 'error');
-                hideDeleteConfirm();
             }
+            
+            // Get alumni type from the badge
+            const typeBadge = card.querySelector('.alumni-type-badge');
+            if (typeBadge) {
+                const type = typeBadge.classList.contains('shs') ? 'shs' : 
+                            typeBadge.classList.contains('college') ? 'college' : 'unknown';
+                card.dataset.alumniType = type;
+            }
+        });
+    });
+
+   // ========================================
+    // FIX: OPEN RESTRICT MODAL - SHOW HIDDEN MODAL
+    // ========================================
+
+    function openRestrictModal() {
+        console.log('🔓 Opening restrict modal');
+        
+        // Get all required elements safely
+        const id = document.getElementById('manageAlumniId')?.value;
+        const nameEl = document.getElementById('manageAlumniName');
+        const statusEl = document.getElementById('manageAccountStatus');
+        
+        if (!id || !nameEl) {
+            console.error('❌ Required elements not found');
+            return;
         }
-
-        // Add this function to your existing script section
-        function redirectToMessages(alumniId, alumniName) {
-            // Store the alumni info in sessionStorage so the messages page can pick it up
-            sessionStorage.setItem('openChat', JSON.stringify({
-                id: alumniId,
-                name: alumniName,
-                timestamp: Date.now()
-            }));
-            
-            // Redirect to messages page
-            window.location.href = '/admin/messages';
+        
+        const name = nameEl.textContent;
+        const isRestricted = statusEl ? statusEl.value == 0 : false;
+        
+        console.log('📊 Account status:', isRestricted ? 'Restricted' : 'Active');
+        
+        if (isRestricted) {
+            prepareUnrestrictFromManage(id, name);
+            return;
         }
-
-        // ========================================
-        // MANAGE MODAL - ENHANCED LOGIC
-        // ========================================
-        let currentManageAlumniId = null;
-        let currentManageAlumniName = '';
-        let currentManageAccountStatus = 1;
-
-        // --- Manage Modal Functions ---
-        function openManageModal(id, name, status) {
-            // If status is not provided, default to 1 (active)
-            const accountStatus = status !== undefined ? parseInt(status) : 1;
-            
-            currentManageAlumniId = id;
-            currentManageAlumniName = name;
-            currentManageAccountStatus = accountStatus;
-            
-            document.getElementById('manageAlumniId').value = id;
-            document.getElementById('manageAlumniName').textContent = name;
-            document.getElementById('manageAccountStatus').value = accountStatus;
-            
-            // Update restrict button based on current status
-            updateRestrictButton(accountStatus);
-            
-            document.getElementById('manageModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function hideManageModal() {
-            document.getElementById('manageModal').classList.remove('active');
-            document.body.style.overflow = '';
-            currentManageAlumniId = null;
-        }
-
-        function updateRestrictButton(status) {
-            const isRestricted = status == 0;
-            const restrictTitle = document.getElementById('restrictTitle');
-            const restrictDesc = document.getElementById('restrictDesc');
-            const restrictBtn = document.getElementById('manageRestrictBtn');
-            const restrictIcon = document.getElementById('restrictActionIcon');
-            
-            if (isRestricted) {
-                restrictTitle.textContent = 'Unrestrict Account';
-                restrictDesc.textContent = 'Restore access for this alumnus.';
-                restrictBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
-                restrictBtn.className = 'btn btn-success';
-                restrictIcon.innerHTML = '<i class="fa-solid fa-user-check"></i>';
+        
+        // Set up for restriction
+        const restrictIdEl = document.getElementById('restrictAlumniId');
+        const restrictNameEl = document.getElementById('restrictModalName');
+        const restrictTitleEl = document.getElementById('restrictModalTitle');
+        const restrictActionEl = document.getElementById('restrictAction');
+        const restrictBtnTextEl = document.getElementById('restrictBtnText');
+        const confirmBtn = document.getElementById('restrictConfirmBtn');
+        const reasonEl = document.getElementById('restrictionReason');
+        const customReasonEl = document.getElementById('customReason');
+        const commentEl = document.getElementById('restrictionComment');
+        const customReasonGroup = document.getElementById('customReasonGroup');
+        
+        // If elements are missing, the modal might have been removed from DOM
+        if (!restrictIdEl || !restrictNameEl || !restrictTitleEl || !restrictActionEl || !restrictBtnTextEl || !confirmBtn) {
+            console.warn('⚠️ Some modal elements missing, attempting to recover...');
+            const modal = document.getElementById('restrictReasonModal');
+            if (modal) {
+                modal.classList.add('active');
+                modal.removeAttribute('inert');
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                
+                if (restrictIdEl) restrictIdEl.value = id;
+                if (restrictNameEl) restrictNameEl.textContent = name;
+                if (restrictTitleEl) restrictTitleEl.textContent = 'Restrict Account';
+                if (restrictActionEl) restrictActionEl.value = 'restrict';
+                if (restrictBtnTextEl) restrictBtnTextEl.textContent = 'Restrict Account';
+                if (confirmBtn) {
+                    confirmBtn.className = 'btn btn-warning';
+                    confirmBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict Account';
+                }
+                // Reset values
+                if (reasonEl) { reasonEl.value = ''; reasonEl.disabled = false; }
+                if (customReasonEl) customReasonEl.value = '';
+                if (commentEl) commentEl.value = '';
+                if (customReasonGroup) customReasonGroup.style.display = 'none';
             } else {
-                restrictTitle.textContent = 'Restrict Account';
-                restrictDesc.textContent = 'Temporarily suspend access for this alumnus.';
-                restrictBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
-                restrictBtn.className = 'btn btn-warning';
-                restrictIcon.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+                console.error('❌ Modal completely missing from DOM');
             }
+            return;
         }
-
-        // ========================================
-        // RESET PASSWORD
-        // ========================================
-        function prepareResetPassword() {
-            const id = document.getElementById('manageAlumniId').value;
-            const name = document.getElementById('manageAlumniName').textContent;
-            
-            document.getElementById('resetConfirmName').textContent = name;
-            hideManageModal();
-            document.getElementById('resetPasswordConfirmModal').classList.add('active');
+        
+        // Elements exist, set values for current alumni
+        restrictIdEl.value = id;
+        restrictNameEl.textContent = name;
+        restrictTitleEl.textContent = 'Restrict Account';
+        restrictActionEl.value = 'restrict';
+        restrictBtnTextEl.textContent = 'Restrict Account';
+        
+        confirmBtn.className = 'btn btn-warning';
+        confirmBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Restrict Account';
+        
+        // Reset and show reason inputs
+        if (reasonEl) {
+            reasonEl.disabled = false;
+            reasonEl.value = ''; // Reset to empty
+        }
+        if (customReasonEl) {
+            customReasonEl.value = ''; // Reset
+        }
+        if (commentEl) {
+            commentEl.disabled = false;
+            commentEl.value = ''; // Reset
+        }
+        if (customReasonGroup) {
+            customReasonGroup.style.display = 'none';
+        }
+        
+        const reasonGroup = document.getElementById('restrictionReason')?.closest('.form-group');
+        if (reasonGroup) reasonGroup.style.display = 'block';
+        
+        const commentGroup = document.getElementById('restrictionComment')?.closest('.form-group');
+        if (commentGroup) commentGroup.style.display = 'block';
+        
+        // Update note
+        const note = document.querySelector('#restrictReasonModal .form-note');
+        if (note) {
+            note.innerHTML = `
+                <i class="fa-solid fa-circle-info"></i>
+                <div>
+                    <strong>Note:</strong> The reason and comments will be emailed to the alumni and shown when they try to log in.
+                </div>
+            `;
+        }
+        
+        // Close the manage modal
+        hideManageModal();
+        
+        // Open restrict reason modal - make sure it's visible
+        const modal = document.getElementById('restrictReasonModal');
+        if (modal) {
+            modal.classList.add('active');
+            modal.removeAttribute('inert');
+            modal.style.display = 'block';
             document.body.style.overflow = 'hidden';
         }
+    }
 
-        function hideResetPasswordConfirm() {
-            document.getElementById('resetPasswordConfirmModal').classList.remove('active');
+    // ========================================
+    // FIX: HIDE RESTRICT REASON MODAL - RESET FORM VALUES
+    // ========================================
+
+    function hideRestrictReasonModal() {
+        const modal = document.getElementById('restrictReasonModal');
+        if (modal) {
+            // Reset the form values
+            const reasonEl = document.getElementById('restrictionReason');
+            const customReasonEl = document.getElementById('customReason');
+            const commentEl = document.getElementById('restrictionComment');
+            
+            if (reasonEl) {
+                reasonEl.value = '';
+                reasonEl.disabled = false;
+            }
+            if (customReasonEl) {
+                customReasonEl.value = '';
+            }
+            if (commentEl) {
+                commentEl.value = '';
+            }
+            
+            // Hide custom reason group
+            const customReasonGroup = document.getElementById('customReasonGroup');
+            if (customReasonGroup) {
+                customReasonGroup.style.display = 'none';
+            }
+            
+            // Only hide the modal, don't remove it from DOM
+            modal.classList.remove('active');
+            modal.setAttribute('inert', '');
+            modal.style.display = 'none';
             document.body.style.overflow = '';
-        }
-
-        async function executeResetPassword() {
-            const id = document.getElementById('manageAlumniId').value;
             
-            try {
-                const response = await fetch(`/admin/alumni/${id}/reset-password`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                const data = await response.json();
-                
-                hideResetPasswordConfirm();
-                
-                if (data.success) {
-                    showAlert(data.message, 'success');
-                    setTimeout(() => window.location.reload(), 2000);
-                } else {
-                    showAlert(data.message || 'Failed to reset password.', 'error');
-                }
-            } catch (error) {
-                console.error('Reset password error:', error);
-                hideResetPasswordConfirm();
-                showAlert('An error occurred while resetting the password.', 'error');
+            // Ensure focus is removed from the modal
+            if (document.activeElement && document.activeElement.closest('#restrictReasonModal')) {
+                document.activeElement.blur();
             }
         }
+    }
 
-        // ========================================
-        // RESTRICT / UNRESTRICT
-        // ========================================
-        function prepareToggleRestrict() {
-            const id = document.getElementById('manageAlumniId').value;
-            const name = document.getElementById('manageAlumniName').textContent;
-            const isRestricted = currentManageAccountStatus == 0;
-            
-            document.getElementById('restrictConfirmName').textContent = name;
-            
-            if (isRestricted) {
-                document.getElementById('restrictConfirmTitle').textContent = 'Unrestrict Account';
-                document.getElementById('restrictConfirmMessage').innerHTML = 
-                    'Are you sure you want to <strong>unrestrict</strong> ' + name + '\'s account?<br><small>They will be able to log in again.</small>';
-                document.getElementById('restrictConfirmBtn').innerHTML = '<i class="fa-solid fa-unlock"></i> Unrestrict';
-                document.getElementById('restrictConfirmBtn').className = 'btn btn-success';
-                document.getElementById('restrictConfirmIcon').style.background = '#d1fae5';
-                document.getElementById('restrictConfirmIcon').style.color = '#065f46';
-                document.getElementById('restrictConfirmIcon').innerHTML = '<i class="fa-solid fa-user-check"></i>';
-            } else {
-                document.getElementById('restrictConfirmTitle').textContent = 'Restrict Account';
-                document.getElementById('restrictConfirmMessage').innerHTML = 
-                    'Are you sure you want to <strong>restrict</strong> ' + name + '\'s account?<br><small>They will not be able to log in until unrestricted.</small>';
-                document.getElementById('restrictConfirmBtn').innerHTML = '<i class="fa-solid fa-lock"></i> Restrict';
-                document.getElementById('restrictConfirmBtn').className = 'btn btn-warning';
-                document.getElementById('restrictConfirmIcon').style.background = '#fef3c7';
-                document.getElementById('restrictConfirmIcon').style.color = '#d97706';
-                document.getElementById('restrictConfirmIcon').innerHTML = '<i class="fa-solid fa-user-slash"></i>';
-            }
-            
-            hideManageModal();
-            document.getElementById('restrictConfirmModal').classList.add('active');
+   // ========================================
+    // FIX: PREPARE UNRESTRICT FROM MANAGE - SAFE VERSION
+    // ========================================
+
+    function prepareUnrestrictFromManage(id, name) {
+        console.log('🔓 Preparing unrestrict for:', name);
+        
+        const restrictIdEl = document.getElementById('restrictAlumniId');
+        const restrictNameEl = document.getElementById('restrictModalName');
+        const restrictTitleEl = document.getElementById('restrictModalTitle');
+        const restrictActionEl = document.getElementById('restrictAction');
+        const restrictBtnTextEl = document.getElementById('restrictBtnText');
+        const confirmBtn = document.getElementById('restrictConfirmBtn');
+        
+        if (!restrictIdEl || !restrictNameEl || !restrictTitleEl || !restrictActionEl || !restrictBtnTextEl || !confirmBtn) {
+            console.error('❌ Restrict modal elements not found');
+            return;
+        }
+        
+        restrictIdEl.value = id;
+        restrictNameEl.textContent = name;
+        restrictTitleEl.textContent = 'Unrestrict Account';
+        restrictActionEl.value = 'unrestrict';
+        restrictBtnTextEl.textContent = 'Unrestrict Account';
+        
+        confirmBtn.className = 'btn btn-success';
+        confirmBtn.innerHTML = '<i class="fa-solid fa-user-check"></i> Unrestrict Account';
+        
+        // Hide reason inputs
+        const reasonGroup = document.getElementById('restrictionReason')?.closest('.form-group');
+        if (reasonGroup) reasonGroup.style.display = 'none';
+        const reasonEl = document.getElementById('restrictionReason');
+        if (reasonEl) reasonEl.disabled = true;
+        const customReasonGroup = document.getElementById('customReasonGroup');
+        if (customReasonGroup) customReasonGroup.style.display = 'none';
+        
+        const commentGroup = document.getElementById('restrictionComment')?.closest('.form-group');
+        if (commentGroup) commentGroup.style.display = 'none';
+        const commentEl = document.getElementById('restrictionComment');
+        if (commentEl) commentEl.disabled = true;
+        
+        // Update note
+        const note = document.querySelector('#restrictReasonModal .form-note');
+        if (note) {
+            note.innerHTML = `
+                <i class="fa-solid fa-circle-info"></i>
+                <div>
+                    <strong>Note:</strong> Unrestricting this account will allow the alumni to log in again.
+                    They will receive an email notification.
+                </div>
+            `;
+        }
+        
+        // Close the manage modal
+        hideManageModal();
+        
+        // Open restrict reason modal
+        const modal = document.getElementById('restrictReasonModal');
+        if (modal) {
+            modal.classList.add('active');
+            modal.removeAttribute('inert');
             document.body.style.overflow = 'hidden';
         }
+    }
 
-        function hideRestrictConfirm() {
-            document.getElementById('restrictConfirmModal').classList.remove('active');
-            document.body.style.overflow = '';
-        }
-
-        async function executeToggleRestrict() {
-            const id = document.getElementById('manageAlumniId').value;
-            const isCurrentlyRestricted = currentManageAccountStatus == 0;
-            
-            try {
-                const response = await fetch(`/admin/alumni/${id}/toggle-restrict`, {
-                    method: 'PATCH',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                const data = await response.json();
-                
-                hideRestrictConfirm();
-                
-                if (data.success) {
-                    showAlert(data.message, data.warning ? 'warning' : 'success');
-                    setTimeout(() => window.location.reload(), 2000);
-                } else {
-                    showAlert(data.message || 'Failed to update account status.', 'error');
-                }
-            } catch (error) {
-                console.error('Toggle restrict error:', error);
-                hideRestrictConfirm();
-                showAlert('An error occurred while updating account status.', 'error');
-            }
-        }
-
-        // ========================================
-        // EXPORT FUNCTIONALITY
-        // ========================================
-        function exportAlumni() {
-            // Show loading state
-            const exportBtn = document.querySelector('.btn-secondary .fa-download')?.closest('button');
-            if (exportBtn) {
-                exportBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exporting...';
-                exportBtn.disabled = true;
-            }
-            
-            // Create a hidden link and trigger download
-            const link = document.createElement('a');
-            link.href = '{{ route('admin.alumni.export') }}';
-            link.download = 'alumni_export_' + new Date().toISOString().split('T')[0] + '.csv';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Reset button after delay
-            setTimeout(() => {
-                if (exportBtn) {
-                    exportBtn.innerHTML = '<i class="fa-solid fa-download"></i> Export';
-                    exportBtn.disabled = false;
-                }
-            }, 2000);
-            
-            showAlert('Exporting alumni data...', 'info');
-        }
-
-        // ========================================
-        // KEYBOARD SHORTCUTS - UPDATE
-        // ========================================
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                hideModal();
-                hideManageModal();
-                hideResetPasswordConfirm();
-                hideRestrictConfirm();
-                hideDeleteConfirm();
-                hideAlert();
-            }
-        });
-
-        // ========================================
-        // CLOSE MODALS ON OVERLAY CLICK
-        // ========================================
-        document.getElementById('resetPasswordConfirmModal')?.addEventListener('click', function(e) {
-            if (e.target === this) hideResetPasswordConfirm();
-        });
-
-        document.getElementById('restrictConfirmModal')?.addEventListener('click', function(e) {
-            if (e.target === this) hideRestrictConfirm();
-        });
-
-        document.getElementById('manageModal')?.addEventListener('click', function(e) {
-            if (e.target === this) hideManageModal();
-        });
-
-        // ========================================
-        // HANDLE SUCCESS MESSAGES FROM SERVER
-        // ========================================
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check for session flash messages
-            @if(session('success'))
-                showAlert('{{ session('success') }}', 'success');
-            @endif
-            
-            @if(session('error'))
-                showAlert('{{ session('error') }}', 'error');
-            @endif
-        });
-
-        // ========================================
-// ENHANCED BULK IMPORT WITH PREVIEW
+// ========================================
+// FIX: INDIVIDUAL ACCOUNT CREATION - AJAX
 // ========================================
 
-let importedData = [];
-let currentPage = 1;
-let pageSize = 25;
-let columnMapping = {};
-let validationResults = {};
-let fileHeaders = [];
-
-// --- Download Template ---
-function downloadTemplate() {
-    const headers = [
-        'Student ID', 'First Name', 'Middle Name', 'Last Name',
-        'Email', 'Phone Number', 'Program', 'Graduation Year',
-        'Date of Birth', 'Sex'
-    ];
-    
-    const sample = [
-        '2020-00001', 'Jane', 'Dela', 'Cruz',
-        'jane.cruz@email.com', '09123456789', 'BS Computer Science',
-        '2024-06-01', '2000-01-15', 'Female'
-    ];
-    
-    // Create CSV content with BOM for Excel compatibility
-    const BOM = '\uFEFF';
-    const csvContent = BOM + headers.join(',') + '\n' + sample.join(',') + '\n';
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'alumni_import_template.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    
-    showAlert('Template downloaded successfully!', 'success');
-}
-
-// --- Preview File Function ---
-async function previewFile() {
-    const fileInput = document.getElementById('bulkImportFile');
-    const file = fileInput?.files[0];
-    const status = document.getElementById('bulkImportStatus');
-    
-    if (!file) {
-        showAlert('Please select a file first.', 'error');
-        return;
-    }
-
-    status.textContent = 'Reading file...';
-    status.style.color = 'var(--warning)';
-
-    try {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        
-        // Get all data as array of arrays with proper headers
-        const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
-        
-        if (!rawData || rawData.length < 2) {
-            status.textContent = 'Error: File is empty or contains only headers.';
-            status.style.color = 'var(--danger)';
-            return;
-        }
-
-        // Find header row
-        let headerRowIndex = -1;
-        for (let i = 0; i < Math.min(rawData.length, 10); i++) {
-            const row = rawData[i] || [];
-            const rowString = row.join(' ').toLowerCase();
-            // Check for common header keywords
-            const hasStudentId = rowString.includes('student id') || rowString.includes('studentid');
-            const hasLastName = rowString.includes('last name') || rowString.includes('lastname');
-            const hasFirstName = rowString.includes('first name') || rowString.includes('firstname');
-            const hasEmail = rowString.includes('email') || rowString.includes('e-mail');
+// Override the form submission to use AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    const createForm = document.getElementById('singleCreateForm');
+    if (createForm) {
+        createForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            if (hasStudentId && hasLastName && hasFirstName && hasEmail) {
-                headerRowIndex = i;
-                break;
-            }
-        }
-
-        if (headerRowIndex === -1) {
-            status.textContent = 'Error: Could not find required headers. Ensure file has "Student ID", "Last Name", "First Name", and "Email" columns.';
-            status.style.color = 'var(--danger)';
-            return;
-        }
-
-        // Extract headers and data
-        const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
-        const dataRows = [];
-        
-        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-            const row = rawData[i] || [];
-            // Skip empty rows
-            if (row.every(cell => !cell || String(cell).trim() === '')) continue;
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
             
-            const rowData = {};
-            headers.forEach((header, index) => {
-                const value = row[index] || '';
-                rowData[header] = typeof value === 'string' ? value.trim() : String(value).trim();
-            });
-            dataRows.push(rowData);
-        }
-
-        if (dataRows.length === 0) {
-            status.textContent = 'Error: No data rows found after headers.';
-            status.style.color = 'var(--danger)';
-            return;
-        }
-
-        // Store data for preview
-        importedData = dataRows;
-        fileHeaders = headers;
-        
-        // Show preview step
-        document.getElementById('uploadStep').style.display = 'none';
-        document.getElementById('previewStep').style.display = 'block';
-        document.getElementById('bulkImportStatus').textContent = `Loaded ${dataRows.length} records for preview.`;
-        document.getElementById('bulkImportStatus').style.color = 'var(--success)';
-        
-        // Render preview table
-        renderPreviewTable(dataRows);
-        renderColumnMapping(headers);
-        validateAllRows();
-        
-    } catch (error) {
-        console.error('Preview error:', error);
-        status.textContent = 'Error reading file: ' + error.message;
-        status.style.color = 'var(--danger)';
-    }
-}
-
-// --- Render Preview Table ---
-function renderPreviewTable(data) {
-    const table = document.getElementById('previewTable');
-    const thead = table.querySelector('thead');
-    const tbody = table.querySelector('tbody');
-    
-    // Clear existing content
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
-    
-    // Determine which columns to show (based on mapping or all)
-    const columnsToShow = getVisibleColumns();
-    
-    // If no columns to show, use all file headers
-    if (columnsToShow.length === 0 && fileHeaders.length > 0) {
-        columnsToShow = fileHeaders;
-    }
-    
-    // Build header
-    const headerRow = document.createElement('tr');
-    
-    // Add row number column
-    const numTh = document.createElement('th');
-    numTh.textContent = '#';
-    numTh.style.width = '50px';
-    numTh.style.minWidth = '50px';
-    numTh.style.maxWidth = '50px';
-    numTh.style.textAlign = 'center';
-    numTh.style.position = 'sticky';
-    numTh.style.left = '0';
-    numTh.style.zIndex = '11';
-    numTh.style.background = 'var(--nu-blue)';
-    headerRow.appendChild(numTh);
-    
-    // Add status column
-    const statusTh = document.createElement('th');
-    statusTh.textContent = 'Status';
-    statusTh.style.width = '70px';
-    statusTh.style.minWidth = '70px';
-    statusTh.style.maxWidth = '70px';
-    statusTh.style.textAlign = 'center';
-    statusTh.style.position = 'sticky';
-    statusTh.style.left = '50px';
-    statusTh.style.zIndex = '11';
-    statusTh.style.background = 'var(--nu-blue)';
-    headerRow.appendChild(statusTh);
-    
-    // Data columns - make them scrollable
-    columnsToShow.forEach((col, index) => {
-        const th = document.createElement('th');
-        th.textContent = col;
-        th.dataset.column = col;
-        th.style.minWidth = '150px';
-        th.style.maxWidth = '300px';
-        th.style.position = 'sticky';
-        th.style.top = '0';
-        th.style.background = 'var(--nu-blue)';
-        th.style.zIndex = '10';
-        headerRow.appendChild(th);
-    });
-    
-    thead.appendChild(headerRow);
-    
-    // Calculate pagination
-    const total = data.length;
-    const totalPages = Math.ceil(total / pageSize);
-    
-    // Ensure current page is valid
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-    
-    const start = (currentPage - 1) * pageSize;
-    const end = Math.min(start + pageSize, total);
-    const pageData = data.slice(start, end);
-    
-    // Build rows
-    pageData.forEach((row, index) => {
-        const actualIndex = start + index;
-        const tr = document.createElement('tr');
-        tr.dataset.rowIndex = actualIndex;
-        tr.id = `row-${actualIndex}`;
-        
-        // Row number - sticky
-        const numTd = document.createElement('td');
-        numTd.className = 'row-number';
-        numTd.textContent = actualIndex + 1;
-        numTd.style.position = 'sticky';
-        numTd.style.left = '0';
-        numTd.style.zIndex = '5';
-        numTd.style.background = 'var(--white)';
-        tr.appendChild(numTd);
-        
-        // Status - sticky
-        const statusTd = document.createElement('td');
-        statusTd.className = 'row-status';
-        statusTd.id = `status-${actualIndex}`;
-        statusTd.style.position = 'sticky';
-        statusTd.style.left = '50px';
-        statusTd.style.zIndex = '5';
-        statusTd.style.background = 'var(--white)';
-        statusTd.innerHTML = '<i class="fa-regular fa-hourglass-half" style="color: var(--gray-400);"></i>';
-        tr.appendChild(statusTd);
-        
-        // Data cells
-        columnsToShow.forEach(col => {
-            const td = document.createElement('td');
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = row[col] || '';
-            input.dataset.column = col;
-            input.dataset.rowIndex = actualIndex;
-            input.className = 'editable-cell';
-            input.placeholder = 'Enter value...';
-            input.id = `cell-${actualIndex}-${col}`;
-            input.style.width = '100%';
-            input.style.minWidth = '120px';
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
             
-            input.addEventListener('input', function() {
-                handleCellEdit(this, actualIndex, col);
-            });
-            
-            input.addEventListener('blur', function() {
-                validateSingleRow(actualIndex);
-            });
-            
-            td.appendChild(input);
-            tr.appendChild(td);
-        });
-        
-        tbody.appendChild(tr);
-    });
-    
-    // Update record count with pagination info
-    let countText = `Showing ${start + 1}-${end} of ${total} records`;
-    if (totalPages > 1) {
-        countText += ` (Page ${currentPage} of ${totalPages})`;
-    }
-    document.getElementById('recordCount').textContent = countText;
-    
-    // Render pagination controls
-    renderPaginationControls();
-}
-
-// --- Get Visible Columns ---
-function getVisibleColumns() {
-  
-    return fileHeaders; // <-- This saves the day!
-}
-
-// --- Render Column Mapping ---
-function renderColumnMapping(headers) {
-    const container = document.getElementById('mappingControls');
-    container.innerHTML = '';
-    
-    const requiredFields = {
-        'student_id_number': 'Student ID *',
-        'first_name': 'First Name *',
-        'last_name': 'Last Name *',
-        'email': 'Email *',
-        'program': 'Program *'
-    };
-    
-    const optionalFields = {
-        'middle_name': 'Middle Name',
-        'phone_number': 'Phone Number',
-        'year_graduated': 'Graduation Year',
-        'date_of_birth': 'Date of Birth',
-        'sex': 'Sex'
-    };
-    
-    const allFields = { ...requiredFields, ...optionalFields };
-    
-    Object.entries(allFields).forEach(([field, label]) => {
-        const div = document.createElement('div');
-        div.className = 'mapping-item';
-        
-        const labelEl = document.createElement('label');
-        labelEl.className = 'mapping-label';
-        labelEl.textContent = label;
-        div.appendChild(labelEl);
-        
-        const select = document.createElement('select');
-        select.id = `map-${field}`;
-        select.dataset.field = field;
-        
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = '-- Select Column --';
-        select.appendChild(defaultOption);
-        
-        headers.forEach(header => {
-            const option = document.createElement('option');
-            option.value = header;
-            option.textContent = header;
-            
-            // Auto-detect matching columns
-            const headerLower = header.toLowerCase();
-            const fieldLower = field.toLowerCase();
-            if (headerLower.includes(fieldLower.replace('_', ' ')) || 
-                headerLower === fieldLower ||
-                headerLower.replace(' ', '_') === fieldLower) {
-                option.selected = true;
-            }
-            
-            select.appendChild(option);
-        });
-        
-        select.addEventListener('change', function() {
-            columnMapping[this.dataset.field] = this.value;
-            renderPreviewTable(importedData);
-            validateAllRows();
-        });
-        
-        div.appendChild(select);
-        container.appendChild(div);
-    });
-}
-
-// --- Cell Edit Handler ---
-function handleCellEdit(input, rowIndex, column) {
-    const value = input.value;
-    importedData[rowIndex][column] = value;
-    
-    // Remove any existing error state
-    input.classList.remove('error', 'success');
-    const errorMsg = input.parentElement.querySelector('.error-message');
-    if (errorMsg) errorMsg.remove();
-}
-
-// --- Validate Single Row ---
-function validateSingleRow(rowIndex) {
-    const row = importedData[rowIndex];
-    if (!row) return;
-    
-    const errors = [];
-    const mappedFields = getFieldMapping();
-    
-    // Check required fields
-    const required = ['student_id_number', 'first_name', 'last_name', 'email', 'program'];
-    required.forEach(field => {
-        const col = mappedFields[field];
-        if (!col) {
-            errors.push(`Missing mapping for ${field}`);
-            return;
-        }
-        const value = row[col] || '';
-        if (!value.trim()) {
-            errors.push(`${field.replace('_', ' ')} is required`);
-        }
-    });
-    
-    // Validate email format
-    if (mappedFields.email && row[mappedFields.email]) {
-        const email = row[mappedFields.email];
-        if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-            errors.push('Invalid email format');
-        }
-    }
-    
-    // Update UI
-    const statusTd = document.getElementById(`status-${rowIndex}`);
-    const tr = statusTd?.closest('tr');
-    const inputs = tr?.querySelectorAll('.editable-cell');
-    
-    if (errors.length > 0) {
-        statusTd.innerHTML = '<i class="fa-solid fa-times-circle"></i>';
-        tr?.classList.add('error-row');
-        tr?.classList.remove('success-row');
-        
-        // Highlight fields with errors
-        inputs?.forEach(input => {
-            const col = input.dataset.column;
-            const field = findFieldByColumn(col);
-            if (field && required.includes(field)) {
-                if (!input.value.trim()) {
-                    input.classList.add('error');
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert(data.message || 'Alumni created successfully!', 'success');
+                    hideModal();
+                    // Reload to show the new alumni
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    // Handle validation errors
+                    let errorMessage = data.message || 'Failed to create alumni.';
+                    if (data.errors) {
+                        const errorList = Object.values(data.errors).flat().join('\n');
+                        errorMessage = errorList;
+                    }
+                    showAlert(errorMessage, 'error');
+                    
+                    // Re-enable button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
                 }
+            } catch (error) {
+                console.error('Create error:', error);
+                showAlert('An error occurred while creating the alumni.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
             }
         });
-    } else {
-        statusTd.innerHTML = '<i class="fa-solid fa-check-circle"></i>';
-        tr?.classList.remove('error-row');
-        tr?.classList.add('success-row');
-        
-        // Clear error states
-        inputs?.forEach(input => {
-            input.classList.remove('error');
-        });
     }
-    
-    // Store validation result
-    validationResults[rowIndex] = { errors, valid: errors.length === 0 };
-}
+});
 
-// --- Validate All Rows ---
-function validateAllRows() {
-    const total = importedData.length;
-    let validCount = 0;
-    let errorCount = 0;
+// ========================================
+// FIX: ENSURE DATA-ID ATTRIBUTE IS SET
+// ========================================
+
+// This runs on page load to ensure all cards have data-id
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure all alumni cards have data-id
+    document.querySelectorAll('.alumni-card').forEach(card => {
+        const manageBtn = card.querySelector('.manage-btn');
+        if (manageBtn && !card.dataset.id) {
+            const id = manageBtn.dataset.id;
+            if (id) {
+                card.dataset.id = id;
+                console.log('✅ Added data-id to card:', id);
+            }
+        }
+    });
+});
+
+// ========================================
+// FIX: UPDATE CARD STATUS FOR RESTRICT/UNRESTRICT - COMPLETE VERSION
+// ========================================
+
+function updateCardStatus(alumniId, newStatus) {
+    console.log('🔄 Updating card status for ID:', alumniId, 'New status:', newStatus);
     
-    for (let i = 0; i < total; i++) {
-        validateSingleRow(i);
-        if (validationResults[i]?.valid) {
-            validCount++;
-        } else {
-            errorCount++;
+    // Try to find the card by data-id first
+    let cards = document.querySelectorAll(`.alumni-card[data-id="${alumniId}"]`);
+    
+    // If not found, try to find by manage-btn
+    if (cards.length === 0) {
+        const manageBtn = document.querySelector(`.manage-btn[data-id="${alumniId}"]`);
+        if (manageBtn) {
+            const card = manageBtn.closest('.alumni-card');
+            if (card) {
+                cards = [card];
+                console.log('✅ Found card via manage-btn for status update');
+            }
         }
     }
     
-    // Update summary
-    updateValidationSummary(validCount, errorCount, total);
+    cards.forEach(card => {
+        // Update the status badge
+        const statusBadge = card.querySelector('.alumni-status');
+        if (statusBadge) {
+            if (newStatus === 0) {
+                // Restricted
+                statusBadge.innerHTML = `
+                    <span class="alumni-type-badge restricted" style="background: var(--danger-light); color: var(--danger);">
+                        <i class="fa-solid fa-user-slash"></i>
+                        Restricted
+                    </span>
+                `;
+                console.log('✅ Updated badge to Restricted');
+            } else {
+                // Active - show original type
+                const type = card.dataset.alumniType || 'college';
+                const typeLabels = {
+                    'shs': { icon: 'fa-solid fa-school', label: 'SHS' },
+                    'college': { icon: 'fa-solid fa-graduation-cap', label: 'College' }
+                };
+                const info = typeLabels[type] || typeLabels['college'];
+                statusBadge.innerHTML = `
+                    <span class="alumni-type-badge ${type}">
+                        <i class="${info.icon}"></i>
+                        ${info.label}
+                    </span>
+                `;
+                console.log('✅ Updated badge to', info.label);
+            }
+        }
+        
+        // Update the manage button data-status
+        const manageBtn = card.querySelector('.manage-btn');
+        if (manageBtn) {
+            manageBtn.dataset.status = newStatus;
+        }
+        
+        // 👇 THIS IS CRITICAL - Update the hidden input in manage modal
+        const statusInput = document.getElementById('manageAccountStatus');
+        if (statusInput) {
+            statusInput.value = newStatus;
+        }
+        
+        // 👇 THIS IS CRITICAL - Update current status variable
+        currentManageAccountStatus = newStatus;
+    });
+}
+
+// ========================================
+// FIX: IMPROVED REMOVE ALUMNI CARD - COMPLETE VERSION
+// ========================================
+
+function removeAlumniCard(alumniId, useAnimation = true) {
+    console.log('🗑️ Removing card with ID:', alumniId);
     
-    // Enable/disable import button
-    const importBtn = document.getElementById('confirmImportBtn');
-    if (errorCount === 0 && validCount > 0) {
-        importBtn.disabled = false;
-        importBtn.style.opacity = '1';
-    } else {
-        importBtn.disabled = true;
-        importBtn.style.opacity = '0.6';
+    if (!alumniId) {
+        console.warn('⚠️ No alumni ID provided');
+        return;
     }
-}
-
-// --- Update Validation Summary ---
-function updateValidationSummary(valid, errors, total) {
-    const summary = document.getElementById('validationSummary');
-    summary.style.display = 'block';
     
-    summary.innerHTML = `
-        <h5 style="margin: 0 0 0.75rem 0; color: var(--nu-blue);">
-            <i class="fa-solid fa-clipboard-check"></i> Validation Summary
-        </h5>
-        <div class="validation-summary-grid">
-            <div class="validation-stat success">
-                <span class="stat-number">${valid}</span>
-                <span class="stat-label">Valid Records</span>
-            </div>
-            <div class="validation-stat error">
-                <span class="stat-number">${errors}</span>
-                <span class="stat-label">Invalid Records</span>
-            </div>
-            <div class="validation-stat info">
-                <span class="stat-number">${total}</span>
-                <span class="stat-label">Total Records</span>
-            </div>
-        </div>
-        ${errors > 0 ? `
-            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--danger-light); border-radius: var(--radius); border-left: 4px solid var(--danger);">
-                <p style="font-size: 0.875rem; color: var(--danger); margin: 0;">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    ${errors} record(s) have errors. Please fix them before importing.
-                </p>
-            </div>
-        ` : `
-            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--success-light); border-radius: var(--radius); border-left: 4px solid var(--success);">
-                <p style="font-size: 0.875rem; color: var(--success); margin: 0;">
-                    <i class="fa-solid fa-check-circle"></i>
-                    All ${total} record(s) are valid and ready for import!
-                </p>
-            </div>
-        `}
-    `;
-}
-
-// --- Helper Functions ---
-function getFieldMapping() {
-    const mapping = {};
+    // Try multiple selectors
+    let cards = document.querySelectorAll(`.alumni-card[data-id="${alumniId}"]`);
     
-    // Combine BOTH required and optional fields so no data gets left behind during import!
-    const allFields = [
-        'student_id_number', 'first_name', 'last_name', 'email', 'program',
-        'middle_name', 'phone_number', 'year_graduated', 'date_of_birth', 'sex'
-    ];
+    // If not found, try to find by manage-btn data-id
+    if (cards.length === 0) {
+        const manageBtn = document.querySelector(`.manage-btn[data-id="${alumniId}"]`);
+        if (manageBtn) {
+            const card = manageBtn.closest('.alumni-card');
+            if (card) {
+                cards = [card];
+                console.log('✅ Found card via manage-btn');
+            }
+        }
+    }
     
-    allFields.forEach(field => {
-        const select = document.getElementById(`map-${field}`);
-        // Only map it if the user (or the auto-detect) actually selected a column
-        if (select && select.value !== '') {
-            mapping[field] = select.value;
+    // If still not found, try to find by scanning all cards
+    if (cards.length === 0) {
+        document.querySelectorAll('.alumni-card').forEach(card => {
+            const btn = card.querySelector('.manage-btn');
+            if (btn && btn.dataset.id == alumniId) {
+                cards = [card];
+                console.log('✅ Found card by scanning all cards');
+            }
+        });
+    }
+    
+    console.log(`📊 Found ${cards.length} cards to remove`);
+    
+    if (cards.length === 0) {
+        console.warn('⚠️ No cards found with ID:', alumniId);
+        // Update stats anyway
+        updateDirectoryStats();
+        return;
+    }
+    
+    cards.forEach(card => {
+        if (useAnimation) {
+            // Add fade-out animation
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.9)';
+            card.style.height = card.offsetHeight + 'px';
+            card.style.overflow = 'hidden';
+            
+            setTimeout(() => {
+                if (card.parentNode) {
+                    card.remove();
+                    console.log('✅ Card removed from DOM');
+                }
+            }, 300);
+        } else {
+            if (card.parentNode) {
+                card.remove();
+                console.log('✅ Card removed from DOM (no animation)');
+            }
         }
     });
     
-    return mapping;
+    // Update stats after a short delay
+    setTimeout(() => {
+        updateDirectoryStats();
+    }, 400);
 }
 
-function findFieldByColumn(column) {
-    const mapping = getFieldMapping();
-    for (const [field, col] of Object.entries(mapping)) {
-        if (col === column) return field;
-    }
-    return null;
-}
+// ========================================
+// FIX: EXECUTE RESTRICT - CLOSE BOTH MODALS
+// ========================================
 
-// --- Navigation Functions ---
-function backToUpload() {
-    document.getElementById('uploadStep').style.display = 'block';
-    document.getElementById('previewStep').style.display = 'none';
-    document.getElementById('bulkImportStatus').textContent = 'Returned to upload.';
-    document.getElementById('bulkImportStatus').style.color = 'var(--gray-500)';
-}
-
-// --- Render Pagination Controls ---
-function renderPaginationControls() {
-    const container = document.getElementById('paginationControls');
-    if (!container) return;
+async function executeRestrict(event) {
+    if (event) event.preventDefault();
     
-    const total = importedData.length;
-    const totalPages = Math.ceil(total / pageSize);
+    const id = document.getElementById('restrictAlumniId').value;
+    const action = document.getElementById('restrictAction').value;
+    const isRestricting = action === 'restrict';
     
-    // Don't show pagination if all records are shown or only 1 page
-    if (pageSize >= total || totalPages <= 1) {
-        container.innerHTML = '';
-        return;
-    }
+    console.log('🔒 Executing restrict/unrestrict:', { id, action, isRestricting });
     
-    let html = '';
-    
-    // Previous button
-    html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>
-        <i class="fa-solid fa-chevron-left"></i>
-    </button>`;
-    
-    // Page numbers
-    const maxVisible = 7;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage < maxVisible - 1) {
-        startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-    
-    if (startPage > 1) {
-        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(1)">1</button>`;
-        if (startPage > 2) {
-            html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
-        }
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-secondary'}" onclick="goToPage(${i})">
-            ${i}
-        </button>`;
-    }
-    
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            html += `<span style="color: var(--gray-400); padding: 0 0.25rem;">...</span>`;
-        }
-        html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${totalPages})">${totalPages}</button>`;
-    }
-    
-    // Next button
-    html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>
-        <i class="fa-solid fa-chevron-right"></i>
-    </button>`;
-    
-    // Page info
-    const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, total);
-    html += `<span style="font-size: 0.8125rem; color: var(--gray-500); margin-left: 0.5rem;">
-        ${start}-${end} of ${total}
-    </span>`;
-    
-    container.innerHTML = html;
-}
-
-
-// --- Change Page Size ---
-function changePageSize() {
-    const select = document.getElementById('pageSizeSelect');
-    const value = parseInt(select.value);
-    
-    if (value === 0) {
-        // Show all records
-        pageSize = importedData.length || 25;
-        currentPage = 1;
-    } else {
-        pageSize = value;
-        currentPage = 1;
-    }
-    
-    renderPreviewTable(importedData);
-    renderPaginationControls();
-    validateAllRows();
-}
-
-// --- Validate and Import ---
-async function validateAndImport() {
-    // Double-check all rows are valid
-    const total = importedData.length;
-    let allValid = true;
-    let invalidCount = 0;
-    
-    for (let i = 0; i < total; i++) {
-        if (!validationResults[i]?.valid) {
-            allValid = false;
-            invalidCount++;
-        }
-    }
-    
-    if (!allValid) {
-        showAlert(`Please fix ${invalidCount} error(s) before importing.`, 'error');
-        return;
-    }
-    
-    // Confirm with user
-    if (!confirm(`Ready to import ${total} alumni records. Continue?`)) {
-        return;
-    }
-    
-    const status = document.getElementById('bulkImportStatus');
-    const importBtn = document.getElementById('confirmImportBtn');
-    importBtn.disabled = true;
-    importBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
-    
-    // Get mapping
-    const mapping = getFieldMapping();
-    
-    // Prepare data for server - send the actual importedData with the mapping
-    const payload = {
-        data: importedData,
-        mapping: mapping,
-        _token: getCsrfToken()
+    let payload = {
+        restrict: isRestricting ? 1 : 0
     };
     
+    if (isRestricting) {
+        const reason = document.getElementById('restrictionReason').value;
+        const customReason = document.getElementById('customReason').value;
+        const comment = document.getElementById('restrictionComment').value;
+        
+        if (!reason) {
+            showAlert('Please select a reason for restriction.', 'error');
+            return;
+        }
+        
+        const finalReason = reason === 'other' ? customReason : reason;
+        
+        if (reason === 'other' && !customReason.trim()) {
+            showAlert('Please specify a custom reason.', 'error');
+            return;
+        }
+        
+        payload.restriction_reason = finalReason;
+        payload.restriction_comment = comment || '';
+    }
+    
+    // Show loading state on button
+    const submitBtn = document.getElementById('restrictConfirmBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    
     try {
-        const response = await fetch('/admin/alumni/process-bulk', {
-            method: 'POST',
+        const response = await fetch(`/admin/alumni/${id}/toggle-restrict`, {
+            method: 'PATCH',
             headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                 'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
             body: JSON.stringify(payload)
         });
         
-        const result = await response.json();
+        const data = await response.json();
+        console.log('📥 Restrict response:', data);
         
-        if (result.success) {
-            const { results } = result;
+        // ✅ CLOSE BOTH MODALS
+        hideRestrictReasonModal();
+        hideManageModal();
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
             
-            let message = `Import complete! ✅ ${results.successful} successful, ❌ ${results.failed} failed.`;
+            // Wait a tiny bit before removing the card for smoother UX
+            setTimeout(() => {
+                removeAlumniCard(id, true);
+            }, 300);
             
-            if (results.duplicates && results.duplicates.length > 0) {
-                message += `\n⚠️ ${results.duplicates.length} duplicates skipped.`;
-            }
-            
-            if (results.warnings && results.warnings.length > 0) {
-                message += `\n⚠️ ${results.warnings.length} warnings.`;
-            }
-            
-            if (results.errors && results.errors.length > 0) {
-                const errorList = results.errors.slice(0, 5).join('\n');
-                message += `\n\nErrors:\n${errorList}`;
-                if (results.errors.length > 5) {
-                    message += `\n...and ${results.errors.length - 5} more errors.`;
-                }
-            }
-            
-            status.innerHTML = message.replace(/\n/g, '<br>');
-            status.style.color = results.failed > 0 ? 'var(--warning)' : 'var(--success)';
-            
-            if (results.successful > 0) {
-                showAlert(`Successfully imported ${results.successful} alumni!`, 'success');
-                setTimeout(() => window.location.reload(), 2000);
-            } else if (results.failed > 0) {
-                showAlert('Import completed but no records were added. Check errors above.', 'warning');
-            }
+            // Update stats after animation
+            setTimeout(() => {
+                updateDirectoryStats();
+                // Update both badges
+                updateArchivedBadge();
+                updateRestrictedBadge();
+            }, 700);
         } else {
-            status.textContent = 'Error: ' + (result.message || 'Unknown error occurred.');
-            status.style.color = 'var(--danger)';
-            showAlert('Import failed: ' + result.message, 'error');
+            showAlert(data.message || 'Failed to update account status.', 'error');
         }
-        
     } catch (error) {
-        console.error('Import error:', error);
-        status.textContent = 'Error: ' + error.message;
-        status.style.color = 'var(--danger)';
-        showAlert('An error occurred during import.', 'error');
+        console.error('❌ Toggle restrict error:', error);
+        hideRestrictReasonModal();
+        hideManageModal();
+        showAlert('An error occurred while updating account status. Check console for details.', 'error');
     } finally {
-        importBtn.disabled = false;
-        importBtn.innerHTML = '<i class="fa-solid fa-check"></i> Import All';
+        // Reset button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
-// --- Go to Page ---
-function goToPage(page) {
-    const totalPages = Math.ceil(importedData.length / pageSize);
-    if (page < 1 || page > totalPages) return;
-    currentPage = page;
-    renderPreviewTable(importedData);
-    renderPaginationControls();
-    validateAllRows();
+// ========================================
+// UPDATE BADGE COUNTS
+// ========================================
+
+function updateArchivedBadge() {
+    const archivedBadge = document.querySelector('.btn-sm-link.archived .badge-count');
+    if (archivedBadge) {
+        fetch('/admin/alumni/archived-count', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.count !== undefined) {
+                archivedBadge.textContent = data.count;
+                if (data.count > 0) {
+                    archivedBadge.classList.add('has-items');
+                } else {
+                    archivedBadge.classList.remove('has-items');
+                }
+            }
+        })
+        .catch(error => console.error('Error updating archived badge:', error));
+    }
 }
 
-// --- Update Import Progress ---
-function updateImportProgress(current, total) {
-    const status = document.getElementById('bulkImportStatus');
-    const percentage = Math.round((current / total) * 100);
-    status.textContent = `Importing... ${current}/${total} (${percentage}%)`;
-    status.style.color = 'var(--info)';
+function updateRestrictedBadge() {
+    const restrictedBadge = document.querySelector('.btn-sm-link.restricted .badge-count');
+    if (restrictedBadge) {
+        fetch('/admin/alumni/restricted-count', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.count !== undefined) {
+                restrictedBadge.textContent = data.count;
+                if (data.count > 0) {
+                    restrictedBadge.classList.add('has-items');
+                } else {
+                    restrictedBadge.classList.remove('has-items');
+                }
+            }
+        })
+        .catch(error => console.error('Error updating restricted badge:', error));
+    }
 }
 
-// --- Clear All Errors ---
-function clearAllErrors() {
-    document.querySelectorAll('.error-row').forEach(tr => {
-        tr.classList.remove('error-row');
-    });
-    document.querySelectorAll('.editable-cell.error').forEach(input => {
-        input.classList.remove('error');
-    });
-    showAlert('Error indicators cleared.', 'info');
-}
+</script>
 
-// --- Helper: Get CSRF Token ---
-function getCsrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.content || '';
-}
-
-// --- Override the file input change event ---
-document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('bulkImportFile');
-    const previewBtn = document.getElementById('previewBtn');
-    const status = document.getElementById('bulkImportStatus');
-    
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files[0]) {
-            const fileName = e.target.files[0].name;
-            status.textContent = `Selected: ${fileName}`;
-            status.style.color = 'var(--success)';
-            previewBtn.disabled = false;
-            
-            // Enable preview button and auto-preview if file is selected
-            setTimeout(() => {
-                previewBtn.click();
-            }, 500);
-        }
-    });
-});
-
-    </script>
 </body>
 </html>
+
+{{-- This is admin_directory.blade.php --}}

@@ -96,27 +96,29 @@ class AdminController extends Controller
      */
     public function index()
     {
-        // Fetch all alumni for the grid
-        $alumni = Alumni::query()->latest('created_at')->get();
+        // Fetch ONLY active alumni (not archived, not restricted)
+        $alumni = Alumni::active()->latest('created_at')->get();
 
         // --- DIRECTORY STATS ---
         
-        // 1. Total Alumni Count
-        $totalAlumni = Alumni::count(); 
-        // Note: If you only want to count verified alumni, use: 
-        // $totalAlumni = Alumni::where('verification_status', 'verified')->count();
+        // 1. Total Alumni Count (active only)
+        $totalAlumni = Alumni::active()->count();
 
-        // 2. Recent Graduates (Alumni who graduated in the current year)
-        $recentGraduates = Alumni::whereYear('year_graduated', now()->year)->count();
+        // 2. Recent Graduates (active alumni who graduated in the current year)
+        $recentGraduates = Alumni::active()
+            ->whereYear('year_graduated', now()->year)
+            ->count();
 
-        // 3. Unique Programs Offered
-        $uniquePrograms = Alumni::whereNotNull('program')
+        // 3. Unique Programs Offered (active alumni)
+        $uniquePrograms = Alumni::active()
+            ->whereNotNull('program')
             ->where('program', '!=', '')
             ->distinct('program')
             ->count('program');
 
-        // 4. Alumni With Email Addresses
-        $withEmails = Alumni::whereNotNull('email')
+        // 4. Alumni With Email Addresses (active alumni)
+        $withEmails = Alumni::active()
+            ->whereNotNull('email')
             ->where('email', '!=', '')
             ->count();
 
@@ -1216,6 +1218,36 @@ protected function forceLogoutAdmin($adminId)
     }
 }
 
+/**
+ * Force logout an alumni by clearing their sessions
+ */
+protected function forceLogoutAlumni($alumniId)
+{
+    try {
+        // Check if session driver is database
+        if (config('session.driver') !== 'database') {
+            \Log::info('Session driver is not database, skipping force logout for alumni: ' . $alumniId);
+            return;
+        }
+
+        // Delete sessions where alumni_id is stored in the payload
+        $deleted = \DB::table('sessions')
+            ->where('payload', 'LIKE', '%"alumni_id";i:' . $alumniId . '%')
+            ->orWhere('payload', 'LIKE', '%"alumni_id";s:' . $alumniId . '%')
+            ->orWhere('payload', 'LIKE', '%"alumni_id":' . $alumniId . '%')
+            ->orWhere('user_id', $alumniId) // For web sessions using user_id
+            ->delete();
+
+        \Log::info('Force logout alumni', [
+            'alumni_id' => $alumniId,
+            'sessions_deleted' => $deleted
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to force logout alumni ' . $alumniId . ': ' . $e->getMessage());
+    }
+}
+
     protected function forceLogoutAdminFallback($adminId)
     {
         try {
@@ -1530,22 +1562,41 @@ protected function forceLogoutAdmin($adminId)
         }
     }
 
-/**
- * Toggle alumni account restriction
- */
 public function toggleRestrictAlumni(Request $request, $id)
 {
     $alumnus = Alumni::findOrFail($id);
     $currentAdmin = $this->getAuthenticatedAdmin($request);
 
-    // Toggle status (1 = active, 0 = restricted)
-    $newStatus = ($alumnus->account_status ?? 1) == 1 ? 0 : 1;
-    $isRestricted = $newStatus == 0;
+    $request->validate([
+        'restrict' => 'required|boolean',
+        'restriction_reason' => 'required_if:restrict,true|nullable|string|max:255',
+        'restriction_comment' => 'nullable|string|max:1000',
+    ]);
 
-    $alumnus->update(['account_status' => $newStatus]);
+    $isRestricting = $request->input('restrict') == 1;
+    $newStatus = $isRestricting ? 0 : 1;
+
+    $updateData = [
+        'account_status' => $newStatus,
+    ];
+
+    if ($isRestricting) {
+        $updateData['restriction_reason'] = $request->input('restriction_reason');
+        $updateData['restriction_comment'] = $request->input('restriction_comment', '');
+        $updateData['restricted_by'] = $currentAdmin->id;
+        $updateData['restricted_at'] = now();
+    } else {
+        // Clear restriction data when unrestricting
+        $updateData['restriction_reason'] = null;
+        $updateData['restriction_comment'] = null;
+        $updateData['restricted_by'] = null;
+        $updateData['restricted_at'] = null;
+    }
+
+    $alumnus->update($updateData);
 
     // Force logout if restricting
-    if ($isRestricted) {
+    if ($isRestricting) {
         $this->forceLogoutAlumni($alumnus->id);
     }
 
@@ -1554,32 +1605,41 @@ public function toggleRestrictAlumni(Request $request, $id)
         $service = new BrevoMailService();
         $htmlContent = view('emails.alumni_account_restricted', [
             'alumnus' => $alumnus,
-            'isRestricted' => $isRestricted,
+            'isRestricted' => $isRestricting,
             'updatedBy' => trim(
                 ($currentAdmin->admin_first_name ?? '') . ' ' . 
                 ($currentAdmin->admin_last_name ?? '')
-            )
+            ),
+            'restrictionReason' => $isRestricting ? $request->input('restriction_reason') : null,
+            'restrictionComment' => $isRestricting ? $request->input('restriction_comment') : null,
         ])->render();
 
-        $subject = $isRestricted 
+        $subject = $isRestricting 
             ? 'Your LumiNUs Account Has Been Restricted' 
             : 'Your LumiNUs Account Has Been Restored';
 
         $service->sendEmail($alumnus->email, $subject, $htmlContent);
 
-        \Log::info('Alumni account ' . ($isRestricted ? 'restricted' : 'unrestricted'), [
+        \Log::info('Alumni account ' . ($isRestricting ? 'restricted' : 'unrestricted'), [
             'alumni_id' => $alumnus->id,
             'alumni_email' => $alumnus->email,
             'performed_by' => $currentAdmin->id ?? null,
             'new_status' => $newStatus,
+            'reason' => $request->input('restriction_reason'),
+            'comment' => $request->input('restriction_comment'),
             'ip' => $request->ip()
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => $isRestricted 
+            'message' => $isRestricting 
                 ? $alumnus->first_name . '\'s account has been restricted and they have been logged out.'
-                : $alumnus->first_name . '\'s account has been unrestricted.'
+                : $alumnus->first_name . '\'s account has been unrestricted.',
+            'data' => [
+                'account_status' => $newStatus,
+                'restriction_reason' => $updateData['restriction_reason'] ?? null,
+                'restriction_comment' => $updateData['restriction_comment'] ?? null,
+            ]
         ], 200);
 
     } catch (\Throwable $e) {
@@ -1587,7 +1647,7 @@ public function toggleRestrictAlumni(Request $request, $id)
 
         return response()->json([
             'success' => true,
-            'message' => $isRestricted 
+            'message' => $isRestricting 
                 ? 'Account restricted, but email could not be sent.'
                 : 'Account unrestricted, but email could not be sent.',
             'warning' => true
@@ -1596,31 +1656,248 @@ public function toggleRestrictAlumni(Request $request, $id)
 }
 
 /**
- * Force logout an alumni by clearing their sessions
+ * Archive an alumni account (soft delete)
  */
-protected function forceLogoutAlumni($alumniId)
+public function archiveAlumni(Request $request, $id)
 {
+    $alumnus = Alumni::findOrFail($id);
+    $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+    // Check if already archived - use trashed() instead
+    if ($alumnus->trashed()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'This account is already archived.'
+        ], 400);
+    }
+
+    // Soft delete the account
+    $alumnus->delete();
+
+    // Force logout if they're logged in
+    $this->forceLogoutAlumni($alumnus->id);
+
+    \Log::info('Alumni account archived', [
+        'alumni_id' => $alumnus->id,
+        'alumni_email' => $alumnus->email,
+        'performed_by' => $currentAdmin->id ?? null,
+        'ip' => $request->ip()
+    ]);
+
+    // Send email notification
     try {
-        if (config('session.driver') !== 'database') {
-            \Log::info('Session driver is not database, skipping force logout for alumni: ' . $alumniId);
-            return;
+        $service = new BrevoMailService();
+        $htmlContent = view('emails.alumni_account_archived', [
+            'alumnus' => $alumnus,
+            'archivedBy' => trim(
+                ($currentAdmin->admin_first_name ?? '') . ' ' . 
+                ($currentAdmin->admin_last_name ?? '')
+            )
+        ])->render();
+
+        $service->sendEmail(
+            $alumnus->email,
+            'Your LumiNUs Account Has Been Archived',
+            $htmlContent
+        );
+
+    } catch (\Throwable $e) {
+        \Log::error('Failed to send archive email to ' . $alumnus->email . ': ' . $e->getMessage());
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => $alumnus->first_name . '\'s account has been archived successfully.'
+    ], 200);
+}
+
+/**
+ * Restore an archived alumni account
+ */
+public function restoreAlumni(Request $request, $id)
+{
+    $alumnus = Alumni::withTrashed()->findOrFail($id);
+    $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+    // Check if not archived - use trashed() instead
+    if (!$alumnus->trashed()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'This account is not archived.'
+        ], 400);
+    }
+
+    // Restore the account
+    $alumnus->restore();
+
+    \Log::info('Alumni account restored from archive', [
+        'alumni_id' => $alumnus->id,
+        'alumni_email' => $alumnus->email,
+        'performed_by' => $currentAdmin->id ?? null,
+        'ip' => $request->ip()
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => $alumnus->first_name . '\'s account has been restored successfully.'
+    ], 200);
+}
+
+/**
+ * Permanently delete an alumni account (hard delete)
+ */
+public function permanentlyDeleteAlumni(Request $request, $id)
+{
+    $alumnus = Alumni::withTrashed()->findOrFail($id);
+    $currentAdmin = $this->getAuthenticatedAdmin($request);
+
+    try {
+        // Delete all related records first
+        
+        // 1. Delete addresses
+        $alumnus->addresses()->delete();
+        
+        // 2. Delete employments
+        $alumnus->employments()->delete();
+        
+        // 3. Delete skills
+        $alumnus->skills()->delete();
+        
+        // 4. Delete posts and their related data
+        foreach ($alumnus->posts as $post) {
+            // Delete post images
+            $post->images()->delete();
+            // Delete post reactions
+            $post->reactions()->delete();
+            // Delete post comments (they will be handled below, but let's be safe)
+            $post->comments()->delete();
+            // Delete post reports
+            $post->reports()->delete();
+            // Delete the post
+            $post->delete();
+        }
+        
+        // 5. Delete comments (any remaining comments not tied to posts)
+        $alumnus->comments()->delete();
+        
+        // 6. Delete reactions (any remaining reactions)
+        $alumnus->reactions()->delete();
+        
+        // 7. Delete reposts
+        $alumnus->reposts()->delete();
+        
+        // 8. Delete event registrations
+        $alumnus->eventRegistrations()->delete();
+        
+        // 9. Delete tracer responses and their answers
+        foreach ($alumnus->tracerResponses as $response) {
+            // Delete tracer answers
+            $response->answers()->delete();
+            // Delete the response
+            $response->delete();
+        }
+        
+        // 10. Delete messages (sent and received)
+        $alumnus->messagesSent()->delete();
+        $alumnus->messagesReceived()->delete();
+        
+        // 11. Delete group chat memberships
+        $alumnus->groupChatMembers()->delete();
+        
+        // 12. Delete followers/following relationships
+        $alumnus->followers()->delete();
+        $alumnus->following()->delete();
+        
+        // 13. Delete dismissed notifications
+        $alumnus->dismissedNotifications()->delete();
+        
+        // 14. Delete favorite chats
+        $alumnus->favoriteChats()->delete();
+        
+        // 15. Delete DM settings
+        $alumnus->dmSettings()->delete();
+        
+        // 16. Delete calls (made and received)
+        $alumnus->callsMade()->delete();
+        $alumnus->callsReceived()->delete();
+
+        // 17. Delete photo from S3
+        if ($alumnus->card_photo) {
+            $this->deleteAlumniPhoto($alumnus->card_photo);
+        }
+        if ($alumnus->alumni_photo) {
+            $this->deleteAlumniPhoto($alumnus->alumni_photo);
         }
 
-        $deleted = \DB::table('sessions')
-            ->where('payload', 'LIKE', '%"alumni_id";i:' . $alumniId . '%')
-            ->orWhere('payload', 'LIKE', '%"alumni_id";s:' . $alumniId . '%')
-            ->orWhere('payload', 'LIKE', '%"alumni_id":' . $alumniId . '%')
-            ->orWhere('user_id', $alumniId) // For web sessions using user_id
-            ->delete();
+        // Finally, permanently delete the alumni
+        $alumnus->forceDelete();
 
-        \Log::info('Force logout alumni', [
-            'alumni_id' => $alumniId,
-            'sessions_deleted' => $deleted
+        \Log::info('Alumni account and all related data permanently deleted', [
+            'alumni_id' => $alumnus->id,
+            'alumni_email' => $alumnus->email,
+            'performed_by' => $currentAdmin->id ?? null,
+            'ip' => $request->ip()
         ]);
 
+        return response()->json([
+            'success' => true,
+            'message' => 'Alumni account and all associated data have been permanently deleted.'
+        ], 200);
+
     } catch (\Exception $e) {
-        \Log::error('Failed to force logout alumni ' . $alumniId . ': ' . $e->getMessage());
+        \Log::error('Failed to permanently delete alumni ' . $id . ': ' . $e->getMessage(), [
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'success' => false,
+            'message' => 'An error occurred while deleting the account: ' . $e->getMessage()
+        ], 500);
     }
+}
+
+/**
+ * Display archived alumni accounts
+ */
+public function archivedAlumni(Request $request)
+{
+    $archivedAlumni = Alumni::onlyTrashed()
+        ->latest('deleted_at')
+        ->paginate(20);
+
+    $totalArchived = Alumni::onlyTrashed()->count();
+    $totalRestricted = Alumni::whereNull('deleted_at')->where('account_status', 0)->count();
+    
+    // 👇 ADD THIS - Fetch restricted alumni for the restricted tab
+    $restrictedAlumni = Alumni::whereNull('deleted_at')
+        ->where('account_status', 0)
+        ->latest('restricted_at')
+        ->paginate(20);
+
+    return view('directory.archived', compact(
+        'archivedAlumni',
+        'totalArchived',
+        'totalRestricted',
+        'restrictedAlumni'  // 👈 ADD THIS
+    ));
+}
+
+/**
+ * Display restricted alumni accounts
+ */
+public function restrictedAlumni(Request $request)
+{
+    return redirect('/admin/directory/archived#tab-restricted');
+}
+
+/**
+ * Get restriction reasons for API
+ */
+public function getRestrictionReasons()
+{
+    return response()->json([
+        'success' => true,
+        'reasons' => Alumni::getRestrictionReasons()
+    ]);
 }
 
     /**
