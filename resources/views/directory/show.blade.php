@@ -1893,3 +1893,5 @@ document.querySelector('.interactions-modal-overlay')?.addEventListener('click',
     </script>
 </body>
 </html>
+
+{{-- This is the show alumni profile page - show.blade.php --}}

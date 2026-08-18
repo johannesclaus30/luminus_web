@@ -646,30 +646,12 @@ if ($alumniLocations->count() === 0) {
     }
 
     /**
-     * View a single post (for admin review)
+     * View a single post (for admin review) - Redirects to the dedicated view page
      */
     public function viewPost($id)
     {
-        $post = Post::with(['alumni', 'comments', 'reactions', 'images'])
-            ->find($id);
-
-        if (!$post) {
-            abort(404, 'Post not found');
-        }
-
-        $reports = PostReport::with('reporter')
-            ->where('post_id', $id)
-            ->get();
-
-        if (request()->wantsJson()) {
-            return response()->json([
-                'post' => $post,
-                'reports' => $reports,
-                'report_count' => $reports->count()
-            ]);
-        }
-
-        return view('admin.posts.view', compact('post', 'reports'));
+        // Redirect to the dedicated view post page
+        return redirect()->route('admin.posts.view', $id);
     }
 
     /**
@@ -893,5 +875,25 @@ if ($alumniLocations->count() === 0) {
             'latitude' => 0,
             'longitude' => 0
         ];
+    }
+
+    /**
+     * Display a single post for moderation preview
+     */
+    public function viewPostPage($id)
+    {
+        $post = \App\Models\Post::with([
+            'alumni',
+            'images',
+            'comments.alumni',
+            'reactions'
+        ])->findOrFail($id);
+        
+        // Get report count and reasons (if any)
+        $post->report_count = $post->reports()->count();
+        $post->report_reasons = $post->reports()->pluck('reason')->implode(', ');
+        $post->reported_at = $post->reports()->first()?->created_at;
+        
+        return view('view-post', compact('post'));
     }
 }

@@ -199,22 +199,95 @@
                 </div>
             </div>
 
-            <!-- Search & Actions Bar -->
+            <!-- Search & Filter Toolbar - Unified -->
             <div class="directory-toolbar">
                 <div class="search-wrapper">
                     <i class="fa-solid fa-magnifying-glass search-icon"></i>
                     <input id="searchInput" type="text" 
-                           placeholder="Search alumni by name, email, or program..." 
-                           class="search-bar" 
-                           oninput="filterAlumni()">
+                        placeholder="Search by name, email, program..." 
+                        class="search-bar" 
+                        oninput="performFilter()">
                     <button id="clearSearch" class="clear-search" onclick="clearSearch()" title="Clear search">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
+                
                 <div class="toolbar-actions">
-                    <span class="results-count" id="resultsCount">
-                        {{ $alumni->count() }} result{{ $alumni->count() != 1 ? 's' : '' }}
-                    </span>
+                    <!-- Quick Type Filters -->
+                    <div class="quick-filters">
+                        <button class="filter-pill active" data-filter="all" onclick="applyQuickFilter('all')" title="Show all alumni">
+                            <span>All</span>
+                            <span class="filter-count" id="countAll">0</span>
+                        </button>
+                        <button class="filter-pill" data-filter="college" onclick="applyQuickFilter('college')" title="Show college alumni">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                            <span>College</span>
+                            <span class="filter-count" id="countCollege">0</span>
+                        </button>
+                        <button class="filter-pill" data-filter="shs" onclick="applyQuickFilter('shs')" title="Show SHS alumni">
+                            <i class="fa-solid fa-school"></i>
+                            <span>SHS</span>
+                            <span class="filter-count" id="countShs">0</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Advanced Filter Toggle -->
+                    <button class="btn-filter-toggle" onclick="toggleAdvancedFilters()" title="Advanced filters">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Filters</span>
+                        <span class="filter-badge" id="activeFilterBadge" style="display:none;">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Advanced Filters Panel - Integrated -->
+            <div class="advanced-filters" id="advancedFilters" style="display:none;">
+                <div class="filter-grid">
+                    <!-- Program Filter -->
+                    <div class="filter-group">
+                        <label for="filterProgram">
+                            <i class="fa-solid fa-building-columns"></i> Program
+                        </label>
+                        <select id="filterProgram" onchange="applyAdvancedFilters()">
+                            <option value="">All Programs</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Year Graduated Filter -->
+                    <div class="filter-group">
+                        <label for="filterYear">
+                            <i class="fa-regular fa-calendar"></i> Year Graduated
+                        </label>
+                        <select id="filterYear" onchange="applyAdvancedFilters()">
+                            <option value="">All Years</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Sort By -->
+                    <div class="filter-group">
+                        <label for="filterSort">
+                            <i class="fa-solid fa-arrow-up-wide-short"></i> Sort By
+                        </label>
+                        <select id="filterSort" onchange="applyAdvancedFilters()">
+                            <option value="name_asc">Name (A-Z)</option>
+                            <option value="name_desc">Name (Z-A)</option>
+                            <option value="year_desc">Year Graduated (Newest)</option>
+                            <option value="year_asc">Year Graduated (Oldest)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="filter-group filter-actions-group">
+                        <label>&nbsp;</label>
+                        <div class="filter-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="resetFilters()">
+                                <i class="fa-solid fa-undo"></i> Reset
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="applyAdvancedFilters(); toggleAdvancedFilters();">
+                                <i class="fa-solid fa-check"></i> Apply
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -768,12 +841,13 @@
                             <label for="restrictionReason">Reason for Restriction <span style="color: var(--danger);">*</span></label>
                             <select id="restrictionReason" class="form-control" required>
                                 <option value="">Select a reason...</option>
-                                <option value="violation">Violation of Community Guidelines</option>
-                                <option value="spam">Spam or Unsolicited Messages</option>
-                                <option value="fake_account">Fake or Misleading Account Information</option>
-                                <option value="harassment">Harassment or Bullying</option>
-                                <option value="inappropriate_content">Posting Inappropriate Content</option>
-                                <option value="unauthorized_access">Unauthorized Access Attempts</option>
+                                <option value="spam_fraud">Spam or Fraud</option>
+                                <option value="nudity_sexual">Nudity or Sexual Content</option>
+                                <option value="hate_speech">Hate Speech or Symbols</option>
+                                <option value="violence">Violence or Dangerous Organizations</option>
+                                <option value="bullying">Bullying or Harassment</option>
+                                <option value="illegal_goods">Sale of Illegal or Regulated Goods</option>
+                                <option value="ip_violation">Intellectual Property Violation</option>
                                 <option value="other">Other (Please Specify)</option>
                             </select>
                         </div>
@@ -2884,6 +2958,315 @@ function updateRestrictedBadge() {
         .catch(error => console.error('Error updating restricted badge:', error));
     }
 }
+
+// ========================================
+// UNIFIED FILTER SYSTEM
+// ========================================
+
+let currentQuickFilter = 'all';
+let currentAdvancedFilters = {
+    program: '',
+    year: '',
+    sort: 'name_asc'
+};
+let activeFilterCount = 0;
+let availablePrograms = new Set();
+let availableYears = new Set();
+
+// Populate filter dropdowns from existing alumni cards
+function populateFilterOptions() {
+    const programSelect = document.getElementById('filterProgram');
+    const yearSelect = document.getElementById('filterYear');
+    
+    programSelect.innerHTML = '<option value="">All Programs</option>';
+    yearSelect.innerHTML = '<option value="">All Years</option>';
+    
+    availablePrograms = new Set();
+    availableYears = new Set();
+    
+    document.querySelectorAll('.alumni-card').forEach(card => {
+        // Get program
+        const programEl = card.querySelector('.alumni-program');
+        if (programEl) {
+            const programText = programEl.textContent.replace(/[^\w\s\-\(\)]/g, '').trim();
+            if (programText && programText !== 'Program not specified') {
+                availablePrograms.add(programText);
+            }
+        }
+        
+        // Get year
+        const metaItems = card.querySelectorAll('.meta-item');
+        metaItems.forEach(item => {
+            const text = item.textContent.trim();
+            if (text.includes('Graduated:')) {
+                const yearMatch = text.match(/(\d{4})/);
+                if (yearMatch) availableYears.add(yearMatch[1]);
+            }
+        });
+    });
+    
+    // Sort and populate
+    Array.from(availablePrograms).sort().forEach(program => {
+        const option = document.createElement('option');
+        option.value = program;
+        option.textContent = program;
+        programSelect.appendChild(option);
+    });
+    
+    Array.from(availableYears).sort((a, b) => b - a).forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelect.appendChild(option);
+    });
+}
+
+// Update filter counts
+function updateFilterCounts() {
+    const cards = document.querySelectorAll('.alumni-card');
+    let total = 0, college = 0, shs = 0;
+    
+    cards.forEach(card => {
+        const isVisible = card.style.display !== 'none';
+        if (isVisible) {
+            total++;
+            const typeBadge = card.querySelector('.alumni-type-badge');
+            if (typeBadge) {
+                if (typeBadge.classList.contains('college')) college++;
+                else if (typeBadge.classList.contains('shs')) shs++;
+            }
+        }
+    });
+    
+    document.getElementById('countAll').textContent = total;
+    document.getElementById('countCollege').textContent = college;
+    document.getElementById('countShs').textContent = shs;
+    document.getElementById('resultsCount').textContent = 
+        `${total} result${total != 1 ? 's' : ''}`;
+}
+
+// Apply quick filter
+function applyQuickFilter(type) {
+    currentQuickFilter = type;
+    
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.filter === type);
+    });
+    
+    // Reset advanced filters
+    document.getElementById('filterProgram').value = '';
+    document.getElementById('filterYear').value = '';
+    currentAdvancedFilters.program = '';
+    currentAdvancedFilters.year = '';
+    updateActiveFilterBadge();
+    
+    performFilter();
+}
+
+// Toggle advanced filters panel
+function toggleAdvancedFilters() {
+    const panel = document.getElementById('advancedFilters');
+    const btn = document.querySelector('.btn-filter-toggle');
+    
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        btn.classList.add('active');
+        populateFilterOptions();
+    } else {
+        panel.style.display = 'none';
+        btn.classList.remove('active');
+    }
+}
+
+// Apply advanced filters
+function applyAdvancedFilters() {
+    currentAdvancedFilters.program = document.getElementById('filterProgram').value;
+    currentAdvancedFilters.year = document.getElementById('filterYear').value;
+    currentAdvancedFilters.sort = document.getElementById('filterSort').value;
+    
+    // Unset quick filter if advanced filters are active
+    if (currentAdvancedFilters.program || currentAdvancedFilters.year) {
+        document.querySelectorAll('.filter-pill').forEach(pill => {
+            pill.classList.remove('active');
+        });
+        currentQuickFilter = 'all';
+    }
+    
+    updateActiveFilterBadge();
+    performFilter();
+}
+
+// Update active filter badge
+function updateActiveFilterBadge() {
+    const badge = document.getElementById('activeFilterBadge');
+    const count = Object.values(currentAdvancedFilters)
+        .filter(v => v !== '' && v !== 'name_asc').length;
+    activeFilterCount = count;
+    
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// Perform the actual filtering
+function performFilter() {
+    const cards = document.querySelectorAll('.alumni-card');
+    const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+    let visibleCount = 0;
+    let visibleCards = [];
+    
+    // Show/hide clear button
+    document.getElementById('clearSearch').style.display = searchQuery ? 'flex' : 'none';
+    
+    cards.forEach(card => {
+        // Get card data
+        const name = (card.dataset.name || '').toLowerCase();
+        const email = (card.dataset.email || '').toLowerCase();
+        const program = (card.dataset.program || '').toLowerCase();
+        const type = card.dataset.alumniType || '';
+        
+        // Search filter
+        let matchesSearch = !searchQuery || 
+            name.includes(searchQuery) || 
+            email.includes(searchQuery) || 
+            program.includes(searchQuery);
+        
+        // Quick filter
+        let matchesQuick = true;
+        if (currentQuickFilter !== 'all') {
+            matchesQuick = type === currentQuickFilter;
+        }
+        
+        // Advanced filters
+        let matchesAdvanced = true;
+        
+        if (currentAdvancedFilters.program) {
+            const cardProgram = card.querySelector('.alumni-program')?.textContent.replace(/[^\w\s\-\(\)]/g, '').trim() || '';
+            matchesAdvanced = matchesAdvanced && cardProgram === currentAdvancedFilters.program;
+        }
+        
+        if (currentAdvancedFilters.year) {
+            let cardYear = '';
+            card.querySelectorAll('.meta-item').forEach(item => {
+                const text = item.textContent.trim();
+                if (text.includes('Graduated:')) {
+                    const yearMatch = text.match(/(\d{4})/);
+                    if (yearMatch) cardYear = yearMatch[1];
+                }
+            });
+            matchesAdvanced = matchesAdvanced && cardYear === currentAdvancedFilters.year;
+        }
+        
+        const visible = matchesSearch && matchesQuick && matchesAdvanced;
+        
+        card.style.display = visible ? 'flex' : 'none';
+        if (visible) {
+            visibleCount++;
+            visibleCards.push(card);
+        }
+    });
+    
+    // Apply sorting
+    applySorting(visibleCards);
+    updateFilterCounts();
+    
+    // Show/hide no results
+    const grid = document.getElementById('alumniGrid');
+    const existingNoResults = grid.querySelector('.no-results');
+    
+    if (visibleCount === 0 && cards.length > 0) {
+        if (!existingNoResults) {
+            const noResults = document.createElement('div');
+            noResults.className = 'no-results';
+            noResults.innerHTML = `
+                <div class="empty-icon"><i class="fa-solid fa-filter-circle-xmark"></i></div>
+                <h4>No matching alumni found</h4>
+                <p>Try adjusting your search or filters</p>
+                <button class="btn btn-secondary btn-sm" onclick="resetFilters()" style="margin-top: 0.5rem;">
+                    <i class="fa-solid fa-undo"></i> Reset Filters
+                </button>
+            `;
+            grid.appendChild(noResults);
+        }
+    } else {
+        if (existingNoResults) existingNoResults.remove();
+    }
+}
+
+// Apply sorting
+function applySorting(visibleCards) {
+    const sort = currentAdvancedFilters.sort || 'name_asc';
+    const grid = document.getElementById('alumniGrid');
+    
+    if (visibleCards.length <= 1) return;
+    
+    visibleCards.sort((a, b) => {
+        const getName = (card) => {
+            const nameEl = card.querySelector('.alumni-name');
+            return nameEl ? nameEl.textContent.trim() : '';
+        };
+        const getYear = (card) => {
+            let year = 0;
+            card.querySelectorAll('.meta-item').forEach(item => {
+                const text = item.textContent.trim();
+                if (text.includes('Graduated:')) {
+                    const yearMatch = text.match(/(\d{4})/);
+                    if (yearMatch) year = parseInt(yearMatch[1]);
+                }
+            });
+            return year;
+        };
+        
+        const nameA = getName(a), nameB = getName(b);
+        const yearA = getYear(a), yearB = getYear(b);
+        
+        switch(sort) {
+            case 'name_asc': return nameA.localeCompare(nameB);
+            case 'name_desc': return nameB.localeCompare(nameA);
+            case 'year_desc': return yearB - yearA;
+            case 'year_asc': return yearA - yearB;
+            default: return 0;
+        }
+    });
+    
+    visibleCards.forEach(card => grid.appendChild(card));
+}
+
+// Reset all filters
+function resetFilters() {
+    currentQuickFilter = 'all';
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.filter === 'all');
+    });
+    
+    document.getElementById('filterProgram').value = '';
+    document.getElementById('filterYear').value = '';
+    document.getElementById('filterSort').value = 'name_asc';
+    document.getElementById('searchInput').value = '';
+    
+    currentAdvancedFilters = { program: '', year: '', sort: 'name_asc' };
+    updateActiveFilterBadge();
+    performFilter();
+}
+
+// Clear search
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    performFilter();
+    document.getElementById('searchInput').focus();
+}
+
+// Initialize filter system
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        populateFilterOptions();
+        updateFilterCounts();
+        document.querySelector('.filter-pill[data-filter="all"]')?.classList.add('active');
+    }, 300);
+});
 
 </script>
 

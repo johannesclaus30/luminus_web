@@ -871,6 +871,67 @@
                 </div>
             </div>
 
+            <!-- Post Interactions Modal -->
+            <div id="interactionsModal" class="interactions-modal" style="display: none;">
+                <div class="interactions-modal-overlay" onclick="closeInteractionsModal()"></div>
+                <div class="interactions-modal-content">
+                    <div class="interactions-modal-header">
+                        <div class="interactions-modal-title">
+                            <i class="fa-regular fa-heart"></i>
+                            <span id="interactionsModalTitle">Interactions</span>
+                            <span class="interactions-count" id="interactionsCount">(0)</span>
+                        </div>
+                        <button class="interactions-modal-close" onclick="closeInteractionsModal()">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="interactions-modal-body">
+                        <!-- Tabs -->
+                        <div class="interactions-tabs">
+                            <button class="interactions-tab active" data-tab="likes" onclick="switchInteractionTab('likes')">
+                                <i class="fa-regular fa-heart"></i> Likes
+                            </button>
+                            <button class="interactions-tab" data-tab="comments" onclick="switchInteractionTab('comments')">
+                                <i class="fa-regular fa-comment"></i> Comments
+                            </button>
+                            <button class="interactions-tab" data-tab="reposts" onclick="switchInteractionTab('reposts')">
+                                <i class="fa-solid fa-retweet"></i> Reposts
+                            </button>
+                        </div>
+                        
+                        <!-- Content Panels -->
+                        <div class="interactions-panels">
+                            <!-- Likes Panel -->
+                            <div class="interactions-panel active" id="likesPanel">
+                                <div class="interactions-list" id="likesList">
+                                    <div class="interactions-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading likes...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Comments Panel -->
+                            <div class="interactions-panel" id="commentsPanel">
+                                <div class="interactions-list" id="commentsList">
+                                    <div class="interactions-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading comments...
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Reposts Panel -->
+                            <div class="interactions-panel" id="repostsPanel">
+                                <div class="interactions-list" id="repostsList">
+                                    <div class="interactions-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading reposts...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
     <!-- ============================================ -->
     <!-- JAVASCRIPT -->
     <!-- ============================================ -->
@@ -1311,8 +1372,15 @@
         });
     }
 
-    function restrictUser(alumniId) {
-        if (!confirm('Are you sure you want to restrict this user? This will suspend their account.')) return;
+function restrictUser(alumniId) {
+    // Check if the user is already restricted
+    const userRow = document.querySelector(`.violator-item[data-id="${alumniId}"]`) || 
+                    document.querySelector(`.moderation-item[data-id="${alumniId}"]`);
+    
+    const isRestricted = userRow?.dataset?.status === '0';
+    
+    if (isRestricted) {
+        if (!confirm('This user is currently restricted. Do you want to unrestrict them?')) return;
         
         fetch('/admin/restrict-user', {
             method: 'POST',
@@ -1320,7 +1388,10 @@
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
             },
-            body: JSON.stringify({ alumni_id: alumniId })
+            body: JSON.stringify({ 
+                alumni_id: alumniId, 
+                restrict: 0 
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -1333,11 +1404,153 @@
         .catch(error => {
             alert('An error occurred. Please try again.');
         });
+        return;
     }
+    
+    // Show restriction reason modal with new reasons
+    const reasonOptions = [
+        'Spam or Fraud',
+        'Nudity or Sexual Content', 
+        'Hate Speech or Symbols',
+        'Violence or Dangerous Organizations',
+        'Bullying or Harassment',
+        'Sale of Illegal or Regulated Goods',
+        'Intellectual Property Violation',
+        'Other'
+    ];
+    
+    let reasonHtml = reasonOptions.map(r => 
+        `<option value="${r.toLowerCase().replace(/ /g, '_')}">${r}</option>`
+    ).join('');
+    
+    const reasonModal = `
+        <div id="restrictReasonModal" class="modal-overlay active" style="display:flex;">
+            <div class="modal-content-wrapper" style="max-width: 500px;">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <div>
+                            <h2 class="modal-title">
+                                <i class="fa-solid fa-user-slash"></i>
+                                Restrict User
+                            </h2>
+                            <p class="modal-subtitle">Select a reason for restricting this user</p>
+                        </div>
+                        <button class="modal-close" onclick="closeRestrictModal()">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="restrictForm" onsubmit="submitRestrict(event, ${alumniId})">
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <label for="restrictionReason" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.875rem;">
+                                    Reason for Restriction <span style="color: var(--danger);">*</span>
+                                </label>
+                                <select id="restrictionReason" required style="width: 100%; padding: 0.75rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); font-size: 0.9375rem; font-family: inherit;">
+                                    <option value="">Select a reason...</option>
+                                    ${reasonHtml}
+                                </select>
+                            </div>
+                            <div class="form-group" id="customReasonGroup" style="display: none; margin-bottom: 1rem;">
+                                <label for="customReason" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.875rem;">
+                                    Please specify:
+                                </label>
+                                <input type="text" id="customReason" placeholder="Enter custom reason..." style="width: 100%; padding: 0.75rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); font-size: 0.9375rem; font-family: inherit;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <label for="restrictionComment" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.875rem;">
+                                    Additional Comments <span style="font-weight: 400; color: var(--gray-500);">(Optional)</span>
+                                </label>
+                                <textarea id="restrictionComment" rows="3" placeholder="Add any additional notes..." style="width: 100%; padding: 0.75rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); font-size: 0.9375rem; font-family: inherit; resize: vertical; min-height: 80px;"></textarea>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid var(--gray-100);">
+                                <button type="button" class="btn btn-secondary" onclick="closeRestrictModal()">Cancel</button>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fa-solid fa-lock"></i> Restrict User
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if present
+    const existingModal = document.getElementById('restrictReasonModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', reasonModal);
+    document.body.style.overflow = 'hidden';
+    
+    // Handle "Other" selection
+    document.getElementById('restrictionReason').addEventListener('change', function() {
+        const customGroup = document.getElementById('customReasonGroup');
+        if (this.value === 'other') {
+            customGroup.style.display = 'block';
+        } else {
+            customGroup.style.display = 'none';
+        }
+    });
+}
+
+function closeRestrictModal() {
+    const modal = document.getElementById('restrictReasonModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+}
+
+function submitRestrict(event, alumniId) {
+    event.preventDefault();
+    
+    const reason = document.getElementById('restrictionReason').value;
+    const customReason = document.getElementById('customReason')?.value || '';
+    const comment = document.getElementById('restrictionComment')?.value || '';
+    
+    if (!reason) {
+        alert('Please select a reason for restriction.');
+        return;
+    }
+    
+    const finalReason = reason === 'other' ? customReason : reason;
+    
+    if (reason === 'other' && !customReason.trim()) {
+        alert('Please specify a custom reason.');
+        return;
+    }
+    
+    fetch('/admin/restrict-user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify({ 
+            alumni_id: alumniId, 
+            restrict: 1,
+            restriction_reason: finalReason,
+            restriction_comment: comment
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeRestrictModal();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('An error occurred. Please try again.');
+    });
+}
 
     function viewPost(postId) {
-        // Implement view post modal or redirect
-        window.open('/admin/posts/' + postId, '_blank');
+        // Open the dedicated view post page in a new tab
+        window.open('/admin/posts/' + postId + '/view', '_blank');
     }
 
     function viewComment(commentId) {
@@ -1561,58 +1774,260 @@
     body.innerHTML = html;
 }
 
-    function loadPostDetails(id, bodyId) {
-        const body = document.getElementById(bodyId);
-        const posts = moderationData.reportedPosts;
-        const post = posts.find(p => p.id === id);
+function loadPostDetails(id, bodyId) {
+    const body = document.getElementById(bodyId);
+    const posts = moderationData.reportedPosts;
+    const post = posts.find(p => p.id === id);
+    
+    if (post) {
+        // Get the full post data including images
+        fetch(`/admin/posts/${id}/full`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const fullPost = data.post;
+                renderPostDetailModal(body, fullPost, post);
+            } else {
+                // Fallback to basic info if API fails
+                renderBasicPostDetail(body, post);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading full post:', error);
+            // Fallback to basic info
+            renderBasicPostDetail(body, post);
+        });
+    } else {
+        body.innerHTML = `<div class="empty-state"><p>Post not found</p></div>`;
+    }
+}
+
+function renderPostDetailModal(body, fullPost, reportData) {
+    // Get author info
+    const author = fullPost.alumni || {};
+    const authorName = author ? `${author.first_name || ''} ${author.last_name || ''}`.trim() : 'Unknown';
+    const initials = author ? (author.first_name?.[0] || '?') + (author.last_name?.[0] || '') : '?';
+    
+    // Get profile photo
+    let authorPhoto = '';
+    const photoPath = trim((author?.alumni_photo || author?.card_photo || ''));
+    if (photoPath) {
+        if (photoPath.match(/^https?:\/\//i)) {
+            authorPhoto = photoPath;
+        } else if (photoPath.startsWith('/storage/') || photoPath.startsWith('storage/')) {
+            authorPhoto = photoPath.startsWith('/') ? photoPath : '/' + photoPath;
+        } else {
+            const supabaseUrl = '{{ rtrim(config("filesystems.disks.s3.url", ""), "/") }}';
+            authorPhoto = supabaseUrl ? supabaseUrl + '/' + ltrim(photoPath, '/') : '';
+        }
+    }
+    
+    // Build images HTML
+    let imagesHtml = '';
+    if (fullPost.images && fullPost.images.length > 0) {
+        const imageCount = fullPost.images.length;
+        const gridClass = imageCount === 1 ? 'grid-1' : (imageCount === 2 ? 'grid-2' : (imageCount === 3 ? 'grid-3' : 'grid-4'));
         
-        if (post) {
-            body.innerHTML = `
-                <div class="modal-detail-section">
-                    <div class="detail-row full-width">
-                        <span class="detail-label">Post Content</span>
-                        <span class="detail-value" style="font-size: 1rem; background: var(--gray-50); padding: 1rem; border-radius: var(--radius);">${post.caption || 'No caption'}</span>
+        imagesHtml = `
+            <div class="modal-post-images ${gridClass}">
+                ${fullPost.images.map(img => {
+                    const imgPath = ltrim(img.image_path || '', '/');
+                    const supabaseUrl = '{{ rtrim(config("filesystems.disks.s3.url", ""), "/") }}';
+                    const imgUrl = supabaseUrl ? supabaseUrl + '/' + imgPath : imgPath;
+                    return `<img src="${imgUrl}" alt="Post image" onclick="window.open('${imgUrl}', '_blank')" loading="lazy" onerror="this.style.display='none'">`;
+                }).join('')}
+            </div>
+        `;
+    }
+    
+    // Build comments HTML (top 5)
+    let commentsHtml = '';
+    if (fullPost.comments && fullPost.comments.length > 0) {
+        const topComments = fullPost.comments.slice(0, 5);
+        commentsHtml = `
+            <div class="modal-post-comments">
+                <div class="comments-header">
+                    <i class="fa-regular fa-comment-dots"></i>
+                    Comments (${fullPost.comments.length})
+                </div>
+                ${topComments.map(c => {
+                    const cAuthor = c.alumni || {};
+                    const cName = cAuthor ? `${cAuthor.first_name || ''} ${cAuthor.last_name || ''}`.trim() : 'Unknown';
+                    return `
+                        <div class="modal-comment-item">
+                            <div class="modal-comment-avatar">${(cAuthor.first_name?.[0] || '?') + (cAuthor.last_name?.[0] || '')}</div>
+                            <div class="modal-comment-body">
+                                <div class="modal-comment-author">${cName}</div>
+                                <div class="modal-comment-text">${escapeHtml(c.comment || '')}</div>
+                                <div class="modal-comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+                ${fullPost.comments.length > 5 ? `<div class="more-comments">+ ${fullPost.comments.length - 5} more comments</div>` : ''}
+            </div>
+        `;
+    }
+    
+    // Build reactions summary
+    let reactionsHtml = '';
+    if (fullPost.reactions && fullPost.reactions.length > 0) {
+        const reactionCounts = {};
+        fullPost.reactions.forEach(r => {
+            reactionCounts[r.reaction] = (reactionCounts[r.reaction] || 0) + 1;
+        });
+        const reactionEmojis = {
+            'like': '❤️',
+            'love': '😍',
+            'insightful': '💡',
+            'support': '🤝'
+        };
+        reactionsHtml = Object.entries(reactionCounts).map(([type, count]) => 
+            `${reactionEmojis[type] || '👍'} ${count}`
+        ).join(' ');
+    }
+    
+    body.innerHTML = `
+        <div class="modal-post-full">
+            <!-- Author Info -->
+            <div class="modal-post-author">
+                <div class="modal-post-avatar" style="${authorPhoto ? 'padding: 0; overflow: hidden; background: none;' : ''}">
+                    ${authorPhoto ? `<img src="${authorPhoto}" alt="${authorName}" onerror="this.style.display='none'; this.parentElement.innerHTML='${initials}';">` : initials}
+                </div>
+                <div class="modal-post-author-info">
+                    <div class="modal-post-author-name">${authorName}</div>
+                    <div class="modal-post-author-meta">
+                        <span><i class="fa-regular fa-calendar"></i> ${fullPost.created_at ? new Date(fullPost.created_at).toLocaleString() : 'N/A'}</span>
+                        <span class="post-badge visibility ${fullPost.visibility || 'public'}">
+                            <i class="fa-solid fa-${(fullPost.visibility || 'public') === 'public' ? 'globe' : 'lock'}"></i>
+                            ${fullPost.visibility || 'Public'}
+                        </span>
+                        <span class="post-badge moderation ${fullPost.moderation_status || 'pending'}">
+                            <i class="fa-solid fa-${(fullPost.moderation_status || 'pending') === 'approved' ? 'check' : 'clock'}"></i>
+                            ${fullPost.moderation_status || 'Pending'}
+                        </span>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Caption -->
+            ${fullPost.caption ? `<div class="modal-post-caption">${escapeHtml(fullPost.caption)}</div>` : ''}
+            
+            <!-- Images -->
+            ${imagesHtml}
+            
+            <!-- Reactions Summary -->
+            ${reactionsHtml ? `<div class="modal-post-reactions">${reactionsHtml}</div>` : ''}
+            
+            <!-- Comments -->
+            ${commentsHtml}
+            
+            <!-- Report Details -->
+            <div class="modal-post-report-details">
+                <div class="report-details-header">
+                    <i class="fa-solid fa-flag" style="color: var(--danger);"></i>
+                    Report Details
+                    <span class="report-count-badge-small">${reportData.report_count} report${reportData.report_count > 1 ? 's' : ''}</span>
+                </div>
+                <div class="report-details-body">
                     <div class="detail-row">
-                        <span class="detail-label">Author</span>
-                        <span class="detail-value">${post.alumni ? post.alumni.first_name + ' ' + post.alumni.last_name : 'Unknown'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Posted Date</span>
-                        <span class="detail-value">${post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Date not available'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Report Count</span>
-                        <span class="detail-value"><strong>${post.report_count}</strong></span>
-                    </div>
-                    <div class="detail-row full-width">
                         <span class="detail-label">Report Reasons</span>
-                        <span class="detail-value">${post.report_reasons || 'No specific reasons provided'}</span>
+                        <span class="detail-value">${reportData.report_reasons || 'No specific reasons provided'}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Status</span>
-                        <span class="detail-value">${post.moderation_status || 'unknown'}</span>
+                        <span class="detail-value">${fullPost.moderation_status || 'pending'}</span>
                     </div>
-                    <div class="detail-actions">
-                        <button class="btn btn-primary btn-sm" onclick="viewPost(${post.id})">
-                            <i class="fa-solid fa-eye"></i> View Full Post
-                        </button>
-                        <button class="btn btn-success btn-sm" onclick="moderatePost(${post.id}, 'approve')">
-                            <i class="fa-solid fa-check"></i> Approve
-                        </button>
-                        <button class="btn btn-warning btn-sm" onclick="moderatePost(${post.id}, 'hide')">
-                            <i class="fa-solid fa-eye-slash"></i> Hide
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="moderatePost(${post.id}, 'delete')">
-                            <i class="fa-solid fa-trash"></i> Delete
-                        </button>
+                    ${reportData.created_at ? `
+                    <div class="detail-row">
+                        <span class="detail-label">First Reported</span>
+                        <span class="detail-value">${new Date(reportData.created_at).toLocaleString()}</span>
                     </div>
+                    ` : ''}
                 </div>
-            `;
-        } else {
-            body.innerHTML = `<div class="empty-state"><p>Post not found</p></div>`;
-        }
+            </div>
+            
+            <!-- Actions -->
+            <div class="detail-actions">
+                <button class="btn btn-primary btn-sm" onclick="viewPost(${reportData.id})">
+                    <i class="fa-solid fa-eye"></i> View Full Post
+                </button>
+                <button class="btn btn-success btn-sm" onclick="moderatePost(${reportData.id}, 'approve')">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+                <button class="btn btn-warning btn-sm" onclick="moderatePost(${reportData.id}, 'hide')">
+                    <i class="fa-solid fa-eye-slash"></i> Hide
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="moderatePost(${reportData.id}, 'delete')">
+                    <i class="fa-solid fa-trash"></i> Delete
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="restrictUser(${fullPost.alumni_id})">
+                    <i class="fa-solid fa-user-slash"></i> Restrict User
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderBasicPostDetail(body, post) {
+    body.innerHTML = `
+        <div class="modal-detail-section">
+            <div class="detail-row full-width">
+                <span class="detail-label">Post Content</span>
+                <span class="detail-value" style="font-size: 1rem; background: var(--gray-50); padding: 1rem; border-radius: var(--radius);">${post.caption || 'No caption'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Author</span>
+                <span class="detail-value">${post.alumni ? post.alumni.first_name + ' ' + post.alumni.last_name : 'Unknown'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Posted Date</span>
+                <span class="detail-value">${post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Date not available'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Report Count</span>
+                <span class="detail-value"><strong>${post.report_count}</strong></span>
+            </div>
+            <div class="detail-row full-width">
+                <span class="detail-label">Report Reasons</span>
+                <span class="detail-value">${post.report_reasons || 'No specific reasons provided'}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">${post.moderation_status || 'unknown'}</span>
+            </div>
+            <div class="detail-actions">
+                <button class="btn btn-primary btn-sm" onclick="viewPost(${post.id})">
+                    <i class="fa-solid fa-eye"></i> View Full Post
+                </button>
+                <button class="btn btn-success btn-sm" onclick="moderatePost(${post.id}, 'approve')">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+                <button class="btn btn-warning btn-sm" onclick="moderatePost(${post.id}, 'hide')">
+                    <i class="fa-solid fa-eye-slash"></i> Hide
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="moderatePost(${post.id}, 'delete')">
+                    <i class="fa-solid fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Helper function to trim strings
+function trim(str) {
+    return (str || '').trim();
+}
+
+// Helper function to left trim
+function ltrim(str, char) {
+    if (!str) return '';
+    char = char || '/';
+    while (str.startsWith(char)) {
+        str = str.substring(1);
     }
+    return str;
+}
 
   function loadAllPosts(bodyId) {
     const body = document.getElementById(bodyId);
@@ -1709,7 +2124,7 @@
         }
     }
 
-  function loadAllComments(bodyId) {
+ function loadAllComments(bodyId) {
     const body = document.getElementById(bodyId);
     const comments = moderationData.reportedComments;
     
@@ -1748,6 +2163,237 @@
     html += `</div>`;
     body.innerHTML = html;
 }
+
+let currentPostId = null;
+let currentTab = 'likes';
+
+function openInteractionsModal(postId, tab = 'likes') {
+    currentPostId = postId;
+    currentTab = tab;
+    
+    const modal = document.getElementById('interactionsModal');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Set title
+    const titleMap = {
+        'likes': 'Likes',
+        'comments': 'Comments',
+        'reposts': 'Reposts'
+    };
+    document.getElementById('interactionsModalTitle').textContent = titleMap[tab] || 'Interactions';
+    
+    // Switch tab
+    switchInteractionTab(tab);
+    
+    // Load data
+    loadInteractions(postId, tab);
+}
+
+function closeInteractionsModal() {
+    const modal = document.getElementById('interactionsModal');
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    currentPostId = null;
+}
+
+function switchInteractionTab(tab) {
+    currentTab = tab;
+    
+    // Update tabs
+    document.querySelectorAll('.interactions-tab').forEach(t => {
+        t.classList.remove('active');
+        if (t.dataset.tab === tab) {
+            t.classList.add('active');
+        }
+    });
+    
+    // Update panels
+    document.querySelectorAll('.interactions-panel').forEach(p => {
+        p.classList.remove('active');
+    });
+    const panel = document.getElementById(tab + 'Panel');
+    if (panel) {
+        panel.classList.add('active');
+    }
+    
+    // Update title
+    const titleMap = {
+        'likes': 'Likes',
+        'comments': 'Comments',
+        'reposts': 'Reposts'
+    };
+    document.getElementById('interactionsModalTitle').textContent = titleMap[tab] || 'Interactions';
+    
+    // Load data if we have a post ID
+    if (currentPostId) {
+        loadInteractions(currentPostId, tab);
+    }
+}
+
+function loadInteractions(postId, type) {
+    const listId = type + 'List';
+    const list = document.getElementById(listId);
+    
+    if (!list) {
+        console.error('List element not found:', listId);
+        return;
+    }
+    
+    // Show loading
+    list.innerHTML = `
+        <div class="interactions-loading">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading ${type}...
+        </div>
+    `;
+    
+    // Get CSRF token
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    
+    // Make AJAX request
+    fetch(`/admin/posts/${postId}/interactions?type=${type}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': token
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            renderInteractions(listId, data.data, type);
+            const countEl = document.getElementById('interactionsCount');
+            if (countEl) {
+                countEl.textContent = `(${data.total || 0})`;
+            }
+        } else {
+            list.innerHTML = `
+                <div class="interactions-empty">
+                    <i class="fa-regular fa-circle-xmark"></i>
+                    <p>${data.message || 'Failed to load interactions.'}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading interactions:', error);
+        list.innerHTML = `
+            <div class="interactions-empty">
+                <i class="fa-regular fa-circle-xmark"></i>
+                <p>Error loading ${type}. Please try again.</p>
+            </div>
+        `;
+    });
+}
+
+function renderInteractions(listId, items, type) {
+    const list = document.getElementById(listId);
+    
+    if (!list) return;
+    
+    if (!items || items.length === 0) {
+        const iconMap = {
+            'likes': 'fa-regular fa-heart',
+            'comments': 'fa-regular fa-comment',
+            'reposts': 'fa-solid fa-retweet'
+        };
+        list.innerHTML = `
+            <div class="interactions-empty">
+                <i class="${iconMap[type] || 'fa-regular fa-circle'}" style="font-size: 2.5rem;"></i>
+                <p>No ${type} yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    items.forEach(item => {
+        const initials = (item.first_name?.[0] || '?') + (item.last_name?.[0] || '');
+        const fullName = `${item.first_name || 'Unknown'} ${item.last_name || ''}`.trim();
+        const timeAgo = item.created_at ? timeAgoHelper(item.created_at) : '';
+        
+        // Check if user has a profile photo
+        let avatarHtml = '';
+        if (item.profile_photo) {
+            avatarHtml = `<img src="${item.profile_photo}" alt="${fullName}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            avatarHtml = initials.toUpperCase();
+        }
+        
+        let detailHtml = '';
+        if (type === 'comments' && item.comment) {
+            detailHtml = `<div class="interactions-item-detail"><i class="fa-regular fa-comment"></i> ${escapeHtml(item.comment)}</div>`;
+        } else if (type === 'reposts' && item.caption) {
+            detailHtml = `<div class="interactions-item-detail"><i class="fa-regular fa-retweet"></i> ${escapeHtml(item.caption)}</div>`;
+        }
+        
+        html += `
+            <div class="interactions-item">
+                <div class="interactions-item-avatar" style="${item.profile_photo ? 'padding: 0; overflow: hidden; background: none;' : ''}">
+                    ${avatarHtml}
+                </div>
+                <div class="interactions-item-info">
+                    <div class="interactions-item-name">${escapeHtml(fullName)}</div>
+                    ${detailHtml}
+                </div>
+                ${timeAgo ? `<div class="interactions-item-time">${timeAgo}</div>` : ''}
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+}
+
+function timeAgoHelper(dateString) {
+    const now = new Date();
+    const past = new Date(dateString);
+    const diffMs = now - past;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return diffMins + 'm ago';
+    if (diffHours < 24) return diffHours + 'h ago';
+    if (diffDays < 7) return diffDays + 'd ago';
+    return past.toLocaleDateString();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+// Close modal on ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('interactionsModal');
+        if (modal && modal.style.display === 'flex') {
+            closeInteractionsModal();
+        }
+        // Also close restrict modal
+        const restrictModal = document.getElementById('restrictReasonModal');
+        if (restrictModal && restrictModal.style.display === 'flex') {
+            closeRestrictModal();
+        }
+    }
+});
+// Close modal on overlay click
+document.querySelector('.interactions-modal-overlay')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeInteractionsModal();
+    }
+});
+
+
 // ========== ALUMNI LOCATION MAP ==========
 let alumniMap = null;
 let mapInitialized = false;

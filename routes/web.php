@@ -357,6 +357,17 @@ Route::prefix('admin')->group(function () {
         Route::get('/reports/comment/{id}', [AdminDashboardController::class, 'getCommentReports']);
         Route::post('/moderate/bulk-posts', [AdminDashboardController::class, 'bulkModeratePosts']);
         Route::post('/moderate/bulk-comments', [AdminDashboardController::class, 'bulkModerateComments']);
+
+        // 🆕 Get full post data for moderation modal (with images and comments)
+        Route::get('/posts/{id}/full', [AdminController::class, 'getFullPost'])->name('admin.posts.full');
+
+        // 🆕 Post Interactions (likes, comments, reposts)
+        Route::get('/posts/{post}/interactions', [AdminController::class, 'getPostInteractions'])
+            ->name('admin.posts.interactions');
+
+        // View Post page (for moderation preview)
+        Route::get('/posts/{id}/view', [AdminDashboardController::class, 'viewPostPage'])
+            ->name('admin.posts.view');
     });
 });
 

@@ -2551,4 +2551,41 @@ public function getPostInteractions(Request $request, $postId)
     }
 }
 
+/**
+ * Get full post data with images and comments for moderation modal
+ */
+public function getFullPost($id)
+{
+    try {
+        $post = \App\Models\Post::with([
+            'alumni',
+            'images',
+            'comments.alumni',
+            'reactions'
+        ])->findOrFail($id);
+        
+        // Format images with full URLs
+        $post->images->each(function($image) {
+            $imagePath = ltrim($image->image_path, '/');
+            $supabaseUrl = config('filesystems.disks.s3.url', '');
+            if (empty($supabaseUrl)) {
+                $supabaseUrl = rtrim(config('services.supabase.url', ''), '/') . '/storage/v1/object/public/luminus_assets/';
+            } else {
+                $supabaseUrl = rtrim($supabaseUrl, '/') . '/';
+            }
+            $image->full_url = $supabaseUrl . $imagePath;
+        });
+        
+        return response()->json([
+            'success' => true,
+            'post' => $post
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Post not found'
+        ], 404);
+    }
+}
+
 }
