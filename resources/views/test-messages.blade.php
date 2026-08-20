@@ -595,58 +595,6 @@
     box-shadow: 0 8px 25px rgba(50, 65, 140, 0.3);
 }
 
-/* Lock the static headers so they don't squish */
-.panel-header, 
-.search-container, 
-.filter-tabs {
-    flex-shrink: 0;
-    background: var(--white);
-    z-index: 10; 
-}
-
-/* Scrollable Contacts List - Fix overflow conflicts */
-.contacts-list {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden; /* Overrides the previous visible !important conflict */
-    padding: 0.5rem;
-    background: var(--white);
-    min-height: 0; /* Crucial for flex child scrolling */
-    scroll-behavior: smooth;
-}
-
-/* Contact Card Flex Alignment */
-.contact-card {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    transition: all var(--transition);
-    border-radius: var(--radius-xl);
-    margin-bottom: 0.25rem;
-    border: 2px solid transparent;
-    position: relative;
-}
-
-/* Contact Details Container */
-.contact-details {
-    flex: 1;
-    min-width: 0; /* Prevents long text from breaking the card width */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.15rem;
-}
-
-/* Ensure actions stay pinned to the right */
-.contact-actions {
-    flex-shrink: 0; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
     </style>
 </head>
 <body>
@@ -1010,10 +958,6 @@
     let presenceChannel;
     let typingTimeout;
     let typingIndicatorTimeout;
-    let isLoadingMore = false;
-    let hasMoreMessages = true;
-    let currentOffset = 0;
-    const MESSAGES_PER_PAGE = 50;
     const TYPING_TIMEOUT = 3000;
     
     // ============================================
@@ -1222,11 +1166,9 @@
     // ============================================
     // TYPING: Broadcast typing event
     // ============================================
-function broadcastTyping() {
-    if (!currentChat || !typingChannel) return;
-    
-    // For group chats, broadcast to the group
-    if (currentChat.type === 'group') {
+    function broadcastTyping() {
+        if (!currentChat || !typingChannel) return;
+        
         typingChannel.send({
             type: 'broadcast',
             event: 'typing',
@@ -1234,56 +1176,28 @@ function broadcastTyping() {
                 sender_id: adminId,
                 sender_type: 'admin',
                 receiver_id: currentChat.id,
-                receiver_type: 'group',
+                receiver_type: currentChat.type,
                 timestamp: new Date().toISOString(),
             },
         });
-        return;
     }
-    
-    // For individual chats
-    typingChannel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: {
-            sender_id: adminId,
-            sender_type: 'admin',
-            receiver_id: currentChat.id,
-            receiver_type: currentChat.type,
-            timestamp: new Date().toISOString(),
-        },
-    });
-}
 
     // ============================================
     // TYPING: Handle incoming typing event
     // ============================================
-function handleTypingEvent(data) {
-    // Only process typing events for the current chat
-    if (!currentChat) return;
-    
-    // For group chats, check if the sender is not the current user and the receiver is the current group
-    if (currentChat.type === 'group') {
+    function handleTypingEvent(data) {
+        // Only process typing events for the current chat
+        if (!currentChat) return;
+        
         if (
-            data.sender_id != adminId &&
-            data.receiver_id == currentChat.id &&
-            data.receiver_type === 'group'
+            data.sender_id == currentChat.id && 
+            data.sender_type === currentChat.type &&
+            data.receiver_id == adminId &&
+            data.receiver_type === 'admin'
         ) {
             showTypingIndicator();
         }
-        return;
     }
-    
-    // For individual chats
-    if (
-        data.sender_id == currentChat.id && 
-        data.sender_type === currentChat.type &&
-        data.receiver_id == adminId &&
-        data.receiver_type === 'admin'
-    ) {
-        showTypingIndicator();
-    }
-}
 
     // ============================================
     // TYPING: Show typing indicator in chat header
@@ -1326,12 +1240,16 @@ function handleTypingEvent(data) {
     // ============================================
     // TYPING: Debounced typing broadcast
     // ============================================
-function onMessageInput() {
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        broadcastTyping();
-    }, 500);
-}
+    function onMessageInput() {
+        // Debounce typing broadcast (every 2 seconds)
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            broadcastTyping();
+        }, 500); // Send typing event after 500ms of typing
+        
+        // Also reset the typing indicator timeout for the recipient
+        // (This is handled on their end via the broadcast)
+    }
 
 
     // ============================================
@@ -1677,57 +1595,37 @@ function onMessageInput() {
         pollingInterval = setInterval(checkForNewMessages, 2000);
     }
     
-async function checkForNewMessages() {
-    if (!currentChat) return;
-    
-    try {
-        // ✅ Use /admin prefix for consistency
-        const url = currentChat.type === 'group' 
-            ? `/admin/messages/groups/${currentChat.id}/messages?limit=10&offset=0`
-            : `/admin/messages/${currentChat.type}/${currentChat.id}?limit=10&offset=0`;
-            
-        const response = await fetch(url);
+    async function checkForNewMessages() {
+        if (!currentChat) return;
         
-        const data = await response.json();
-        // Handle both array and object response formats
-        const messageList = Array.isArray(data) ? data : (data.messages || []);
-        
-        if (messageList && messageList.length > 0) {
-            let hasNewMessages = false;
+        try {
+            const response = await fetch(`/admin/messages/${currentChat.type}/${currentChat.id}`);
+            if (!response.ok) return;
             
-            for (const msg of messageList) {
-                if (msg.id > lastMessageId && msg.sender_id != adminId) {
-                    const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
-                    if (!existingMsg) {
-                        // ✅ Decrypt content for group messages
-                        let decryptedContent = msg.content;
-                        if (msg.content && (msg.content.startsWith('enc:') || msg.content.startsWith('U2FsdGVkX1'))) {
-                            decryptedContent = await decryptContent(msg.content, msg.sender_type, 'admin');
+            const messages = await response.json();
+            if (messages && messages.length > 0) {
+                let hasNewMessages = false;
+                
+                messages.forEach(msg => {
+                    if (msg.id > lastMessageId && msg.sender_id != adminId) {
+                        const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
+                        if (!existingMsg) {
+                            appendMessage(msg);
+                            hasNewMessages = true;
                         }
-                        
-                        // ✅ Create a properly formatted message object
-                        const formattedMsg = {
-                            ...msg,
-                            content: decryptedContent,
-                            time: msg.time || formatTime(new Date(msg.created_at))
-                        };
-                        
-                        appendMessage(formattedMsg);
-                        hasNewMessages = true;
+                        lastMessageId = Math.max(lastMessageId, msg.id);
                     }
-                    lastMessageId = Math.max(lastMessageId, msg.id);
+                });
+                
+                if (hasNewMessages) {
+                    scrollToBottom();
+                    loadConversations();
                 }
             }
-            
-            if (hasNewMessages) {
-                scrollToBottom();
-                loadConversations();
-            }
+        } catch (error) {
+            console.error('Polling error:', error);
         }
-    } catch (error) {
-        console.error('Polling error:', error);
     }
-}
     
 async function loadConversations() {
     try {
@@ -1767,7 +1665,7 @@ async function loadConversations() {
     
 function renderContacts(contacts) {
     const contactsList = document.getElementById('contactsList');
-
+    
     if (!contacts || contacts.length === 0) {
         const query = document.getElementById('searchContacts')?.value?.toLowerCase() || '';
         const isGroupsTab = activeTab === 'groups';
@@ -1776,12 +1674,17 @@ function renderContacts(contacts) {
                 <i class="fa-solid ${isGroupsTab ? 'fa-users' : 'fa-user-group'}"></i>
                 <h3>${query ? 'No matches found' : isGroupsTab ? 'No channels yet' : 'No conversations yet'}</h3>
                 <p>${query ? 'Try a different search term' : isGroupsTab ? 'Create a new channel to connect with multiple alumni' : 'Start a new message to connect with alumni'}</p>
-                ${isGroupsTab ? `<button class="btn-primary" onclick="openNewGroupModal()"><i class="fa-solid fa-circle-plus"></i><span>Create Channel</span></button>` : ''}
+                ${isGroupsTab ? `
+                    <button class="btn-primary" id="createGroupBtnEmpty" onclick="openNewGroupModal()" style="margin-top: 1rem; padding: 0.625rem 1.5rem; border: none; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--nu-blue) 0%, var(--nu-blue-light) 100%); color: var(--white); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.875rem; box-shadow: var(--shadow-blue); transition: all var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-circle-plus" style="color: #FFFFFF !important; opacity: 1 !important; font-size: 1.1rem; margin: 0;"></i>
+                        <span>Create Channel</span>
+                    </button>
+                ` : ''}
             </div>
         `;
         return;
     }
-
+    
     contactsList.innerHTML = contacts.map(contact => {
         const isGroup = contact.type === 'group';
         const contactId = contact.id;
@@ -1789,106 +1692,136 @@ function renderContacts(contacts) {
         const isLastMessageFromMe = contact.last_message_from_me || false;
         const isArchived = contact.is_archived || false;
         const isMuted = contact.is_muted || false;
-
-        const onClick = isGroup ? `openGroupChat(${contactId})` : `openChat(${contactId}, '${contactType}')`;
-
-        let avatarHtml;
+        
+        // ✅ Determine onClick handler
+        const onClick = isGroup 
+            ? `openGroupChat(${contactId})`
+            : `openChat(${contactId}, '${contactType}')`;
+        
+        // ✅ Avatar HTML for Groups vs Individuals
+        let avatarHtml = '';
         if (isGroup) {
             avatarHtml = `
-                <div class="group-avatar">
-                    ${contact.avatar
-                        ? `<img src="${contact.avatar}" alt="${escapeHtml(contact.name)}">`
-                        : `<span>${contact.initials || 'G'}</span>`}
-                    <span class="member-count-badge">${contact.member_count || 0}</span>
-                </div>`;
+                <div class="group-avatar" style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.1rem; flex-shrink: 0; overflow: hidden; position: relative;">
+                    ${contact.avatar 
+                        ? `<img src="${contact.avatar}" alt="${escapeHtml(contact.name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` 
+                        : `<span style="font-size: 1rem; font-weight: 700;">${contact.initials || 'G'}</span>`
+                    }
+                    <span class="member-count-badge" style="position: absolute; bottom: -2px; right: -2px; background: #8b5cf6; color: white; font-size: 0.55rem; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: 2px solid white;">${contact.member_count || 0}</span>
+                </div>
+            `;
         } else {
-            avatarHtml = contact.avatar
+            avatarHtml = contact.avatar 
                 ? `<img src="${contact.avatar}" class="contact-avatar-img" alt="${escapeHtml(contact.full_name)}">`
-                : `<div class="contact-avatar">${contact.initials || '??'}</div>`;
+                : `<div class="contact-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light)); color: var(--nu-gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0;">${contact.initials || '??'}</div>`;
         }
-
+        
+        // ✅ Display name - groups use 'name', individuals use 'full_name'
         const displayName = isGroup ? contact.name : contact.full_name;
-
-        const lastMessagePreview = contact.last_message
-            ? (isLastMessageFromMe
+        
+        // ✅ Subtitle - groups show member count, individuals show batch/program
+        const displaySubtitle = isGroup 
+            ? `${contact.member_count || 0} members`
+            : (contact.type === 'admin' 
+                ? (contact.admin_role || 'Admin')
+                : `Batch ${contact.batch || 'N/A'} | ${contact.program || 'N/A'}`);
+        
+        // ✅ Last message preview
+        const lastMessagePreview = contact.last_message 
+            ? (isLastMessageFromMe 
                 ? `<span class="you-prefix">You: </span>${escapeHtml(truncateText(contact.last_message, 30))}`
                 : escapeHtml(truncateText(contact.last_message, 30)))
-            : '<span class="no-message">Start a conversation</span>';
-
-        const displayTime = contact.last_message_timestamp
+            : '<span class="no-message" style="color: #9ca3af;">No messages yet</span>';
+        
+        const displayTime = contact.last_message_timestamp 
             ? formatTime(new Date(contact.last_message_timestamp))
             : '';
-
-        const rowTwo = isGroup
-            ? `<span class="alumni-info-text">${contact.member_count || 0} members</span>`
-            : (contact.type === 'admin'
-                ? `<span class="admin-role-badge">${escapeHtml(contact.admin_role || 'Admin')}</span>`
-                : `<span class="alumni-info-text">Batch ${escapeHtml(contact.batch || 'N/A')} | ${escapeHtml(contact.program || 'N/A')}</span>`);
-
-        const cardClasses = [
-            'contact-card',
-            isGroup ? 'group-card' : '',
-            currentChat?.id == contactId && currentChat?.type === contactType ? 'active' : '',
-            contact.unread_count > 0 ? 'unread' : '',
-            isArchived ? 'archived' : '',
-            isMuted ? 'muted' : ''
-        ].filter(Boolean).join(' ');
-
+        
+        // ✅ Build the contact card HTML
         return `
-            <div class="${cardClasses}" onclick="${onClick}">
+            <div class="contact-card ${isGroup ? 'group-card' : ''} ${currentChat?.id == contactId && currentChat?.type === contactType ? 'active' : ''} ${contact.unread_count > 0 ? 'unread' : ''} ${isArchived ? 'archived' : ''} ${isMuted ? 'muted' : ''}" 
+                onclick="${onClick}"
+                style="display: flex; align-items: center; padding: 0.75rem 1rem; gap: 0.75rem; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s; position: relative;">
+                
                 ${avatarHtml}
-                <div class="contact-details">
-                    <div class="contact-row-1">
-                        <span class="contact-name" title="${escapeHtml(displayName)}">
+                
+                <div class="contact-details" style="flex: 1; min-width: 0;">
+                    <div class="contact-row-1" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="contact-name" style="font-weight: 600; font-size: 0.9rem; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(displayName)}">
                             ${escapeHtml(displayName)}
-                            ${isMuted ? '<span class="muted-indicator"><i class="fa-solid fa-bell-slash"></i></span>' : ''}
-                            ${isGroup ? `<span class="group-badge"><i class="fa-solid fa-users"></i></span>` : ''}
+                            ${isMuted ? '<span class="muted-indicator" style="margin-left: 4px; color: #9ca3af;"><i class="fa-solid fa-bell-slash"></i></span>' : ''}
+                            ${isGroup ? `<span class="group-badge" style="font-size: 0.6rem; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 8px; margin-left: 4px;"><i class="fa-solid fa-users"></i></span>` : ''}
                         </span>
-                        <span class="contact-time">${displayTime}</span>
+                        <span class="contact-time" style="font-size: 0.7rem; color: #9ca3af; white-space: nowrap;">${displayTime}</span>
                     </div>
-                    <div class="contact-row-2">${rowTwo}</div>
-                    <div class="contact-row-3">
-                        <span class="contact-preview">${lastMessagePreview}</span>
-                        ${contact.unread_count > 0 ? `<span class="unread-count">${contact.unread_count}</span>` : ''}
+                    <div class="contact-row-2" style="font-size: 0.75rem; color: #6b7280; margin-top: 2px;">
+                        ${escapeHtml(displaySubtitle)}
+                    </div>
+                    <div class="contact-row-3" style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span class="contact-preview" style="font-size: 0.8rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">${lastMessagePreview}</span>
+                        ${contact.unread_count > 0 
+                            ? `<span class="unread-count" style="background: #3b82f6; color: white; font-size: 0.7rem; font-weight: 600; padding: 1px 8px; border-radius: 10px; min-width: 20px; text-align: center;">${contact.unread_count}</span>` 
+                            : ''
+                        }
                     </div>
                 </div>
-                <div class="contact-actions">
-                    <button class="btn-more"
-                        data-contact-id="${contactId}"
+                
+                <div class="contact-actions" style="flex-shrink: 0;">
+                    <button class="btn-more" 
+                        data-contact-id="${contactId}" 
                         data-contact-type="${contactType}"
-                        onclick="event.stopPropagation(); toggleContactDropdown(${contactId}, '${contactType}', this)">
+                        onclick="event.stopPropagation(); toggleContactDropdown(${contactId}, '${contactType}', this)"
+                        style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 1rem;">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                 </div>
             </div>
-            <div class="contact-dropdown ${isGroup ? 'group-dropdown' : ''}" id="dropdown-${contactId}-${contactType}" data-contact-id="${contactId}" data-contact-type="${contactType}">
+            
+            <div class="contact-dropdown ${isGroup ? 'group-dropdown' : ''}" id="dropdown-${contactId}-${contactType}" data-contact-id="${contactId}" data-contact-type="${contactType}" style="display: none; position: absolute; right: 10px; top: 100%; background: white; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); min-width: 180px; z-index: 100; padding: 4px 0; margin-top: 4px;">
                 ${isGroup ? `
-                    <button type="button" class="dropdown-item" onclick="event.stopPropagation(); openGroupInfo(${contactId})">
-                        <i class="fa-solid fa-info-circle"></i> Channel Info
+                    <button type="button" class="dropdown-item" onclick="event.stopPropagation(); openGroupInfo(${contactId})" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #374151; transition: background 0.2s;">
+                        <i class="fa-solid fa-info-circle"></i>
+                        Channel Info
                     </button>
-                    <hr>
+                    <hr style="margin: 4px 12px; border: none; border-top: 1px solid #e5e7eb;">
                 ` : ''}
-                <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isArchived ? 'unarchive' : 'archive'}')">
+                <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isArchived ? 'unarchive' : 'archive'}')" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #374151; transition: background 0.2s;">
                     <i class="fa-solid ${isArchived ? 'fa-box-open' : 'fa-box-archive'}"></i>
-                    ${isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+                    ${isArchived ? 'Unarchive' : 'Archive'}
                 </button>
-                <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isMuted ? 'unmute' : 'mute'}')">
+                <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isMuted ? 'unmute' : 'mute'}')" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #374151; transition: background 0.2s;">
                     <i class="fa-solid ${isMuted ? 'fa-bell' : 'fa-bell-slash'}"></i>
-                    ${isMuted ? 'Unmute Chat' : 'Mute Chat'}
+                    ${isMuted ? 'Unmute' : 'Mute'}
                 </button>
                 ${isGroup ? `
-                    <hr>
-                    <button type="button" class="dropdown-item leave-group" onclick="event.stopPropagation(); handleDropdownAction(event, ${contactId}, '${contactType}', 'leave')">
-                        <i class="fa-solid fa-right-from-bracket"></i> Leave Channel
+                    <hr style="margin: 4px 12px; border: none; border-top: 1px solid #e5e7eb;">
+                    <button type="button" class="dropdown-item leave-group" onclick="event.stopPropagation(); handleDropdownAction(event, ${contactId}, '${contactType}', 'leave')" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #ef4444; transition: background 0.2s;">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        Leave Channel
                     </button>
                 ` : ''}
-                <hr>
-                <button type="button" class="dropdown-item danger" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', 'delete')">
-                    <i class="fa-solid fa-trash-can"></i> Delete Chat
+                <hr style="margin: 4px 12px; border: none; border-top: 1px solid #e5e7eb;">
+                <button type="button" class="dropdown-item danger" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', 'delete')" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%; background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #ef4444; transition: background 0.2s;">
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete Chat
                 </button>
             </div>
         `;
     }).join('');
+    
+    // ✅ Make dropdowns work with click outside
+    document.querySelectorAll('.btn-more').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    });
+    
+    // ✅ Close dropdowns when clicking elsewhere
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.contact-dropdown').forEach(d => {
+            d.style.display = 'none';
+        });
+    });
 }
     
     // Handle search input - show/hide clear button and trigger search
@@ -2360,225 +2293,34 @@ function checkAndDisableArchivedChat(contactId, contactType) {
             document.querySelector('.chat-panel').classList.remove('chat-active');
         }
     }
-
-async function loadMessages(contactId, type = 'alumni') {
-    const container = document.getElementById('chatMessages');
-    container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading messages...</div>';
     
-    currentOffset = 0;
-    hasMoreMessages = true;
-    
-    try {
-        // ✅ Use the correct URL without extra /admin
-        const response = await fetch(`/admin/messages/${type}/${contactId}?limit=${MESSAGES_PER_PAGE}&offset=0`);
-        if (!response.ok) throw new Error('Failed to load messages');
+    async function loadMessages(contactId, type = 'alumni') {
+        const container = document.getElementById('chatMessages');
+        container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading messages...</div>';
         
-        const data = await response.json();
-        const messages = data.messages || [];
-        const total = data.total || 0;
-        
-        hasMoreMessages = messages.length < total;
-        
-        if (messages && messages.length > 0) {
-            lastMessageId = Math.max(...messages.map(m => m.id));
-        }
-        
-        renderMessages(messages);
-        scrollToBottom();
-        setupInfiniteScroll(contactId, type);
-        
-    } catch (error) {
-        console.error('Error loading messages:', error);
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-exclamation-circle"></i>
-                <h3>Error loading messages</h3>
-                <p>Please try again</p>
-            </div>
-        `;
-    }
-}
-
-function setupInfiniteScroll(contactId, type) {
-    const container = document.getElementById('chatMessages');
-    
-    // Remove existing listener
-    container.removeEventListener('scroll', loadMoreMessages);
-    
-    // Add scroll listener with context
-    container.addEventListener('scroll', function() {
-        loadMoreMessages(contactId, type);
-    });
-}
-
-async function loadMoreMessages(contactId, type) {
-    if (!hasMoreMessages || isLoadingMore) return;
-    
-    const container = document.getElementById('chatMessages');
-    const scrollTop = container.scrollTop;
-    
-    if (scrollTop > 200) return;
-    
-    isLoadingMore = true;
-    const nextOffset = currentOffset + MESSAGES_PER_PAGE;
-    
-    try {
-        let url;
-        if (type === 'group') {
-            url = `/admin/messages/groups/${contactId}/messages?limit=${MESSAGES_PER_PAGE}&offset=${nextOffset}`;
-        } else {
-            url = `/admin/messages/${type}/${contactId}?limit=${MESSAGES_PER_PAGE}&offset=${nextOffset}`;
-        }
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to load more messages');
-        
-        const data = await response.json();
-        
-        let messages = [];
-        let total = 0;
-        
-        if (Array.isArray(data)) {
-            messages = data;
-            total = data.length;
-        } else if (data.messages && Array.isArray(data.messages)) {
-            messages = data.messages;
-            total = data.total || messages.length;
-        } else {
-            messages = [];
-            total = 0;
-        }
-        
-        if (messages.length === 0) {
-            hasMoreMessages = false;
-            isLoadingMore = false;
-            return;
-        }
-        
-        const firstMessage = container.firstChild;
-        const firstMessageOffset = firstMessage ? firstMessage.offsetTop : 0;
-        
-        // ✅ Decrypt content for group messages
-        if (type === 'group') {
-            const decryptedMessages = await Promise.all(messages.map(async (msg) => {
-                let decryptedContent = msg.content;
-                if (msg.content && (msg.content.startsWith('enc:') || msg.content.startsWith('U2FsdGVkX1'))) {
-                    decryptedContent = await decryptContent(msg.content, msg.sender_type, 'admin');
-                }
-                return {
-                    ...msg,
-                    content: decryptedContent
-                };
-            }));
-            renderGroupMessagesPrepend(decryptedMessages);
-        } else {
-            renderMessagesPrepend(messages);
-        }
-        
-        if (firstMessage) {
-            const newFirstMessage = container.firstChild;
-            if (newFirstMessage) {
-                const newOffset = newFirstMessage.offsetTop;
-                container.scrollTop = newOffset - firstMessageOffset + 50;
+        try {
+            const response = await fetch(`/admin/messages/${type}/${contactId}`);
+            if (!response.ok) throw new Error('Failed to load messages');
+            
+            const messages = await response.json();
+            
+            if (messages && messages.length > 0) {
+                lastMessageId = Math.max(...messages.map(m => m.id));
             }
+            
+            renderMessages(messages);
+            scrollToBottom();
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <h3>Error loading messages</h3>
+                    <p>Please try again</p>
+                </div>
+            `;
         }
-        
-        currentOffset = nextOffset;
-        hasMoreMessages = messages.length + currentOffset < total;
-        
-    } catch (error) {
-        console.error('Error loading more messages:', error);
     }
-    
-    isLoadingMore = false;
-}
-
-function renderGroupMessagesPrepend(messages) {
-    const container = document.getElementById('chatMessages');
-    
-    if (!messages || messages.length === 0) return;
-    
-    let html = '';
-    let lastDate = null;
-    
-    messages.forEach(msg => {
-        let msgDate;
-        if (typeof msg.created_at === 'string') {
-            if (!msg.created_at.endsWith('Z') && !msg.created_at.includes('+')) {
-                msgDate = new Date(msg.created_at + 'Z');
-            } else {
-                msgDate = new Date(msg.created_at);
-            }
-        } else {
-            msgDate = new Date(msg.created_at);
-        }
-        
-        const localDateStr = msgDate.toLocaleDateString();
-        
-        if (localDateStr !== lastDate) {
-            html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
-            lastDate = localDateStr;
-        }
-        
-        const isSent = msg.sender_id == adminId;
-        const senderName = msg.sender_name || 'Unknown';
-        
-        html += `
-            <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
-                ${!isSent ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(senderName)}</div>` : ''}
-                <div class="message-bubble">
-                    <p>${escapeHtml(msg.content)}</p>
-                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                    <span class="msg-time">
-                        ${msg.time || formatTime(msgDate)}
-                    </span>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.insertAdjacentHTML('afterbegin', html);
-}
-
-function renderMessagesPrepend(messages) {
-    const container = document.getElementById('chatMessages');
-    
-    if (!messages || messages.length === 0) return;
-    
-    let html = '';
-    let lastDate = null;
-    
-    // Get existing dates
-    const existingDates = container.querySelectorAll('.date-divider');
-    const firstExistingDate = existingDates[0]?.textContent || null;
-    
-    messages.forEach(msg => {
-        const msgDate = new Date(msg.created_at);
-        const localDateStr = msgDate.toLocaleDateString();
-        
-        if (localDateStr !== lastDate) {
-            html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
-            lastDate = localDateStr;
-        }
-        
-        const isSent = msg.sender_id == adminId;
-        html += `
-            <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
-                <div class="message-bubble">
-                    <p>${escapeHtml(msg.content)}</p>
-                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                    <span class="msg-time">
-                        ${msg.time || formatTime(msgDate)}
-                        ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
-                    </span>
-                </div>
-            </div>
-        `;
-    });
-    
-    // Prepend to container
-    container.insertAdjacentHTML('afterbegin', html);
-}
     
     function renderMessages(messages) {
         const container = document.getElementById('chatMessages');
@@ -2649,42 +2391,38 @@ function renderMessagesPrepend(messages) {
         }).join('');
     }
     
-function appendMessage(msg) {
-    const container = document.getElementById('chatMessages');
-    
-    if (msg.id && !msg.id.toString().startsWith('temp-')) {
-        const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
-        if (existingMsg) {
-            console.log('⚠️ Duplicate message prevented in appendMessage:', msg.id);
-            return;
+    function appendMessage(msg) {
+        const container = document.getElementById('chatMessages');
+        
+        if (msg.id && !msg.id.toString().startsWith('temp-')) {
+            const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
+            if (existingMsg) {
+                console.log('⚠️ Duplicate message prevented in appendMessage:', msg.id);
+                return;
+            }
         }
-    }
-    
-    const isSent = msg.sender_id == adminId;
-    const displayTime = msg.time || formatTime(new Date(msg.created_at));
-    
-    // ✅ Check if it's a group message (has sender_name) and not sent by current user
-    const isGroupMsg = msg.sender_name && !isSent;
-    
-    const messageHtml = `
-        <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
-            ${isGroupMsg ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(msg.sender_name)}</div>` : ''}
-            <div class="message-bubble">
-                <p>${escapeHtml(msg.content)}</p>
-                ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                <span class="msg-time">
-                    ${displayTime}
-                    ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
-                </span>
+        
+        const isSent = msg.sender_id == adminId;
+        const displayTime = msg.time || formatTime(new Date(msg.created_at));
+        
+        const messageHtml = `
+            <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
+                <div class="message-bubble">
+                    <p>${escapeHtml(msg.content)}</p>
+                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                    <span class="msg-time">
+                        ${displayTime}
+                        ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                    </span>
+                </div>
             </div>
-        </div>
-    `;
-    
-    const emptyState = container.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
-    
-    container.insertAdjacentHTML('beforeend', messageHtml);
-}
+        `;
+        
+        const emptyState = container.querySelector('.empty-state');
+        if (emptyState) emptyState.remove();
+        
+        container.insertAdjacentHTML('beforeend', messageHtml);
+    }
     
 async function sendMessage() {
     const input = document.getElementById('messageInput');
@@ -3435,38 +3173,14 @@ async function sendMessage() {
     // HANDLE: Typing event with stopped flag
     // ============================================
     // Update the handleTypingEvent function to handle stopped events
-const originalHandleTypingEvent = handleTypingEvent;
-handleTypingEvent = function(data) {
-    if (data.stopped) {
-        hideTypingIndicator();
-        return;
-    }
-    
-    // Only process typing events for the current chat
-    if (!currentChat) return;
-    
-    // For group chats
-    if (currentChat.type === 'group') {
-        if (
-            data.sender_id != adminId &&
-            data.receiver_id == currentChat.id &&
-            data.receiver_type === 'group'
-        ) {
-            showTypingIndicator();
+    const originalHandleTypingEvent = handleTypingEvent;
+    handleTypingEvent = function(data) {
+        if (data.stopped) {
+            hideTypingIndicator();
+            return;
         }
-        return;
-    }
-    
-    // For individual chats
-    if (
-        data.sender_id == currentChat.id && 
-        data.sender_type === currentChat.type &&
-        data.receiver_id == adminId &&
-        data.receiver_type === 'admin'
-    ) {
-        showTypingIndicator();
-    }
-};
+        originalHandleTypingEvent(data);
+    };
 
     // ============================================
     // EMOJI PICKER
@@ -3783,156 +3497,91 @@ function renderAttachments(attachments, isSent) {
     };
 
 // ============================================
-// DROPDOWN FUNCTIONS - COMPLETE FIX
+// CONTACT DROPDOWN TOGGLE - SIMPLEST FIX
 // ============================================
-
-// Height cache
-const dropdownHeightCache = {};
-
 function toggleContactDropdown(contactId, contactType, button) {
     event.stopPropagation();
     const dropdownId = `dropdown-${contactId}-${contactType}`;
     const dropdown = document.getElementById(dropdownId);
     const backdrop = document.getElementById('dropdownBackdrop');
     
-    // ✅ Close all other dropdowns first
-    closeAllDropdowns();
+    // Close all other dropdowns
+    document.querySelectorAll('.contact-dropdown.active').forEach(d => {
+        if (d.id !== dropdownId) d.classList.remove('active');
+    });
     
-    // If this dropdown was already open, it's now closed by closeAllDropdowns()
-    // Check if it still has active class (it shouldn't)
     if (dropdown.classList.contains('active')) {
+        dropdown.classList.remove('active');
+        backdrop.classList.remove('active');
         return;
     }
     
     // Position the dropdown near the button
     const buttonRect = button.getBoundingClientRect();
+    const listRect = document.querySelector('.contacts-list').getBoundingClientRect();
     
-    // Get or measure dropdown height
-    let dropdownHeight = dropdownHeightCache[contactType];
-    
-    if (!dropdownHeight) {
-        const originalDisplay = dropdown.style.display;
-        dropdown.style.visibility = 'hidden';
-        dropdown.style.display = 'block';
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = '-9999px';
-        dropdown.style.left = '-9999px';
-        
-        dropdownHeight = dropdown.scrollHeight + 20;
-        dropdownHeightCache[contactType] = dropdownHeight;
-        
-        dropdown.style.display = originalDisplay || 'none';
-        dropdown.style.visibility = 'visible';
-        dropdown.style.top = '';
-        dropdown.style.left = '';
-        dropdown.style.position = '';
-    }
-    
-    let top = buttonRect.bottom + 2;
-    let left = buttonRect.right - 200;
-    
-    if (top + dropdownHeight > window.innerHeight - 10) {
-        top = buttonRect.top - dropdownHeight - 2;
-    }
-    
-    if (top < 10) top = 10;
-    if (left < 10) left = 10;
-    if (left + 200 > window.innerWidth) left = window.innerWidth - 210;
-    
-    dropdown.style.top = top + 'px';
-    dropdown.style.left = left + 'px';
-    dropdown.style.right = 'auto';
-    dropdown.style.display = 'block';
-    dropdown.style.visibility = 'visible';
-    dropdown.style.position = 'fixed';
+    dropdown.style.top = (buttonRect.bottom - listRect.top + 4) + 'px';
+    dropdown.style.right = (listRect.right - buttonRect.right) + 'px';
     
     dropdown.classList.add('active');
     backdrop.classList.add('active');
 }
 
-function handleDropdownAction(event, contactId, contactType, action) {
-    event.stopPropagation();
-    event.preventDefault();
-    
-    // Close dropdown
+    function handleDropdownAction(event, contactId, contactType, action) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        // Close dropdown
+        const dropdown = document.getElementById(`dropdown-${contactId}-${contactType}`);
+        if (dropdown) dropdown.classList.remove('active');
+        document.getElementById('dropdownBackdrop').classList.remove('active');
+        
+        switch(action) {
+            case 'archive':
+            case 'unarchive':
+                if (contactType === 'group') {
+                    toggleArchiveGroup(contactId);
+                } else {
+                    toggleArchiveChat(contactId, contactType);
+                }
+                break;
+            case 'mute':
+            case 'unmute':
+                if (contactType === 'group') {
+                    toggleMuteGroup(contactId);
+                } else {
+                    toggleMuteChat(contactId, contactType);
+                }
+                break;
+            case 'leave':
+                if (contactType === 'group') {
+                    leaveGroupById(contactId);
+                }
+                break;
+            case 'delete':
+                if (contactType === 'group') {
+                    confirmDeleteGroup(contactId);
+                } else {
+                    confirmDeleteChat(contactId, contactType);
+                }
+                break;
+        }
+    }
+
+// Close dropdown when clicking backdrop
+document.getElementById('dropdownBackdrop').addEventListener('click', function() {
     closeAllDropdowns();
-    
-    switch(action) {
-        case 'archive':
-        case 'unarchive':
-            if (contactType === 'group') {
-                toggleArchiveGroup(contactId);
-            } else {
-                toggleArchiveChat(contactId, contactType);
-            }
-            break;
-        case 'mute':
-        case 'unmute':
-            if (contactType === 'group') {
-                toggleMuteGroup(contactId);
-            } else {
-                toggleMuteChat(contactId, contactType);
-            }
-            break;
-        case 'leave':
-            if (contactType === 'group') {
-                leaveGroupById(contactId);
-            }
-            break;
-        case 'delete':
-            if (contactType === 'group') {
-                confirmDeleteGroup(contactId);
-            } else {
-                confirmDeleteChat(contactId, contactType);
-            }
-            break;
-    }
-}
-
-function closeAllDropdowns() {
-    document.querySelectorAll('.contact-dropdown.active').forEach(d => {
-        d.classList.remove('active');
-        // Reset styles
-        d.style.display = 'none';
-        d.style.visibility = 'visible';
-    });
-    const backdrop = document.getElementById('dropdownBackdrop');
-    if (backdrop) {
-        backdrop.classList.remove('active');
-    }
-}
-
-// ✅ Close dropdown when clicking outside (using event delegation)
-document.addEventListener('click', function(event) {
-    const activeDropdowns = document.querySelectorAll('.contact-dropdown.active');
-    if (activeDropdowns.length === 0) return;
-    
-    // Check if click is on a dropdown or the three-dots button
-    const isDropdown = event.target.closest('.contact-dropdown');
-    const isMoreButton = event.target.closest('.btn-more');
-    
-    if (!isDropdown && !isMoreButton) {
-        closeAllDropdowns();
-    }
 });
 
 // Close dropdown on Escape
 document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        closeAllDropdowns();
-    }
+    if (event.key === 'Escape') closeAllDropdowns();
 });
 
-// Also handle backdrop click directly (the HTML has onclick="closeAllDropdowns()")
-// But also add a backup click listener
-document.addEventListener('DOMContentLoaded', function() {
-    const backdrop = document.getElementById('dropdownBackdrop');
-    if (backdrop) {
-        backdrop.addEventListener('click', function(e) {
-            closeAllDropdowns();
-        });
-    }
-});
+function closeAllDropdowns() {
+    document.querySelectorAll('.contact-dropdown.active').forEach(d => d.classList.remove('active'));
+    document.getElementById('dropdownBackdrop').classList.remove('active');
+}
 
 // ============================================
 // HELPER: Find contact card by ID and type
@@ -4577,38 +4226,11 @@ async function loadGroupMessages(groupId) {
     const container = document.getElementById('chatMessages');
     container.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading messages...</div>';
     
-    // Reset pagination for group messages
-    currentOffset = 0;
-    hasMoreMessages = true;
-    
     try {
-        const response = await fetch(`/admin/messages/groups/${groupId}/messages?limit=${MESSAGES_PER_PAGE}&offset=0`);
+        const response = await fetch(`/admin/messages/groups/${groupId}/messages`);
         if (!response.ok) throw new Error('Failed to load messages');
         
-        const data = await response.json();
-        
-        // ✅ Handle both old and new response formats
-        let messages = [];
-        let total = 0;
-        
-        if (Array.isArray(data)) {
-            // Old format: just an array of messages
-            messages = data;
-            total = data.length;
-        } else if (data.messages && Array.isArray(data.messages)) {
-            // New format: { messages: [...], total: X, limit: Y, offset: Z }
-            messages = data.messages;
-            total = data.total || messages.length;
-        } else {
-            // Unexpected format
-            console.error('Unexpected response format:', data);
-            messages = [];
-            total = 0;
-        }
-        
-        // Check if there are more messages
-        hasMoreMessages = messages.length < total;
-        
+        const messages = await response.json();
         renderGroupMessages(messages);
         scrollToBottom();
         
@@ -4631,9 +4253,6 @@ async function loadGroupMessages(groupId) {
         emojiBtn.style.cursor = 'pointer';
         
         input.focus();
-        
-        // Setup infinite scroll for group messages
-        setupInfiniteScroll(groupId, 'group');
         
     } catch (error) {
         console.error('Error loading group messages:', error);
@@ -5669,26 +5288,6 @@ async function addGroupMembers(memberIds) {
         console.error('Error adding members:', error);
         showToast('Failed to add members', 'error');
     }
-}
-
-// Helper function to get group avatar URL
-function getGroupAvatarUrl(avatarPath) {
-    if (!avatarPath) return null;
-    
-    // If it's already a full URL (including signed URLs), return it
-    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-        return avatarPath;
-    }
-    
-    // Fallback: if for some reason the server didn't provide a signed URL
-    const supabaseUrl = '{{ env("SUPABASE_URL") }}';
-    if (supabaseUrl) {
-        const baseUrl = supabaseUrl.replace(/\/$/, '');
-        const cleanPath = avatarPath.replace(/^\/+/, '');
-        return `${baseUrl}/storage/v1/object/public/luminus_messages_attachments/${cleanPath}`;
-    }
-    
-    return null;
 }
 
 </script>

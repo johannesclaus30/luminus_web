@@ -6,6 +6,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\GroupChatController;
 use App\Http\Controllers\TracerFormController;
 use App\Http\Controllers\AdminDashboardController;
 
@@ -313,6 +314,42 @@ Route::prefix('admin')->group(function () {
 
         
         // Messages
+        // ============================================
+        // GROUP CHAT ROUTES - PUT THESE FIRST
+        // ============================================
+
+        // Group CRUD - Static paths first
+        Route::get('/messages/groups/list', [GroupChatController::class, 'getGroups'])->name('messages.groups.list');
+        Route::post('/messages/groups/create', [GroupChatController::class, 'createGroup'])->name('messages.groups.create');
+
+        // Group Info & Settings
+        Route::get('/messages/groups/{groupId}/info', [GroupChatController::class, 'getGroupInfo'])->name('messages.groups.info');
+        Route::get('/messages/groups/{groupId}/settings', [GroupChatController::class, 'getGroupSettings'])->name('messages.groups.settings');
+
+        // Group Messages
+        Route::get('/messages/groups/{groupId}/messages', [GroupChatController::class, 'getMessages'])->name('messages.groups.messages');
+        Route::post('/messages/groups/{groupId}/send', [GroupChatController::class, 'sendMessage'])->name('messages.groups.send');
+        Route::post('/messages/groups/{groupId}/send-attachments', [GroupChatController::class, 'sendWithAttachments'])->name('messages.groups.send-attachments');
+
+        // Group Management
+        Route::put('/messages/groups/{groupId}', [GroupChatController::class, 'updateGroup'])->name('messages.groups.update');
+        Route::post('/messages/groups/{groupId}/members/add', [GroupChatController::class, 'addMembers'])->name('messages.groups.members.add');
+        Route::delete('/messages/groups/{groupId}/members/{memberId}', [GroupChatController::class, 'removeMember'])->name('messages.groups.members.remove');
+        Route::put('/messages/groups/{groupId}/members/{memberId}/role', [GroupChatController::class, 'updateMemberRole'])->name('messages.groups.members.role');
+        Route::post('/messages/groups/{groupId}/leave', [GroupChatController::class, 'leaveGroup'])->name('messages.groups.leave');
+
+        // Group Settings
+        Route::post('/messages/groups/{groupId}/archive', [GroupChatController::class, 'toggleArchive'])->name('messages.groups.archive');
+        Route::post('/messages/groups/{groupId}/mute', [GroupChatController::class, 'toggleMute'])->name('messages.groups.mute');
+        Route::delete('/messages/groups/{groupId}', [GroupChatController::class, 'deleteGroup'])->name('messages.groups.delete');
+
+        // Search Alumni for Group Creation
+        Route::get('/messages/groups/search/alumni', [GroupChatController::class, 'searchAlumniForGroup'])->name('messages.groups.search.alumni');
+
+        // ============================================
+        // INDIVIDUAL MESSAGE ROUTES - PUT THESE AFTER
+        // ============================================
+
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/conversations', [MessageController::class, 'getConversations'])->name('messages.conversations');
         Route::get('/messages/search/alumni', [MessageController::class, 'searchAlumni'])->name('messages.search');
@@ -333,7 +370,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/messages/archive', [MessageController::class, 'archiveChat']);
         Route::post('/messages/mute', [MessageController::class, 'muteChat']);
         Route::post('/messages/delete', [MessageController::class, 'deleteChat']);
-        Route::get('/messages/settings', [MessageController::class, 'getDmSettings']);
+        Route::get('/messages/dm-settings', [MessageController::class, 'getDmSettings'])->name('messages.dm-settings');
 
         // Preview bulk import file
         Route::post('/alumni/preview-bulk', [AdminController::class, 'previewBulkImport'])
@@ -368,6 +405,7 @@ Route::prefix('admin')->group(function () {
         // View Post page (for moderation preview)
         Route::get('/posts/{id}/view', [AdminDashboardController::class, 'viewPostPage'])
             ->name('admin.posts.view');
+
     });
 });
 
@@ -387,3 +425,4 @@ Route::get('/debug-mail', function() {
     ];
 });
 
+// This the web.php file

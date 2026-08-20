@@ -16,9 +16,14 @@ use Illuminate\Support\Str;
 
 class MessageController extends Controller
 {
-    // 🚨 CRITICAL: This MUST match EXPO_PUBLIC_MESSAGE_SECRET in mobile app's .env
-    // Check your mobile app folder: .env file -> EXPO_PUBLIC_MESSAGE_SECRET
-    private $cryptoSecretKey = "LumiNUs_Chat_Sec_9x$2!kPqLmN8vWz";
+
+    private $cryptoSecretKey;
+
+    public function __construct()
+    {
+        // Load the secret key from .env
+        $this->cryptoSecretKey = env('MESSAGE_SECRET_KEY', 'LumiNUs_Chat_Sec_' . Str::random(32));
+    }
 
     public function index()
     {
@@ -34,73 +39,72 @@ class MessageController extends Controller
     /**
      * Decrypt CryptoJS AES encrypted messages
      */
-private function decryptMessageContent($content, $senderType, $receiverType)
-{
-    if (empty($content)) {
-        return '';
-    }
-    
-    $input = (string)$content;
-
-    if (substr($input, 0, 4) !== 'enc:' && substr($input, 0, 10) !== 'U2FsdGVkX1') {
-        return $input;
-    }
-
-    try {
-        $payload = substr($input, 0, 4) === 'enc:' ? substr($input, 4) : $input;
-        $decoded = base64_decode($payload, true);
+    private function decryptMessageContent($content, $senderType, $receiverType)
+    {
+        if (empty($content)) {
+            return '';
+        }
         
-        if ($decoded === false || substr($decoded, 0, 8) !== 'Salted__') {
+        $input = (string)$content;
+
+        if (substr($input, 0, 4) !== 'enc:' && substr($input, 0, 10) !== 'U2FsdGVkX1') {
             return $input;
         }
 
-        $salt = substr($decoded, 8, 8);
-        $ciphertext = substr($decoded, 16);
-
-        // Try multiple key variations to handle special character interpretation issues
-        $baseKey = $this->cryptoSecretKey;
-        $possibleKeys = [
-            $baseKey,                                    // Original
-            str_replace('$', '\$', $baseKey),           // Escaped $
-            str_replace('$2', '', $baseKey),            // Without $2
-            str_replace('$', '', $baseKey),             // Without any $
-            '$' . str_replace('$', '', $baseKey),       // $ at start only
-        ];
-
-        foreach ($possibleKeys as $index => $password) {
-            Log::info("[DECRYPT] Trying key variant {$index}: '{$password}' (length: " . strlen($password) . ")");
+        try {
+            $payload = substr($input, 0, 4) === 'enc:' ? substr($input, 4) : $input;
+            $decoded = base64_decode($payload, true);
             
-            $derived = '';
-            $block = '';
-            
-            while (strlen($derived) < 48) {
-                $block = md5($block . $password . $salt, true);
-                $derived .= $block;
+            if ($decoded === false || substr($decoded, 0, 8) !== 'Salted__') {
+                return $input;
             }
+
+            $salt = substr($decoded, 8, 8);
+            $ciphertext = substr($decoded, 16);
+
+            // ✅ Load keys from .env
+            $newKey = env('MESSAGE_SECRET_KEY');
+            $oldKey = env('OLD_MESSAGE_SECRET_KEY');
             
-            $key = substr($derived, 0, 32);
-            $iv = substr($derived, 32, 16);
+            $possibleKeys = [
+                $newKey,                                    // New key first
+                $oldKey,                                    // Old key as fallback
+                str_replace('$', '\$', $oldKey),           // Escaped $
+                str_replace('$2', '', $oldKey),            // Without $2
+                str_replace('$', '', $oldKey),             // Without any $
+                '$' . str_replace('$', '', $oldKey),       // $ at start only
+            ];
 
-            $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            foreach ($possibleKeys as $index => $password) {
+                if (empty($password)) continue; // Skip empty keys
+                
+                $derived = '';
+                $block = '';
+                
+                while (strlen($derived) < 48) {
+                    $block = md5($block . $password . $salt, true);
+                    $derived .= $block;
+                }
+                
+                $key = substr($derived, 0, 32);
+                $iv = substr($derived, 32, 16);
 
-            if ($decrypted !== false) {
-                Log::info("[DECRYPT] ✅ SUCCESS with variant {$index}!");
-                Log::info("[DECRYPT] Decrypted message: " . substr($decrypted, 0, 100));
-                return $decrypted;
+                $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+                if ($decrypted !== false) {
+                    Log::info("[DECRYPT] ✅ SUCCESS with key variant {$index}!");
+                    return $decrypted;
+                }
             }
+
+            Log::error('[DECRYPT] ❌ All key variants failed');
+            return $input;
+
+        } catch (\Exception $e) {
+            Log::error('[DECRYPT] Exception: ' . $e->getMessage());
+            return $input;
         }
-
-        Log::error('[DECRYPT] ❌ All key variants failed');
-        Log::error('[DECRYPT] Original key: ' . $baseKey);
-        Log::error('[DECRYPT] Original key hex: ' . bin2hex($baseKey));
-        
-        return $input;
-
-    } catch (\Exception $e) {
-        Log::error('[DECRYPT] Exception: ' . $e->getMessage());
-        return $input;
     }
-}
 
 /**
  * Method 1: Standard EVP_BytesToKey with MD5 (CryptoJS default)
@@ -337,11 +341,8 @@ private function deriveKeyMethod3($password, $salt)
                 if ($type === 'admin') {
                     $avatar = $this->resolveAdminPhotoUrl($photo);
                 } else {
-                    if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                        $avatar = $photo;
-                    } else {
-                        $avatar = asset('storage/' . ltrim($photo, '/'));
-                    }
+                    // ✅ Use resolveAlumniPhotoUrl for alumni photos
+                    $avatar = $this->resolveAlumniPhotoUrl($photo);
                 }
             }
             
@@ -386,94 +387,119 @@ private function deriveKeyMethod3($password, $salt)
         }
     }
 
-    public function getMessages($type, $contactId, Request $request)
-    {
+public function getMessages($type, $id, Request $request)
+{
+    try {
         $adminId = $this->getAdminId();
         
         if (!$adminId) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
-        
-        $type = is_string($type) ? $type : 'alumni';
-        
+
+        // Validate the type
         if (!in_array($type, ['alumni', 'admin'])) {
             return response()->json(['error' => 'Invalid contact type'], 400);
         }
-        
-        try {
-            // Removed ->with('attachments') to prevent BadMethodCallException if relationship is missing
-            $messages = Message::where(function($query) use ($adminId, $contactId, $type) {
-                    $query->where('sender_id', $adminId)
-                        ->where('sender_type', 'admin')
-                        ->where('receiver_id', $contactId)
-                        ->where('receiver_type', $type);
-                })
-                ->orWhere(function($query) use ($adminId, $contactId, $type) {
-                    $query->where('sender_id', $contactId)
-                        ->where('sender_type', $type)
-                        ->where('receiver_id', $adminId)
-                        ->where('receiver_type', 'admin');
-                })
-                ->orderBy('created_at', 'asc')
-                ->get()
-                ->map(function ($message) use ($adminId) {
-                    $decryptedContent = $this->decryptMessageContent(
-                        $message->content,
-                        $message->sender_type,
-                        $message->receiver_type
-                    );
-                    
-                    $attachmentsData = [];
-                    
-                    // Safely fetch attachments directly from the database to avoid model relationship crashes
-                    $attachments = MessagesAttachment::where('message_id', $message->id)->get();
-                    
-                    foreach ($attachments as $attachment) {
-                        $attachmentsData[] = [
-                            'id' => $attachment->id,
-                            'type' => $attachment->attachment_type,
-                            'name' => pathinfo($attachment->attachment_path, PATHINFO_BASENAME),
-                            'size' => null, 
-                            'url' => $this->getSecureAttachmentUrl($attachment),
-                        ];
-                    }
-                    
-                    return [
-                        'id' => $message->id,
-                        'content' => $decryptedContent,
-                        'sender_id' => $message->sender_id,
-                        'sender_type' => $message->sender_type,
-                        'receiver_id' => $message->receiver_id,
-                        'receiver_type' => $message->receiver_type,
-                        'is_read' => $message->is_read,
-                        'is_outgoing' => $message->sender_id == $adminId,
-                        'created_at' => $message->created_at ? $message->created_at->toISOString() : null,
-                        'time' => null, 
-                        'attachments' => $attachmentsData,
+
+        $contactId = (int) $id;
+
+        // ✅ Get pagination parameters
+        $limit = (int) $request->get('limit', 50);
+        $offset = (int) $request->get('offset', 0);
+
+        // ✅ Get total count first
+        $totalCount = Message::where(function($query) use ($adminId, $contactId, $type) {
+                $query->where('sender_id', $adminId)
+                    ->where('sender_type', 'admin')
+                    ->where('receiver_id', $contactId)
+                    ->where('receiver_type', $type);
+            })
+            ->orWhere(function($query) use ($adminId, $contactId, $type) {
+                $query->where('sender_id', $contactId)
+                    ->where('sender_type', $type)
+                    ->where('receiver_id', $adminId)
+                    ->where('receiver_type', 'admin');
+            })
+            ->where(function($query) use ($adminId) {
+                $query->whereNull('deleted_by')
+                    ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+            })
+            ->count();
+
+        // ✅ Get messages with pagination
+        $messages = Message::where(function($query) use ($adminId, $contactId, $type) {
+                $query->where('sender_id', $adminId)
+                    ->where('sender_type', 'admin')
+                    ->where('receiver_id', $contactId)
+                    ->where('receiver_type', $type);
+            })
+            ->orWhere(function($query) use ($adminId, $contactId, $type) {
+                $query->where('sender_id', $contactId)
+                    ->where('sender_type', $type)
+                    ->where('receiver_id', $adminId)
+                    ->where('receiver_type', 'admin');
+            })
+            ->where(function($query) use ($adminId) {
+                $query->whereNull('deleted_by')
+                    ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+            })
+            ->orderBy('created_at', 'desc')
+            ->offset($offset)
+            ->limit($limit)
+            ->get()
+            ->reverse()
+            ->values()
+            ->map(function ($message) {
+                $decryptedContent = $this->decryptMessageContent(
+                    $message->content, 
+                    $message->sender_type, 
+                    $message->receiver_type
+                );
+                
+                $attachmentsData = [];
+                $attachments = MessagesAttachment::where('message_id', $message->id)->get();
+                
+                foreach ($attachments as $attachment) {
+                    $attachmentsData[] = [
+                        'id' => $attachment->id,
+                        'type' => $attachment->attachment_type,
+                        'name' => pathinfo($attachment->attachment_path, PATHINFO_BASENAME),
+                        'size' => null,
+                        'url' => $this->getSecureAttachmentUrl($attachment),
                     ];
-                });
-            
-            // Mark messages as read
-            Message::where('sender_id', $contactId)
-                ->where('sender_type', $type)
-                ->where('receiver_id', $adminId)
-                ->where('receiver_type', 'admin')
-                ->where('is_read', false)
-                ->update(['is_read' => true]);
-            
-            return response()->json($messages);
-            
-        } catch (\Exception $e) {
-            // Detailed logging to help you debug if it still fails
-            Log::error('Error loading messages: ' . $e->getMessage());
-            Log::error('Trace: ' . $e->getTraceAsString());
-            
-            return response()->json([
-                'error' => 'Failed to load messages', 
-                'details' => $e->getMessage()
-            ], 500);
-        }
+                }
+                
+                return [
+                    'id' => $message->id,
+                    'content' => $decryptedContent,
+                    'sender_id' => $message->sender_id,
+                    'sender_type' => $message->sender_type,
+                    'receiver_id' => $message->receiver_id,
+                    'receiver_type' => $message->receiver_type,
+                    'is_read' => $message->is_read,
+                    'created_at' => $message->created_at->toISOString(),
+                    'time' => $message->created_at->format('g:i A'),
+                    'attachments' => $attachmentsData,
+                ];
+            });
+
+        Log::info("✅ Loaded " . count($messages) . " messages for contact {$contactId} (type: {$type}, total: {$totalCount})");
+
+        return response()->json([
+            'messages' => $messages,
+            'total' => $totalCount,
+            'limit' => $limit,
+            'offset' => $offset,
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error loading messages: ' . $e->getMessage());
+        return response()->json([
+            'error' => 'Failed to load messages',
+            'message' => $e->getMessage()
+        ], 500);
     }
+}
 
     public function sendMessage(Request $request)
     {
@@ -574,11 +600,7 @@ private function deriveKeyMethod3($password, $salt)
                     $avatar = null;
                     $photo = $alumni->alumni_photo ?? null;
                     if ($photo) {
-                        if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                            $avatar = $photo;
-                        } else {
-                            $avatar = asset('storage/' . ltrim($photo, '/'));
-                        }
+                        $avatar = $this->resolveAlumniPhotoUrl($photo);
                     }
                     
                     $batch = $alumni->year_graduated 
@@ -889,11 +911,8 @@ private function deriveKeyMethod3($password, $salt)
                 if ($type === 'admin') {
                     $avatar = $this->resolveAdminPhotoUrl($photo);
                 } else {
-                    if (filter_var($photo, FILTER_VALIDATE_URL)) {
-                        $avatar = $photo;
-                    } else {
-                        $avatar = asset('storage/' . ltrim($photo, '/'));
-                    }
+                    // ✅ Use resolveAlumniPhotoUrl for alumni photos
+                    $avatar = $this->resolveAlumniPhotoUrl($photo);
                 }
             }
             
@@ -1072,9 +1091,41 @@ private function deriveKeyMethod3($password, $salt)
             return $photoPath;
         }
 
-        return Storage::disk('supabase_admin')->url($photoPath);
+        // ✅ FIXED: Correct bucket name is 'luminus_assets' (not 'luminous_assets')
+        $bucket = 'luminus_assets';
+        $baseUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucket;
+        $path = ltrim($photoPath, '/');
+        if (!str_starts_with($path, 'admin_photos/')) {
+            $path = 'admin_photos/' . $path;
+        }
+        
+        return $baseUrl . '/' . $path;
     }
 
+    /**
+     * Resolve alumni photo URL - use public URL (bucket is public)
+     */
+    private function resolveAlumniPhotoUrl($path)
+    {
+        if (!$path) return null;
+        if (filter_var($path, FILTER_VALIDATE_URL)) return $path;
+        
+        // ✅ Use the admin assets bucket (public) for alumni photos too
+        $bucket = env('SUPABASE_BUCKET', 'luminus_assets');
+        $baseUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucket;
+        
+        // Clean up the path
+        $path = ltrim($path, '/');
+        
+        // If the path doesn't start with 'alumni_photos/', add it
+        if (!str_starts_with($path, 'alumni_photos/')) {
+            $path = 'alumni_photos/' . $path;
+        }
+        
+        return $baseUrl . '/' . $path;
+    }
+
+    
         /**
      * API Endpoint for React Native Mobile App
      * Route: GET /api/messages/attachments/{id}/url
@@ -1301,7 +1352,7 @@ public function archiveChat(Request $request)
     {
         $request->validate([
             'contact_id' => 'required|integer',
-            'contact_type' => 'required|in:alumni,admin',
+            'contact_type' => 'required|in:alumni,admin,group',
         ]);
 
         $adminId = $this->getAdminId();
@@ -1309,6 +1360,20 @@ public function archiveChat(Request $request)
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        // ✅ If it's a group, get settings from group_chat_members
+        if ($request->contact_type === 'group') {
+            $member = \App\Models\GroupChatMember::where('group_chat_id', $request->contact_id)
+                ->where('alumni_id', $adminId)
+                ->first();
+
+            return response()->json([
+                'is_archived' => $member ? $member->archived : false,
+                'is_muted' => $member ? $member->muted : false,
+                'is_hidden' => false,
+            ]);
+        }
+
+        // For alumni/admin, use dm_settings
         $setting = DmSetting::where('user_id', $adminId)
             ->where('contact_id', $request->contact_id)
             ->where('contact_type', $request->contact_type)
@@ -1337,5 +1402,8 @@ public function archiveChat(Request $request)
             return null;
         }
     }
+    
 
 }
+
+// This is the MessageController.php
