@@ -1016,93 +1016,247 @@
     const MESSAGES_PER_PAGE = 50;
     const TYPING_TIMEOUT = 3000;
     
-    // ============================================
-    // SUPABASE INITIALIZATION
-    // ============================================
-    function initSupabase() {
-        const supabaseUrl = '{{ env("SUPABASE_URL") }}';
-        const supabaseKey = '{{ env("SUPABASE_KEY") }}';
-        
-        if (!supabaseUrl || !supabaseKey) {
-            console.warn('Supabase credentials not configured - falling back to polling');
-            startPolling();
-            return;
-        }
-        
-        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-        
-        // ============================================
-        // REALTIME: Message changes
-        // ============================================
-        supabaseRealtimeChannel = supabaseClient
-            .channel('admin-messages-' + adminId)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `receiver_id=eq.${adminId}`,
-            }, (payload) => {
-                console.log('📨 New incoming message:', payload.new);
-                handleIncomingMessage(payload.new);
-            })
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `sender_id=eq.${adminId}`,
-            }, (payload) => {
-                console.log('📤 Message sent (from another session):', payload.new);
-                handleOutgoingMessageFromOtherSession(payload.new);
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Supabase Realtime connected');
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ Supabase Realtime error - falling back to polling');
-                    startPolling();
-                }
-            });
-        
-        // ============================================
-        // BROADCAST: Typing indicators
-        // ============================================
-        typingChannel = supabaseClient.channel('typing-indicators', {
-            config: {
-                broadcast: { self: false } // Don't receive own broadcasts
-            }
-        });
-        
-        typingChannel.on('broadcast', { event: 'typing' }, (payload) => {
-            handleTypingEvent(payload.payload);
-        }).subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('✅ Typing channel connected');
-            }
-        });
-        
-        // ============================================
-        // PRESENCE: Online status tracking
-        // ============================================
-        initPresence();
-        
-        // ============================================
-        // REALTIME: Alumni online status changes
-        // ============================================
-        supabaseClient
-            .channel('alumni-presence')
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'alumnis',
-            }, (payload) => {
-                handleAlumniPresenceChange(payload.new, payload.old);
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Alumni presence tracking connected');
-                }
-            });
+function initSupabase() {
+    const supabaseUrl = '{{ env("SUPABASE_URL") }}';
+    const supabaseKey = '{{ env("SUPABASE_KEY") }}';
+    
+    if (!supabaseUrl || !supabaseKey) {
+        console.warn('Supabase credentials not configured - falling back to polling');
+        startPolling();
+        return;
     }
+    
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // ============================================
+    // REALTIME: Message changes
+    // ============================================
+    supabaseRealtimeChannel = supabaseClient
+        .channel('admin-messages-' + adminId)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${adminId}`,
+        }, (payload) => {
+            console.log('📨 New incoming message:', payload.new);
+            handleIncomingMessage(payload.new);
+        })
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${adminId}`,
+        }, (payload) => {
+            console.log('📤 Message sent (from another session):', payload.new);
+            handleOutgoingMessageFromOtherSession(payload.new);
+        })
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Supabase Realtime connected');
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error('❌ Supabase Realtime error - falling back to polling');
+                startPolling();
+            }
+        });
+    
+    // ============================================
+    // 🔥 REALTIME: Attachment changes (SAME channel)
+    // ============================================
+    // Use the SAME channel for attachments too
+    supabaseRealtimeChannel
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages_attachments',
+        }, (payload) => {
+            console.log('📎 New attachment inserted (realtime):', payload.new);
+            console.log('📎 Current chat:', currentChat);
+            handleAttachmentInsert(payload.new);
+        });
+    
+    // ============================================
+    // BROADCAST: Typing indicators
+    // ============================================
+    typingChannel = supabaseClient.channel('typing-indicators', {
+        config: {
+            broadcast: { self: false }
+        }
+    });
+    
+    typingChannel.on('broadcast', { event: 'typing' }, (payload) => {
+        handleTypingEvent(payload.payload);
+    }).subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('✅ Typing channel connected');
+        }
+    });
+    
+    // ============================================
+    // PRESENCE: Online status tracking
+    // ============================================
+    initPresence();
+    
+    // ============================================
+    // REALTIME: Alumni online status changes
+    // ============================================
+    supabaseClient
+        .channel('alumni-presence')
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'alumnis',
+        }, (payload) => {
+            handleAlumniPresenceChange(payload.new, payload.old);
+        })
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Alumni presence tracking connected');
+            }
+        });
+}
+
+function handleAttachmentInsert(attachment) {
+    console.log('🔄 Processing new attachment:', attachment);
+    
+    // Find the message element by ID
+    const messageElement = document.querySelector(`[data-msg-id="${attachment.message_id}"]`);
+    if (!messageElement) {
+        console.log('⏭️ Message element not found for attachment:', attachment.message_id);
+        // ✅ Try to find the message in the DOM after a delay
+        setTimeout(() => {
+            const retryElement = document.querySelector(`[data-msg-id="${attachment.message_id}"]`);
+            if (retryElement) {
+                console.log('✅ Message found after delay, updating attachment');
+                handleAttachmentInsert(attachment);
+            }
+        }, 1000);
+        return;
+    }
+    
+    // Check if this attachment is already rendered
+    const existingAttach = messageElement.querySelector('.message-attachment');
+    if (existingAttach && !existingAttach.classList.contains('uploading') && !existingAttach.classList.contains('loading')) {
+        console.log('⏭️ Attachment already rendered for message:', attachment.message_id);
+        return;
+    }
+    
+    // Generate signed URL for the attachment
+    fetch(`/admin/messages/attachments/${attachment.id}/url`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to get attachment URL');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.url) {
+                console.log('✅ Got attachment URL:', data.url);
+                // ✅ Update the attachment with the URL
+                updateMessageAttachment(attachment.message_id, attachment.id, data.url, attachment);
+            } else {
+                console.warn('⚠️ No URL returned for attachment:', attachment.id);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error fetching attachment URL:', error);
+        });
+}
+
+// Fallback function to check and update attachment
+function checkAndUpdateAttachment(attachment) {
+    // Check if the message is now in the DOM
+    const messageElement = document.querySelector(`[data-msg-id="${attachment.message_id}"]`);
+    if (messageElement) {
+        console.log('✅ Message found after delay, updating attachment');
+        handleAttachmentInsert(attachment);
+    } else {
+        console.log('⏭️ Message still not found, attachment might be for a different chat');
+    }
+}
+
+function updateMessageAttachment(messageId, attachmentId, url, attachmentData) {
+    console.log('🔍 Looking for message element:', messageId);
+    
+    // Try multiple selectors
+    let messageElement = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (!messageElement) {
+        // Try to find by data attribute with different format
+        messageElement = document.querySelector(`[data-msg-id="${messageId}"]`);
+    }
+    
+    if (!messageElement) {
+        console.log('⚠️ Message element not found for update:', messageId);
+        // Try again after delay
+        setTimeout(() => {
+            const retryElement = document.querySelector(`[data-msg-id="${messageId}"]`);
+            if (retryElement) {
+                console.log('✅ Message found on retry, updating attachment');
+                updateMessageAttachment(messageId, attachmentId, url, attachmentData);
+            }
+        }, 500);
+        return;
+    }
+    
+    // Find the message bubble
+    const bubble = messageElement.querySelector('.message-bubble');
+    if (!bubble) {
+        console.log('⚠️ No message bubble found');
+        return;
+    }
+    
+    // Remove any existing attachment containers (especially loading ones)
+    const existingAttach = bubble.querySelector('.message-attachment');
+    if (existingAttach) {
+        existingAttach.remove();
+    }
+    
+    // Create attachment container
+    const attachmentContainer = document.createElement('div');
+    attachmentContainer.className = 'message-attachment';
+    
+    // Determine if it's an image or document
+    const isImage = attachmentData.attachment_type === 'image' || 
+                    (attachmentData.attachment_path && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(attachmentData.attachment_path));
+    
+    // Get filename from attachment_path
+    let fileName = 'File';
+    if (attachmentData.attachment_path) {
+        const pathParts = attachmentData.attachment_path.split('/');
+        fileName = pathParts[pathParts.length - 1] || 'File';
+    }
+    if (attachmentData.file_name) {
+        fileName = attachmentData.file_name;
+    }
+    
+    if (isImage) {
+        attachmentContainer.innerHTML = `
+            <img src="${url}" alt="${escapeHtml(fileName)}" 
+                onclick="window.open('${url}', '_blank')" 
+                loading="lazy"
+                style="max-width: 100%; max-height: 300px; border-radius: 8px; cursor: pointer; object-fit: contain;"
+                onerror="this.outerHTML = '<div class=\\'file-error\\'><i class=\\'fa-solid fa-file-image\\'></i> Failed to load image</div>'">
+        `;
+    } else {
+        const fileIcon = getFileIcon(attachmentData.attachment_type || 'document');
+        attachmentContainer.innerHTML = `
+            <a href="${url}" class="file-download" target="_blank" download="${escapeHtml(fileName)}">
+                <i class="fa-solid ${fileIcon}"></i>
+                <div class="file-info">
+                    <span class="file-name">${escapeHtml(fileName)}</span>
+                    <span class="file-size">${attachmentData.file_size ? formatFileSize(attachmentData.file_size) : ''}</span>
+                </div>
+                <i class="fa-solid fa-download"></i>
+            </a>
+        `;
+    }
+    
+    // Append to message bubble (insert before the time)
+    const timeElement = bubble.querySelector('.msg-time');
+    if (timeElement) {
+        bubble.insertBefore(attachmentContainer, timeElement);
+    } else {
+        bubble.appendChild(attachmentContainer);
+    }
+}
 
     // ============================================
     // PRESENCE: Track admin online status
@@ -1333,102 +1487,149 @@ function onMessageInput() {
     }, 500);
 }
 
-
-    // ============================================
-    // MESSAGE HANDLERS
-    // ============================================
-    async function handleIncomingMessage(message) {
-        if (message.receiver_id != adminId || message.receiver_type !== 'admin') return;
-        
-        // 🔧 FIX: Ensure the created_at is treated as UTC
-        const utcTimestamp = ensureUTCTimestamp(message.created_at);
-        
-        // Update contacts panel immediately
-        updateContactWithNewMessage(
-            message.sender_id, 
-            message.sender_type || 'alumni', 
-            message.content, 
-            utcTimestamp, // 🔧 Use the fixed UTC timestamp
-            true
-        );
-        
-        if (currentChat && message.sender_id == currentChat.id && message.sender_type === currentChat.type) {
-            const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
-            if (existingMsg) {
-                console.log('⚠️ Duplicate message prevented:', message.id);
-                await markMessagesAsRead(currentChat.id, currentChat.type);
-                return;
-            }
-            
-            const decryptedContent = await decryptContent(
-                message.content, 
-                message.sender_type, 
-                message.receiver_type
-            );
-            
-            const decryptedMessage = {
-                id: message.id,
-                content: decryptedContent,
-                sender_id: message.sender_id,
-                sender_type: message.sender_type,
-                receiver_id: message.receiver_id,
-                receiver_type: message.receiver_type,
-                is_read: message.is_read,
-                created_at: utcTimestamp, // 🔧 Use the fixed UTC timestamp
-                time: formatTime(new Date(utcTimestamp)), // 🔧 Proper local time
-                attachments: []
-            };
-            
-            appendMessage(decryptedMessage);
-            scrollToBottom();
+async function handleIncomingMessage(message) {
+    if (message.receiver_id != adminId || message.receiver_type !== 'admin') return;
+    
+    // 🔧 FIX: Ensure the created_at is treated as UTC
+    const utcTimestamp = ensureUTCTimestamp(message.created_at);
+    
+    // Update contacts panel immediately
+    updateContactWithNewMessage(
+        message.sender_id, 
+        message.sender_type || 'alumni', 
+        message.content, 
+        utcTimestamp,
+        true
+    );
+    
+    if (currentChat && message.sender_id == currentChat.id && message.sender_type === currentChat.type) {
+        const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
+        if (existingMsg) {
+            console.log('⚠️ Duplicate message prevented:', message.id);
             await markMessagesAsRead(currentChat.id, currentChat.type);
-            lastMessageId = Math.max(lastMessageId, message.id);
+            return;
         }
         
-        refreshConversationsInBackground();
-    }
-
-    function handleOutgoingMessageFromOtherSession(message) {
-        if (message.sender_id != adminId || message.sender_type !== 'admin') return;
-        
-        // 🔧 FIX: Ensure the created_at is treated as UTC
-        const utcTimestamp = ensureUTCTimestamp(message.created_at);
-        
-        updateContactWithNewMessage(
-            message.receiver_id, 
-            message.receiver_type || 'alumni', 
+        const decryptedContent = await decryptContent(
             message.content, 
-            utcTimestamp, // 🔧 Use the fixed UTC timestamp
-            false
+            message.sender_type, 
+            message.receiver_type
         );
         
-        if (currentChat && message.receiver_id == currentChat.id && message.receiver_type === currentChat.type) {
-            const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
-            if (existingMsg) {
-                console.log('⚠️ Duplicate outgoing message prevented:', message.id);
-                return;
+        // ✅ Fetch attachments for this message
+        let attachments = [];
+        try {
+            const attachResponse = await fetch(`/admin/messages/attachments/message/${message.id}`);
+            if (attachResponse.ok) {
+                const attachData = await attachResponse.json();
+                if (attachData.length > 0) {
+                    attachments = attachData.map(att => ({
+                        id: att.id,
+                        type: att.attachment_type || 'document',
+                        name: att.file_name || 'File',
+                        size: att.file_size || 0,
+                        url: att.url || null,
+                        uploading: false
+                    }));
+                }
             }
-            
-            appendMessage({
-                id: message.id,
-                content: message.content,
-                sender_id: message.sender_id,
-                sender_type: message.sender_type,
-                receiver_id: message.receiver_id,
-                receiver_type: message.receiver_type,
-                is_read: message.is_read,
-                created_at: utcTimestamp, // 🔧 Use the fixed UTC timestamp
-                time: formatTime(new Date(utcTimestamp)), // 🔧 Proper local time
-                attachments: []
-            });
-            scrollToBottom();
-            lastMessageId = Math.max(lastMessageId, message.id);
+        } catch (e) {
+            console.warn('Could not fetch attachments for incoming message:', e);
         }
+        
+        const decryptedMessage = {
+            id: message.id,
+            content: decryptedContent,
+            sender_id: message.sender_id,
+            sender_type: message.sender_type,
+            receiver_id: message.receiver_id,
+            receiver_type: message.receiver_type,
+            is_read: message.is_read,
+            created_at: utcTimestamp,
+            time: formatTime(new Date(utcTimestamp)),
+            attachments: attachments
+        };
+        
+        appendMessage(decryptedMessage);
+        scrollToBottom();
+        await markMessagesAsRead(currentChat.id, currentChat.type);
+        lastMessageId = Math.max(lastMessageId, message.id);
     }
+    
+    refreshConversationsInBackground();
+}
 
-    // ============================================
-    // 🔧 NEW: Helper function to ensure UTC timestamps
-    // ============================================
+function handleOutgoingMessageFromOtherSession(message) {
+    if (message.sender_id != adminId || message.sender_type !== 'admin') return;
+    
+    const utcTimestamp = ensureUTCTimestamp(message.created_at);
+    
+    updateContactWithNewMessage(
+        message.receiver_id, 
+        message.receiver_type || 'alumni', 
+        message.content, 
+        utcTimestamp,
+        false
+    );
+    
+    if (currentChat && message.receiver_id == currentChat.id && message.receiver_type === currentChat.type) {
+        const existingMsg = document.querySelector(`[data-msg-id="${message.id}"]`);
+        if (existingMsg) {
+            console.log('⚠️ Duplicate outgoing message prevented:', message.id);
+            return;
+        }
+        
+        // ✅ Also fetch attachments for outgoing messages from other sessions
+        fetch(`/admin/messages/attachments/message/${message.id}`)
+            .then(response => response.json())
+            .then(attachData => {
+                let attachments = [];
+                if (attachData.length > 0) {
+                    attachments = attachData.map(att => ({
+                        id: att.id,
+                        type: att.attachment_type || 'document',
+                        name: att.file_name || 'File',
+                        size: att.file_size || 0,
+                        url: att.url || null,
+                        uploading: false
+                    }));
+                }
+                
+                appendMessage({
+                    id: message.id,
+                    content: message.content,
+                    sender_id: message.sender_id,
+                    sender_type: message.sender_type,
+                    receiver_id: message.receiver_id,
+                    receiver_type: message.receiver_type,
+                    is_read: message.is_read,
+                    created_at: utcTimestamp,
+                    time: formatTime(new Date(utcTimestamp)),
+                    attachments: attachments
+                });
+                scrollToBottom();
+                lastMessageId = Math.max(lastMessageId, message.id);
+            })
+            .catch(() => {
+                // Fallback: append without attachments
+                appendMessage({
+                    id: message.id,
+                    content: message.content,
+                    sender_id: message.sender_id,
+                    sender_type: message.sender_type,
+                    receiver_id: message.receiver_id,
+                    receiver_type: message.receiver_type,
+                    is_read: message.is_read,
+                    created_at: utcTimestamp,
+                    time: formatTime(new Date(utcTimestamp)),
+                    attachments: []
+                });
+                scrollToBottom();
+                lastMessageId = Math.max(lastMessageId, message.id);
+            });
+    }
+}
+
     function ensureUTCTimestamp(timestamp) {
         if (!timestamp) return new Date().toISOString();
         
@@ -1440,14 +1641,12 @@ function onMessageInput() {
             }
             
             // Missing timezone - assume UTC by appending Z
-            // Supabase sends timestamps without timezone, so we must add it
             if (timestamp.includes('T')) {
-                // Format: "2026-07-17T08:00:00" -> "2026-07-17T08:00:00Z"
                 return timestamp + 'Z';
             }
             
             // If it's just a date string, create a proper UTC ISO string
-            const date = new Date(timestamp + 'Z'); // Force UTC interpretation
+            const date = new Date(timestamp + 'Z');
             return date.toISOString();
         }
         
@@ -1681,35 +1880,50 @@ async function checkForNewMessages() {
     if (!currentChat) return;
     
     try {
-        // ✅ Use /admin prefix for consistency
         const url = currentChat.type === 'group' 
             ? `/admin/messages/groups/${currentChat.id}/messages?limit=10&offset=0`
             : `/admin/messages/${currentChat.type}/${currentChat.id}?limit=10&offset=0`;
             
         const response = await fetch(url);
-        
         const data = await response.json();
-        // Handle both array and object response formats
         const messageList = Array.isArray(data) ? data : (data.messages || []);
         
         if (messageList && messageList.length > 0) {
             let hasNewMessages = false;
             
             for (const msg of messageList) {
-                if (msg.id > lastMessageId && msg.sender_id != adminId) {
+                if (msg.id > lastMessageId) {
                     const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
                     if (!existingMsg) {
-                        // ✅ Decrypt content for group messages
                         let decryptedContent = msg.content;
                         if (msg.content && (msg.content.startsWith('enc:') || msg.content.startsWith('U2FsdGVkX1'))) {
                             decryptedContent = await decryptContent(msg.content, msg.sender_type, 'admin');
                         }
                         
-                        // ✅ Create a properly formatted message object
+                        // ✅ Ensure attachments have URLs
+                        let attachments = msg.attachments || [];
+                        if (attachments.length > 0) {
+                            // Fetch fresh attachment URLs
+                            for (const att of attachments) {
+                                if (att.id && !att.url) {
+                                    try {
+                                        const urlResponse = await fetch(`/admin/messages/attachments/${att.id}/url`);
+                                        const urlData = await urlResponse.json();
+                                        if (urlData.success) {
+                                            att.url = urlData.url;
+                                        }
+                                    } catch (e) {
+                                        console.error('Error fetching attachment URL:', e);
+                                    }
+                                }
+                            }
+                        }
+                        
                         const formattedMsg = {
                             ...msg,
                             content: decryptedContent,
-                            time: msg.time || formatTime(new Date(msg.created_at))
+                            time: msg.time || formatTime(new Date(msg.created_at)),
+                            attachments: attachments
                         };
                         
                         appendMessage(formattedMsg);
@@ -2500,8 +2714,20 @@ function renderGroupMessagesPrepend(messages) {
     
     let html = '';
     let lastDate = null;
+    let lastSender = null;
+    let lastSenderId = null;
     
-    messages.forEach(msg => {
+    // We need to check the first existing message to determine if we should hide avatar
+    const firstExistingMsg = container.querySelector('.message-group:not(.date-divider)');
+    let firstExistingSender = null;
+    let firstExistingSenderId = null;
+    if (firstExistingMsg) {
+        firstExistingSender = firstExistingMsg.dataset.senderName;
+        // We can't easily get sender_id from the DOM, so we'll store it in a data attribute
+        firstExistingSenderId = firstExistingMsg.dataset.senderId;
+    }
+    
+    messages.forEach((msg, index) => {
         let msgDate;
         if (typeof msg.created_at === 'string') {
             if (!msg.created_at.endsWith('Z') && !msg.created_at.includes('+')) {
@@ -2518,20 +2744,55 @@ function renderGroupMessagesPrepend(messages) {
         if (localDateStr !== lastDate) {
             html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
             lastDate = localDateStr;
+            lastSender = null;
+            lastSenderId = null;
         }
         
         const isSent = msg.sender_id == adminId;
         const senderName = msg.sender_name || 'Unknown';
         
+        // Check if same sender as next message (for prepend, we check against the next message)
+        const nextMsg = messages[index + 1];
+        const isSameAsNext = nextMsg && nextMsg.sender_name === senderName && nextMsg.sender_id === msg.sender_id && !isSent;
+        
+        // Also check against the first existing message in the container
+        const isSameAsExisting = !isSent && firstExistingSender === senderName && firstExistingSenderId == msg.sender_id;
+        
+        // For prepend, we show avatar if it's different from the next message AND different from the first existing
+        const shouldShowAvatar = !isSent && !isSameAsNext && !isSameAsExisting;
+        
+        // Get avatar info
+        const avatarInfo = getSenderAvatarInfo(msg.sender_id, msg.sender_type);
+        
+        let avatarHtml = '';
+        if (shouldShowAvatar) {
+            avatarHtml = `
+                <div class="message-avatar" style="background: ${avatarInfo.color};">
+                    ${avatarInfo.photo 
+                        ? `<img src="${avatarInfo.photo}" alt="${escapeHtml(senderName)}">` 
+                        : `<span>${avatarInfo.initials || '?'}</span>`
+                    }
+                    ${avatarInfo.is_online ? `<span class="online-indicator"></span>` : ''}
+                    <span class="sender-tooltip">${escapeHtml(senderName)}</span>
+                </div>
+            `;
+        }
+        
         html += `
-            <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
-                ${!isSent ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(senderName)}</div>` : ''}
-                <div class="message-bubble">
-                    <p>${escapeHtml(msg.content)}</p>
-                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                    <span class="msg-time">
-                        ${msg.time || formatTime(msgDate)}
-                    </span>
+            <div class="message-group ${isSent ? 'sent' : 'received'} ${!isSent && !shouldShowAvatar ? 'same-sender' : ''}" 
+                 data-msg-id="${msg.id}" 
+                 data-sender-name="${escapeHtml(senderName)}"
+                 data-sender-id="${msg.sender_id}">
+                <div class="message-wrapper">
+                    ${!isSent ? avatarHtml : ''}
+                    <div class="message-bubble">
+                        <p>${escapeHtml(msg.content)}</p>
+                        ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                        <span class="msg-time">
+                            ${msg.time || formatTime(msgDate)}
+                            ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                        </span>
+                    </div>
                 </div>
             </div>
         `;
@@ -2623,55 +2884,66 @@ function renderMessagesPrepend(messages) {
         
         container.innerHTML = html;
     }
-
-    function renderAttachments(attachments, isSent) {
-        return attachments.map(att => {
-            if (att.type === 'image') {
-                return `
-                    <div class="message-attachment">
-                        <img src="${att.url}" alt="${escapeHtml(att.name)}" onclick="window.open('${att.url}', '_blank')" loading="lazy">
-                    </div>
-                `;
-            } else {
-                return `
-                    <div class="message-attachment">
-                        <a href="${att.url}" class="file-download" download="${escapeHtml(att.name)}">
-                            <i class="fa-solid ${getFileIcon(att.type || 'document')}"></i>
-                            <div class="file-info">
-                                <span class="file-name">${escapeHtml(att.name)}</span>
-                                <span class="file-size">${att.size ? formatFileSize(att.size) : ''}</span>
-                            </div>
-                            <i class="fa-solid fa-download"></i>
-                        </a>
-                    </div>
-                `;
-            }
-        }).join('');
-    }
     
 function appendMessage(msg) {
+    console.log('📝 appendMessage called with:', msg);
+    console.log('📎 Attachments in appendMessage:', msg.attachments);
+    console.log('📎 Attachments count:', msg.attachments ? msg.attachments.length : 0);
+    
     const container = document.getElementById('chatMessages');
     
+    // ✅ Check if this is a real message replacing a temp one
     if (msg.id && !msg.id.toString().startsWith('temp-')) {
+        // Check for existing real message
         const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
         if (existingMsg) {
             console.log('⚠️ Duplicate message prevented in appendMessage:', msg.id);
+            
+            // ✅ If this real message has attachments, update the existing message
+            if (msg.attachments && msg.attachments.length > 0) {
+                const existingAttach = existingMsg.querySelector('.message-attachment');
+                if (!existingAttach || existingAttach.classList.contains('uploading')) {
+                    console.log('🔄 Updating existing message with attachments');
+                    updateExistingMessageWithAttachments(existingMsg, msg);
+                }
+            }
             return;
         }
+        
+        // ✅ CRITICAL FIX: Remove any temp message with the same content
+        // Find and remove temp messages that match this real message
+        const tempMessages = container.querySelectorAll('[data-msg-id^="temp-"]');
+        tempMessages.forEach(tempEl => {
+            // Check if the temp message has the same content or was uploaded recently
+            const tempBubble = tempEl.querySelector('.message-bubble p');
+            const tempContent = tempBubble ? tempBubble.textContent : '';
+            const realContent = msg.content || '';
+            
+            // If temp has the attachment placeholder or matches content, remove it
+            if (tempContent.includes('📎') || tempContent === realContent) {
+                console.log('🗑️ Removing temp message:', tempEl.dataset.msgId);
+                tempEl.remove();
+            }
+        });
     }
     
     const isSent = msg.sender_id == adminId;
     const displayTime = msg.time || formatTime(new Date(msg.created_at));
     
-    // ✅ Check if it's a group message (has sender_name) and not sent by current user
     const isGroupMsg = msg.sender_name && !isSent;
+    
+    let attachmentsHtml = '';
+    if (msg.attachments && msg.attachments.length > 0) {
+        console.log('📎 Rendering attachments in appendMessage');
+        attachmentsHtml = renderAttachments(msg.attachments, isSent);
+    }
     
     const messageHtml = `
         <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
             ${isGroupMsg ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(msg.sender_name)}</div>` : ''}
             <div class="message-bubble">
-                <p>${escapeHtml(msg.content)}</p>
-                ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                ${msg.content ? `<p>${escapeHtml(msg.content)}</p>` : ''}
+                ${attachmentsHtml}
                 <span class="msg-time">
                     ${displayTime}
                     ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
@@ -2684,215 +2956,67 @@ function appendMessage(msg) {
     if (emptyState) emptyState.remove();
     
     container.insertAdjacentHTML('beforeend', messageHtml);
+    
+    // ✅ After inserting, check if attachments have URLs but didn't render
+    if (msg.attachments && msg.attachments.length > 0) {
+        const messageElement = container.querySelector(`[data-msg-id="${msg.id}"]`);
+        if (messageElement) {
+            const renderedAttach = messageElement.querySelector('.message-attachment');
+            if (!renderedAttach) {
+                console.log('⚠️ Attachment was not rendered, checking URL...');
+                const hasValidUrl = msg.attachments.some(att => att.url && !att.uploading);
+                if (hasValidUrl) {
+                    console.log('🔄 Re-rendering message with attachments');
+                    messageElement.outerHTML = messageHtml;
+                }
+            }
+        }
+    }
+    
+    // ✅ Clean up any remaining temp messages that might be left
+    setTimeout(() => {
+        const tempRemaining = container.querySelectorAll('[data-msg-id^="temp-"]');
+        if (tempRemaining.length > 0) {
+            tempRemaining.forEach(el => {
+                // If temp message is old (more than 5 seconds), remove it
+                const timestamp = el.dataset.msgId ? parseInt(el.dataset.msgId.replace('temp-', '')) : 0;
+                if (timestamp && (Date.now() - timestamp > 5000)) {
+                    console.log('🗑️ Removing stale temp message:', el.dataset.msgId);
+                    el.remove();
+                }
+            });
+        }
+    }, 3000);
 }
-    
-async function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const content = input.value.trim();
-    
-    // If it's a group chat, use group send
-    if (currentChat && currentChat.type === 'group') {
-        return sendGroupMessage();
-    }
-    
-    if (!content || !currentChat) return;
 
-    // Check if chat is archived
-    const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
-    if (contact && contact.is_archived) {
-        showToast('Cannot send messages to archived chat. Unarchive it first.', 'error');
-        return;
-    }
+// ✅ Enhanced: Update existing message with attachments
+function updateExistingMessageWithAttachments(messageElement, msg) {
+    const bubble = messageElement.querySelector('.message-bubble');
+    if (!bubble) return;
     
-    // If there are files, send with attachments
-    if (selectedFiles.length > 0) {
-        if (!currentChat) return;
-        
-        input.value = '';
-        input.focus();
-        
-        const tempId = 'temp-' + Date.now();
-        const fileNames = selectedFiles.map(f => f.name).join(', ');
-        const tempContent = content || `📎 ${fileNames}`;
-        
-        const tempMessage = {
-            id: tempId,
-            content: tempContent,
-            sender_id: adminId,
-            sender_type: 'admin',
-            is_read: false,
-            created_at: new Date().toISOString(),
-            time: formatTime(new Date()),
-            attachments: selectedFiles.map(f => ({
-                name: f.name,
-                size: f.size,
-                type: f.type,
-                uploading: true
-            }))
-        };
-        
-        appendMessage(tempMessage);
-        scrollToBottom();
-        
-        // Clear typing broadcast
-        clearTimeout(typingTimeout);
-        if (typingChannel) {
-            typingChannel.send({
-                type: 'broadcast',
-                event: 'typing',
-                payload: {
-                    sender_id: adminId,
-                    sender_type: 'admin',
-                    receiver_id: currentChat.id,
-                    receiver_type: currentChat.type,
-                    stopped: true,
-                    timestamp: new Date().toISOString(),
-                },
-            });
-        }
-        
-        const filesToUpload = [...selectedFiles];
-        selectedFiles = [];
-        renderFilePreviews();
-        
-        try {
-            const formData = new FormData();
-            formData.append('receiver_id', currentChat.id);
-            formData.append('receiver_type', currentChat.type);
-            formData.append('content', content || '');
-            filesToUpload.forEach(file => {
-                formData.append('attachments[]', file);
-            });
-            
-            const response = await fetch('/admin/messages/send-with-attachments', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                },
-                body: formData
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to send files');
+    // Remove any existing attachment containers (especially uploading ones)
+    const existingAttach = bubble.querySelector('.message-attachment');
+    if (existingAttach) existingAttach.remove();
+    
+    // Add the new attachments
+    if (msg.attachments && msg.attachments.length > 0) {
+        const attachmentsHtml = renderAttachments(msg.attachments, true);
+        if (attachmentsHtml) {
+            // Insert before the time
+            const timeElement = bubble.querySelector('.msg-time');
+            if (timeElement) {
+                // Insert the attachments HTML before the time element
+                timeElement.insertAdjacentHTML('beforebegin', attachmentsHtml);
+            } else {
+                bubble.insertAdjacentHTML('beforeend', attachmentsHtml);
             }
             
-            const data = await response.json();
-            
-            if (data.success) {
-                const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-                if (tempElement) tempElement.remove();
-                
-                data.message.time = formatTime(new Date(data.message.created_at));
-                appendMessage(data.message);
-                scrollToBottom();
-                
-                lastMessageId = Math.max(lastMessageId, data.message.id);
-                
-                updateContactWithNewMessage(
-                    currentChat.id,
-                    currentChat.type,
-                    content || '📎 Attachment',
-                    data.message.created_at,
-                    false
-                );
+            // Ensure the message content is visible
+            const contentP = bubble.querySelector('p');
+            if (!contentP && msg.content) {
+                bubble.insertAdjacentHTML('afterbegin', `<p>${escapeHtml(msg.content)}</p>`);
             }
-        } catch (error) {
-            console.error('Error sending files:', error);
-            const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-            if (tempElement) tempElement.remove();
-            alert('Failed to send files. Please try again.');
         }
-        return;
-    }
-    
-    // No files, send text message
-    // Clear typing timeout since we're sending
-    clearTimeout(typingTimeout);
-    
-    input.value = '';
-    input.focus();
-    
-    const now = new Date();
-    const tempId = 'temp-' + Date.now();
-    const tempMessage = {
-        id: tempId,
-        content: content,
-        sender_id: adminId,
-        sender_type: 'admin',
-        is_read: false,
-        created_at: now.toISOString(),
-        time: formatTime(now),
-        attachments: []
-    };
-    
-    appendMessage(tempMessage);
-    scrollToBottom();
-    
-    // Broadcast that we're no longer typing
-    if (typingChannel) {
-        typingChannel.send({
-            type: 'broadcast',
-            event: 'typing',
-            payload: {
-                sender_id: adminId,
-                sender_type: 'admin',
-                receiver_id: currentChat.id,
-                receiver_type: currentChat.type,
-                stopped: true,
-                timestamp: new Date().toISOString(),
-            },
-        });
-    }
-    
-    try {
-        const response = await fetch('/admin/messages/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                receiver_id: currentChat.id,
-                receiver_type: currentChat.type,
-                content: content
-            })
-        });
-        
-        if (!response.ok) throw new Error('Failed to send message');
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-            if (tempElement) tempElement.remove();
-            
-            if (!data.message.time) {
-                data.message.time = formatTime(new Date(data.message.created_at));
-            }
-            
-            appendMessage(data.message);
-            scrollToBottom();
-            
-            lastMessageId = Math.max(lastMessageId, data.message.id);
-            
-            updateContactWithNewMessage(
-                currentChat.id,
-                currentChat.type,
-                content,
-                data.message.created_at,
-                false
-            );
-        }
-    } catch (error) {
-        console.error('Error sending message:', error);
-        const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-        if (tempElement) tempElement.remove();
-        
-        input.value = content;
-        alert('Failed to send message. Please try again.');
     }
 }
     
@@ -3195,6 +3319,11 @@ async function sendMessage() {
             date = new Date(date);
         }
         
+        // If date is invalid, return 'Just now'
+        if (isNaN(date.getTime())) {
+            return 'Just now';
+        }
+        
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
@@ -3215,11 +3344,13 @@ async function sendMessage() {
             return `${diffHours}h ago`;
         }
         
-        // Otherwise show the time
-        return date.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit', 
-            hour12: true 
+        // For older messages, show the date and time
+        return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
         });
     }
     
@@ -3642,145 +3773,81 @@ function formatFileSize(bytes) {
 }
 
 function renderAttachments(attachments, isSent) {
-    if (!attachments || attachments.length === 0) return '';
+    console.log('🎨 renderAttachments called with:', attachments);
     
-    return attachments.map(att => {
-        if (att.type === 'image') {
+    if (!attachments || attachments.length === 0) {
+        console.log('⚠️ No attachments to render');
+        return '';
+    }
+    
+    const result = attachments.map(att => {
+        console.log('🔍 Processing attachment:', att);
+        console.log('🔍 att.uploading:', att.uploading);
+        console.log('🔍 att.url:', att.url);
+        
+        // If still uploading, show a spinner
+        if (att.uploading) {
+            console.log('⏳ Attachment is still uploading');
+            return `
+                <div class="message-attachment uploading">
+                    <div class="uploading-placeholder">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>Uploading ${escapeHtml(att.name || 'file')}...</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ✅ CRITICAL: If no URL, show a placeholder
+        if (!att.url) {
+            console.log('⚠️ No URL for attachment, showing placeholder');
+            return `
+                <div class="message-attachment loading">
+                    <div class="uploading-placeholder">
+                        <i class="fa-solid ${getFileIcon(att.type || 'document')}"></i>
+                        <span>${escapeHtml(att.name || 'File')}</span>
+                        <span style="font-size: 0.7rem; color: #999;">Loading...</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ✅ Now we have a URL, render the actual attachment
+        console.log('✅ Rendering attachment with URL:', att.url);
+        
+        // ✅ Check if it's an image by type
+        const isImage = att.type === 'image' || 
+                        (att.name && /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(att.name));
+        
+        if (isImage) {
             return `
                 <div class="message-attachment">
-                    <img src="${att.url}" alt="${escapeHtml(att.name || 'Image')}" onclick="window.open('${att.url}', '_blank')" loading="lazy">
+                    <img src="${att.url}" alt="${escapeHtml(att.name || 'Image')}" 
+                         onclick="window.open('${att.url}', '_blank')" 
+                         loading="lazy"
+                         onerror="this.outerHTML = '<div class=\\'file-error\\'><i class=\\'fa-solid fa-file-image\\'></i> Failed to load image</div>'"
+                         style="max-width: 100%; max-height: 300px; border-radius: 8px; cursor: pointer; object-fit: contain;">
                 </div>
             `;
         } else {
             return `
                 <div class="message-attachment">
-                    <a href="${att.url}" class="file-download" download="${escapeHtml(att.name || 'file')}">
+                    <a href="${att.url}" class="file-download" target="_blank" download="${escapeHtml(att.name || 'file')}">
                         <i class="fa-solid ${getFileIcon(att.type || 'document')}"></i>
                         <div class="file-info">
                             <span class="file-name">${escapeHtml(att.name || 'File')}</span>
-                            <span class="file-size">${formatFileSize(att.size)}</span>
+                            <span class="file-size">${att.size ? formatFileSize(att.size) : ''}</span>
                         </div>
                         <i class="fa-solid fa-download"></i>
                     </a>
                 </div>
             `;
         }
-    }).join('');
+    });
+    
+    console.log('🎨 renderAttachments result length:', result.length);
+    return result.join('');
 }
-
-    // Override sendMessage to handle files
-    const originalSendMessageFn = sendMessage;
-    sendMessage = async function() {
-        const input = document.getElementById('messageInput');
-        const content = input.value.trim();
-        
-        // If there are files, send with attachments
-        if (selectedFiles.length > 0) {
-            if (!currentChat) return;
-            
-            input.value = '';
-            input.focus();
-            
-            const tempId = 'temp-' + Date.now();
-            const fileNames = selectedFiles.map(f => f.name).join(', ');
-            const tempContent = content || `📎 ${fileNames}`;
-            
-            const tempMessage = {
-                id: tempId,
-                content: tempContent,
-                sender_id: adminId,
-                sender_type: 'admin',
-                is_read: false,
-                created_at: new Date().toISOString(),
-                time: formatTime(new Date()),
-                attachments: selectedFiles.map(f => ({
-                    name: f.name,
-                    size: f.size,
-                    type: f.type,
-                    uploading: true
-                }))
-            };
-            
-            appendMessage(tempMessage);
-            scrollToBottom();
-            
-            // Clear typing broadcast
-            clearTimeout(typingTimeout);
-            if (typingChannel) {
-                typingChannel.send({
-                    type: 'broadcast',
-                    event: 'typing',
-                    payload: {
-                        sender_id: adminId,
-                        sender_type: 'admin',
-                        receiver_id: currentChat.id,
-                        receiver_type: currentChat.type,
-                        stopped: true,
-                        timestamp: new Date().toISOString(),
-                    },
-                });
-            }
-            
-            const filesToUpload = [...selectedFiles];
-            selectedFiles = [];
-            renderFilePreviews();
-            
-            try {
-                const formData = new FormData();
-                formData.append('receiver_id', currentChat.id);
-                formData.append('receiver_type', currentChat.type);
-                formData.append('content', content || '');
-                filesToUpload.forEach(file => {
-                    formData.append('attachments[]', file);
-                });
-                
-                const response = await fetch('/admin/messages/send-with-attachments', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    },
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || 'Failed to send files');
-                }
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-                    if (tempElement) tempElement.remove();
-                    
-                    data.message.time = formatTime(new Date(data.message.created_at));
-                    appendMessage(data.message);
-                    scrollToBottom();
-                    
-                    lastMessageId = Math.max(lastMessageId, data.message.id);
-                    
-                    updateContactWithNewMessage(
-                        currentChat.id,
-                        currentChat.type,
-                        content || '📎 Attachment',
-                        data.message.created_at,
-                        false
-                    );
-                }
-            } catch (error) {
-                console.error('Error sending files:', error);
-                const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
-                if (tempElement) tempElement.remove();
-                alert('Failed to send files. Please try again.');
-            }
-            return;
-        }
-        
-        // No files, use original send
-        if (!content || !currentChat) return;
-        originalSendMessageFn();
-    };
 
 // ============================================
 // DROPDOWN FUNCTIONS - COMPLETE FIX
@@ -4445,6 +4512,305 @@ if (!document.querySelector('#toast-styles')) {
     document.head.appendChild(toastStyles);
 }
 
+async function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    
+    // If it's a group chat, use group send
+    if (currentChat && currentChat.type === 'group') {
+        return sendGroupMessage();
+    }
+    
+    // ✅ FIX: Allow sending files even without text content
+    if (!currentChat) {
+        return;
+    }
+    
+    // ✅ If there's no content AND no files, do nothing
+    if (!content && selectedFiles.length === 0) {
+        return;
+    }
+
+    // Check if chat is archived
+    const contact = allContacts.find(c => c.id == currentChat.id && c.type === currentChat.type);
+    if (contact && contact.is_archived) {
+        showToast('Cannot send messages to archived chat. Unarchive it first.', 'error');
+        return;
+    }
+    
+    // If there are files, send with attachments
+    if (selectedFiles.length > 0) {
+        await sendMessageWithAttachments(content);
+        return;
+    }
+    
+    // No files, send text message
+    await sendTextMessage(content);
+}
+
+// ============================================
+// SEND MESSAGE WITH ATTACHMENTS - FIXED FOR SENDER
+// ============================================
+async function sendMessageWithAttachments(content) {
+    const input = document.getElementById('messageInput');
+    
+    input.value = '';
+    input.focus();
+    
+    const tempId = 'temp-' + Date.now();
+    const fileNames = selectedFiles.map(f => f.name).join(', ');
+    const tempContent = content || `📎 ${fileNames}`;
+    
+    // ✅ Create attachments array for temp message with proper structure
+    const tempAttachments = selectedFiles.map(f => ({
+        id: 'temp-' + Date.now() + '-' + Math.random(),
+        type: f.type.startsWith('image/') ? 'image' : 'document',
+        name: f.name,
+        size: f.size,
+        uploading: true,
+        url: null
+    }));
+    
+    const tempMessage = {
+        id: tempId,
+        content: tempContent,
+        sender_id: adminId,
+        sender_type: 'admin',
+        is_read: false,
+        created_at: new Date().toISOString(),
+        time: formatTime(new Date()),
+        attachments: tempAttachments
+    };
+    
+    // ✅ Show temp message with upload indicator
+    appendMessage(tempMessage);
+    scrollToBottom();
+    
+    clearTimeout(typingTimeout);
+    if (typingChannel) {
+        typingChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: {
+                sender_id: adminId,
+                sender_type: 'admin',
+                receiver_id: currentChat.id,
+                receiver_type: currentChat.type,
+                stopped: true,
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
+    
+    const filesToUpload = [...selectedFiles];
+    selectedFiles = [];
+    renderFilePreviews();
+    
+    try {
+        const formData = new FormData();
+        formData.append('receiver_id', currentChat.id);
+        formData.append('receiver_type', currentChat.type);
+        formData.append('content', content || '');
+        filesToUpload.forEach(file => {
+            formData.append('attachments[]', file);
+        });
+        
+        const response = await fetch('/admin/messages/send-with-attachments', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: formData
+        });
+        
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error('❌ Failed to parse response:', responseText);
+            throw new Error('Server returned invalid response');
+        }
+        
+        if (!response.ok) {
+            throw new Error(data.error || `Server error: ${response.status}`);
+        }
+        
+        if (data.success && data.message) {
+            // ✅ Remove temp message
+            const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+            if (tempElement) tempElement.remove();
+            
+            // ✅ IMPORTANT: Get attachments from the server response
+            let finalAttachments = [];
+            if (data.message.attachments && data.message.attachments.length > 0) {
+                // Server should return attachments with signed URLs
+                finalAttachments = data.message.attachments.map(att => ({
+                    id: att.id,
+                    type: att.type || 'document',
+                    name: att.name || 'File',
+                    size: att.size || 0,
+                    url: att.url || null,
+                    uploading: false
+                }));
+                console.log('✅ Final attachments from server:', finalAttachments);
+            } else {
+                // ✅ FALLBACK: If server didn't return attachments, fetch them
+                console.warn('⚠️ No attachments in server response, fetching them...');
+                try {
+                    const attachResponse = await fetch(`/admin/messages/attachments/message/${data.message.id}`);
+                    if (attachResponse.ok) {
+                        const attachData = await attachResponse.json();
+                        if (attachData.length > 0) {
+                            finalAttachments = attachData.map(att => ({
+                                id: att.id,
+                                type: att.attachment_type || 'document',
+                                name: att.file_name || 'File',
+                                size: att.file_size || 0,
+                                url: att.url || null,
+                                uploading: false
+                            }));
+                            console.log('✅ Attachments fetched via fallback:', finalAttachments);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch attachments directly:', e);
+                }
+            }
+            
+            // ✅ Create final message with proper attachments
+            const finalMessage = {
+                id: data.message.id,
+                content: data.message.content || content || '📎 Attachment',
+                sender_id: data.message.sender_id || adminId,
+                sender_type: data.message.sender_type || 'admin',
+                receiver_id: data.message.receiver_id || currentChat.id,
+                receiver_type: data.message.receiver_type || currentChat.type,
+                is_read: data.message.is_read || false,
+                created_at: data.message.created_at || new Date().toISOString(),
+                time: formatTime(new Date(data.message.created_at || new Date())),
+                attachments: finalAttachments
+            };
+            
+            console.log('📤 Final message with attachments:', finalMessage);
+            
+            // ✅ Append the final message - this will render the attachment
+            appendMessage(finalMessage);
+            scrollToBottom();
+            
+            lastMessageId = Math.max(lastMessageId, data.message.id || 0);
+            
+            // ✅ Update contact list
+            updateContactWithNewMessage(
+                currentChat.id,
+                currentChat.type,
+                finalMessage.content,
+                finalMessage.created_at,
+                false
+            );
+            
+            showToast('Message sent successfully');
+        }
+    } catch (error) {
+        console.error('❌ Error sending files:', error);
+        const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+        if (tempElement) tempElement.remove();
+        showToast('Failed to send files. Please try again.', 'error');
+    }
+}
+
+// ============================================
+// SEND TEXT MESSAGE ONLY
+// ============================================
+async function sendTextMessage(content) {
+    const input = document.getElementById('messageInput');
+    
+    clearTimeout(typingTimeout);
+    input.value = '';
+    input.focus();
+    
+    const now = new Date();
+    const tempId = 'temp-' + Date.now();
+    const tempMessage = {
+        id: tempId,
+        content: content,
+        sender_id: adminId,
+        sender_type: 'admin',
+        is_read: false,
+        created_at: now.toISOString(),
+        time: formatTime(now),
+        attachments: []
+    };
+    
+    appendMessage(tempMessage);
+    scrollToBottom();
+    
+    if (typingChannel) {
+        typingChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: {
+                sender_id: adminId,
+                sender_type: 'admin',
+                receiver_id: currentChat.id,
+                receiver_type: currentChat.type,
+                stopped: true,
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
+    
+    try {
+        const response = await fetch('/admin/messages/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                receiver_id: currentChat.id,
+                receiver_type: currentChat.type,
+                content: content
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to send message');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+            if (tempElement) tempElement.remove();
+            
+            if (!data.message.time) {
+                data.message.time = formatTime(new Date(data.message.created_at));
+            }
+            
+            appendMessage(data.message);
+            scrollToBottom();
+            
+            lastMessageId = Math.max(lastMessageId, data.message.id);
+            
+            updateContactWithNewMessage(
+                currentChat.id,
+                currentChat.type,
+                content,
+                data.message.created_at,
+                false
+            );
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+        if (tempElement) tempElement.remove();
+        input.value = content;
+        showToast('Failed to send message. Please try again.', 'error');
+    }
+}
+
+
     // ============================================
     // GROUP CHAT STATE
     // ============================================
@@ -4647,7 +5013,6 @@ async function loadGroupMessages(groupId) {
     }
 }
 
-// RENDER GROUP MESSAGES
 function renderGroupMessages(messages) {
     const container = document.getElementById('chatMessages');
     
@@ -4664,12 +5029,13 @@ function renderGroupMessages(messages) {
     
     let html = '';
     let lastDate = null;
+    let lastSender = null;
+    let lastSenderId = null;
     
-    messages.forEach(msg => {
+    messages.forEach((msg, index) => {
         // ✅ Handle both string and Date objects for created_at
         let msgDate;
         if (typeof msg.created_at === 'string') {
-            // Make sure we handle UTC properly
             if (!msg.created_at.endsWith('Z') && !msg.created_at.includes('+')) {
                 msgDate = new Date(msg.created_at + 'Z');
             } else {
@@ -4684,23 +5050,63 @@ function renderGroupMessages(messages) {
         if (localDateStr !== lastDate) {
             html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
             lastDate = localDateStr;
+            // Reset sender tracking on date change
+            lastSender = null;
+            lastSenderId = null;
         }
         
         const isSent = msg.sender_id == adminId;
         const senderName = msg.sender_name || 'Unknown';
         
+        // Check if same sender as previous message (excluding date dividers)
+        const isSameSender = (lastSender === senderName && lastSenderId === msg.sender_id && !isSent);
+        
+        // Get avatar info
+        const avatarInfo = getSenderAvatarInfo(msg.sender_id, msg.sender_type);
+        
+        // Build avatar HTML
+        let avatarHtml = '';
+        if (!isSent && !isSameSender) {
+            avatarHtml = `
+                <div class="message-avatar" style="background: ${avatarInfo.color};">
+                    ${avatarInfo.photo 
+                        ? `<img src="${avatarInfo.photo}" alt="${escapeHtml(senderName)}">` 
+                        : `<span>${avatarInfo.initials || '?'}</span>`
+                    }
+                    ${avatarInfo.is_online ? `<span class="online-indicator"></span>` : ''}
+                    <span class="sender-tooltip">${escapeHtml(senderName)}</span>
+                </div>
+            `;
+        }
+        
         html += `
-            <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
-                ${!isSent ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(senderName)}</div>` : ''}
-                <div class="message-bubble">
-                    <p>${escapeHtml(msg.content)}</p>
-                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                    <span class="msg-time">
-                        ${msg.time || formatTime(msgDate)}
-                    </span>
+            <div class="message-group ${isSent ? 'sent' : 'received'} ${!isSent && isSameSender ? 'same-sender' : ''}" 
+                 data-msg-id="${msg.id}" 
+                 data-sender-name="${escapeHtml(senderName)}">
+                <div class="message-wrapper">
+                    ${!isSent ? avatarHtml : ''}
+                    <div class="message-bubble">
+                        <p>${escapeHtml(msg.content)}</p>
+                        ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                        <span class="msg-time">
+                            ${msg.time || formatTime(msgDate)}
+                            ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                        </span>
+                    </div>
                 </div>
             </div>
         `;
+        
+        // Update last sender for next iteration
+        if (!isSent) {
+            lastSender = senderName;
+            lastSenderId = msg.sender_id;
+        } else {
+            // For sent messages, don't affect the "same sender" logic
+            // But we want to reset if a sent message is in between
+            lastSender = null;
+            lastSenderId = null;
+        }
     });
     
     container.innerHTML = html;
@@ -4709,40 +5115,87 @@ function renderGroupMessages(messages) {
 function appendGroupMessage(msg) {
     const container = document.getElementById('chatMessages');
     
+    // Check for duplicate by ID
     if (msg.id && !msg.id.toString().startsWith('temp-')) {
         const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
-        if (existingMsg) return;
+        if (existingMsg) {
+            console.log('⚠️ Duplicate message prevented:', msg.id);
+            return;
+        }
     }
     
     const isSent = msg.sender_id == adminId;
     const displayTime = msg.time || formatTime(new Date(msg.created_at));
     const senderName = msg.sender_name || 'Unknown';
     
+    // Check if previous message is from same sender (for avatar hiding)
+    const lastMessage = container.lastElementChild;
+    let isSameSender = false;
+    let previousSenderName = '';
+    
+    if (lastMessage && !lastMessage.classList.contains('date-divider')) {
+        const prevSenderAttr = lastMessage.dataset.senderName;
+        if (prevSenderAttr) {
+            previousSenderName = prevSenderAttr;
+            isSameSender = (previousSenderName === senderName && !isSent);
+        }
+    }
+    
+    // Get avatar info for received messages
+    let avatarHtml = '';
+    if (!isSent) {
+        const avatarInfo = getSenderAvatarInfo(msg.sender_id, msg.sender_type);
+        if (!isSameSender) {
+            avatarHtml = `
+                <div class="message-avatar" style="background: ${avatarInfo.color};">
+                    ${avatarInfo.photo 
+                        ? `<img src="${avatarInfo.photo}" alt="${escapeHtml(senderName)}">` 
+                        : `<span>${avatarInfo.initials || '?'}</span>`
+                    }
+                    ${avatarInfo.is_online ? `<span class="online-indicator"></span>` : ''}
+                    <span class="sender-tooltip">${escapeHtml(senderName)}</span>
+                </div>
+            `;
+        }
+    }
+    
     const messageHtml = `
-        <div class="message-group ${isSent ? 'sent' : 'received'}" ${msg.id ? `data-msg-id="${msg.id}"` : ''}>
-            ${!isSent ? `<div class="sender-name" style="font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.25rem; margin-left: 0.75rem;">${escapeHtml(senderName)}</div>` : ''}
-            <div class="message-bubble">
-                <p>${escapeHtml(msg.content)}</p>
-                ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
-                <span class="msg-time">
-                    ${displayTime}
-                </span>
+        <div class="message-group ${isSent ? 'sent' : 'received'} ${!isSent && isSameSender ? 'same-sender' : ''}" 
+             data-msg-id="${msg.id}" 
+             data-sender-name="${escapeHtml(senderName)}">
+            <div class="message-wrapper">
+                ${!isSent ? avatarHtml : ''}
+                <div class="message-bubble">
+                    <p>${escapeHtml(msg.content)}</p>
+                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                    <span class="msg-time">
+                        ${displayTime}
+                        ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
+                    </span>
+                </div>
             </div>
         </div>
     `;
     
+    // Remove empty state if it exists
     const emptyState = container.querySelector('.empty-state');
     if (emptyState) emptyState.remove();
     
     container.insertAdjacentHTML('beforeend', messageHtml);
+    
+    // Update the last message tracking
+    if (!isSent) {
+        // Update the group's last message in the list
+        updateGroupWithNewMessage(msg.group_chat_id, msg.content, msg.created_at);
+    }
 }
 
-// SEND GROUP MESSAGE
+// SEND GROUP MESSAGE (with attachments support)
 async function sendGroupMessage() {
     const input = document.getElementById('messageInput');
     const content = input.value.trim();
     
-    if (!content || !currentChat || currentChat.type !== 'group') return;
+    if (!currentChat || currentChat.type !== 'group') return;
     
     // Check if group is archived
     const group = allGroups.find(g => g.id == currentChat.id);
@@ -4750,6 +5203,106 @@ async function sendGroupMessage() {
         showToast('Cannot send messages to archived channel. Unarchive it first.', 'error');
         return;
     }
+    
+    // If there are files, send with attachments
+    if (selectedFiles.length > 0) {
+        input.value = '';
+        input.focus();
+        
+        const tempId = 'temp-' + Date.now();
+        const fileNames = selectedFiles.map(f => f.name).join(', ');
+        const tempContent = content || `📎 ${fileNames}`;
+        
+        const tempMessage = {
+            id: tempId,
+            content: tempContent,
+            sender_id: adminId,
+            sender_type: 'admin',
+            sender_name: 'You',
+            group_chat_id: currentChat.id,
+            created_at: new Date().toISOString(),
+            time: formatTime(new Date()),
+            attachments: selectedFiles.map(f => ({
+                name: f.name,
+                size: f.size,
+                type: f.type,
+                uploading: true
+            }))
+        };
+        
+        appendGroupMessage(tempMessage);
+        scrollToBottom();
+        
+        // Clear typing broadcast
+        clearTimeout(typingTimeout);
+        if (typingChannel) {
+            typingChannel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: {
+                    sender_id: adminId,
+                    sender_type: 'admin',
+                    receiver_id: currentChat.id,
+                    receiver_type: 'group',
+                    stopped: true,
+                    timestamp: new Date().toISOString(),
+                },
+            });
+        }
+        
+        const filesToUpload = [...selectedFiles];
+        selectedFiles = [];
+        renderFilePreviews();
+        
+        try {
+            const formData = new FormData();
+            formData.append('content', content || '');
+            filesToUpload.forEach(file => {
+                formData.append('attachments[]', file);
+            });
+            
+            const response = await fetch(`/admin/messages/groups/${currentChat.id}/send-attachments`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to send files');
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+                if (tempElement) tempElement.remove();
+                
+                // Fix UTC timestamp
+                const utcTimestamp = ensureUTCTimestamp(data.message.created_at);
+                data.message.created_at = utcTimestamp;
+                data.message.time = formatTime(new Date(utcTimestamp));
+                
+                appendGroupMessage(data.message);
+                scrollToBottom();
+                
+                // Update group in list
+                updateGroupWithNewMessage(currentChat.id, data.message.content, utcTimestamp);
+            }
+        } catch (error) {
+            console.error('Error sending files:', error);
+            const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
+            if (tempElement) tempElement.remove();
+            showToast('Failed to send files. Please try again.', 'error');
+        }
+        return;
+    }
+    
+    // No files, send text message
+    if (!content) return;
     
     clearTimeout(typingTimeout);
     input.value = '';
@@ -4806,11 +5359,16 @@ async function sendGroupMessage() {
             const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
             if (tempElement) tempElement.remove();
             
+            // Fix UTC timestamp
+            const utcTimestamp = ensureUTCTimestamp(data.message.created_at);
+            data.message.created_at = utcTimestamp;
+            data.message.time = formatTime(new Date(utcTimestamp));
+            
             appendGroupMessage(data.message);
             scrollToBottom();
             
             // Update group in list
-            updateGroupWithNewMessage(currentChat.id, content, data.message.created_at);
+            updateGroupWithNewMessage(currentChat.id, data.message.content, utcTimestamp);
         }
     } catch (error) {
         console.error('Error sending group message:', error);
@@ -4850,83 +5408,214 @@ async function markGroupMessagesAsRead(groupId) {
     }
 }
 
-// REAL-TIME GROUP MESSAGES (Supabase)
 function subscribeToGroupMessages(groupId) {
     // Unsubscribe from previous
     if (groupRealtimeChannel) {
-        supabaseClient.removeChannel(groupRealtimeChannel);
+        try {
+            supabaseClient.removeChannel(groupRealtimeChannel);
+        } catch (e) {
+            console.warn('Error removing previous channel:', e);
+        }
         groupRealtimeChannel = null;
     }
     
-    if (!supabaseClient) return;
+    if (!supabaseClient) {
+        console.warn('⚠️ Supabase not initialized, using polling');
+        startGroupPolling(groupId);
+        return;
+    }
+    
+    console.log(`📡 Subscribing to group ${groupId} messages...`);
     
     groupRealtimeChannel = supabaseClient
         .channel(`group-messages-${groupId}`)
-        .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'group_messages',
-            filter: `group_chat_id=eq.${groupId}`,
-        }, (payload) => {
-            console.log('📨 New group message:', payload.new);
-            handleNewGroupMessage(payload.new);
-        })
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'group_messages',
+                filter: `group_chat_id=eq.${groupId}`
+            },
+            (payload) => {
+                console.log('📨 New group message (realtime):', payload.new);
+                // Call the handler directly
+                handleNewGroupMessage(payload.new);
+            }
+        )
         .subscribe((status) => {
+            console.log(`📡 Group ${groupId} subscription status:`, status);
             if (status === 'SUBSCRIBED') {
                 console.log(`✅ Subscribed to group ${groupId} messages`);
+                // Stop polling if it was running
+                if (groupPollingInterval) {
+                    clearInterval(groupPollingInterval);
+                    groupPollingInterval = null;
+                    console.log('🛑 Group polling stopped (realtime connected)');
+                }
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error(`❌ Failed to subscribe to group ${groupId} messages`);
+                // Fallback to polling
+                startGroupPolling(groupId);
             }
         });
 }
 
+// ============================================
+// GROUP POLLING FALLBACK
+// ============================================
+let groupPollingInterval = null;
+
+function startGroupPolling(groupId) {
+    if (groupPollingInterval) {
+        clearInterval(groupPollingInterval);
+        groupPollingInterval = null;
+    }
+    
+    console.log('🔄 Starting group polling (every 2 seconds)...');
+    groupPollingInterval = setInterval(() => {
+        checkForNewGroupMessages(groupId);
+    }, 2000);
+}
+
+async function checkForNewGroupMessages(groupId) {
+    if (!currentChat || currentChat.type !== 'group' || currentChat.id != groupId) return;
+    
+    try {
+        const response = await fetch(`/admin/messages/groups/${groupId}/messages?limit=10&offset=0`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        const messageList = data.messages || [];
+        
+        if (messageList && messageList.length > 0) {
+            let hasNewMessages = false;
+            
+            // Get the last message ID currently displayed
+            const lastMsgElement = document.querySelector('.message-group:last-child');
+            let lastDisplayedId = null;
+            if (lastMsgElement) {
+                lastDisplayedId = parseInt(lastMsgElement.dataset.msgId);
+            }
+            
+            // Process messages in reverse (oldest first) to maintain order
+            const reversedMessages = [...messageList].reverse();
+            
+            for (const msg of reversedMessages) {
+                // Skip if message is from current user or already displayed
+                if (msg.sender_id == adminId) continue;
+                
+                const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
+                if (!existingMsg) {
+                    // Decrypt content
+                    let decryptedContent = msg.content;
+                    if (msg.content && (msg.content.startsWith('enc:') || msg.content.startsWith('U2FsdGVkX1'))) {
+                        decryptedContent = await decryptContent(msg.content, msg.sender_type, 'admin');
+                    }
+                    
+                    const formattedMsg = {
+                        ...msg,
+                        content: decryptedContent,
+                        time: msg.time || formatTime(new Date(msg.created_at))
+                    };
+                    
+                    appendGroupMessage(formattedMsg);
+                    hasNewMessages = true;
+                }
+            }
+            
+            if (hasNewMessages) {
+                scrollToBottom();
+                markGroupMessagesAsRead(groupId);
+                loadGroupConversations(); // Update unread count
+            }
+        }
+    } catch (error) {
+        console.error('Group polling error:', error);
+    }
+}
+
 function handleNewGroupMessage(message) {
-    if (message.sender_id == adminId && message.sender_type === 'admin') return;
+    console.log('🔄 Processing new group message:', message);
+    
+    // Don't process if message is from current user
+    if (message.sender_id == adminId && message.sender_type === 'admin') {
+        console.log('⏭️ Skipping own message');
+        return;
+    }
     
     // Check if already displayed
     const existing = document.querySelector(`[data-msg-id="${message.id}"]`);
-    if (existing) return;
+    if (existing) {
+        console.log('⏭️ Message already displayed:', message.id);
+        return;
+    }
+    
+    console.log('📝 New message from user:', message.sender_id, 'type:', message.sender_type);
+    
+    // Update group list to show unread count (even if not viewing)
+    updateGroupWithNewMessage(message.group_chat_id, message.content, message.created_at);
+    
+    // Only process if we're viewing this group
+    if (!currentChat || currentChat.type !== 'group' || currentChat.id != message.group_chat_id) {
+        console.log('⏭️ Not viewing this group, only updating list');
+        return;
+    }
     
     // Decrypt content
-    decryptContent(message.content, message.sender_type, 'admin').then(decryptedContent => {
-        // Get sender name
-        let senderName = 'Unknown';
-        if (message.sender_type === 'alumni') {
-            const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'alumni');
-            if (contact) {
-                senderName = contact.full_name;
-            } else {
-                fetchContactInfo(message.sender_id, 'alumni', message.content, message.created_at, true);
-                senderName = 'Alumni #' + message.sender_id;
+    decryptContent(message.content, message.sender_type, 'admin')
+        .then(decryptedContent => {
+            console.log('🔓 Decrypted content:', decryptedContent);
+            
+            // Get sender name
+            let senderName = 'Unknown';
+            if (message.sender_type === 'alumni') {
+                const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'alumni');
+                if (contact) {
+                    senderName = contact.full_name;
+                } else {
+                    // Try to fetch contact info
+                    fetchContactInfoForAvatar(message.sender_id, 'alumni');
+                    senderName = 'Alumni #' + message.sender_id;
+                }
+            } else if (message.sender_type === 'admin') {
+                const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'admin');
+                if (contact) {
+                    senderName = contact.full_name;
+                } else {
+                    fetchContactInfoForAvatar(message.sender_id, 'admin');
+                    senderName = 'Admin #' + message.sender_id;
+                }
             }
-        } else if (message.sender_type === 'admin') {
-            const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'admin');
-            if (contact) {
-                senderName = contact.full_name;
-            } else {
-                senderName = 'Admin #' + message.sender_id;
-            }
-        }
-        
-        const formattedMessage = {
-            id: message.id,
-            content: decryptedContent,
-            sender_id: message.sender_id,
-            sender_type: message.sender_type,
-            sender_name: senderName,
-            group_chat_id: message.group_chat_id,
-            created_at: message.created_at,
-            time: formatTime(new Date(message.created_at)),
-            attachments: []
-        };
-        
-        appendGroupMessage(formattedMessage);
-        scrollToBottom();
-        
-        if (currentChat && currentChat.id == message.group_chat_id) {
+            
+            // Fix UTC timestamp
+            const utcTimestamp = ensureUTCTimestamp(message.created_at);
+            
+            const formattedMessage = {
+                id: message.id,
+                content: decryptedContent,
+                sender_id: message.sender_id,
+                sender_type: message.sender_type,
+                sender_name: senderName,
+                group_chat_id: message.group_chat_id,
+                created_at: utcTimestamp,
+                time: formatTime(new Date(utcTimestamp)),
+                attachments: []
+            };
+            
+            console.log('📤 Appending group message:', formattedMessage);
+            appendGroupMessage(formattedMessage);
+            scrollToBottom();
+            
+            // Mark as read
             markGroupMessagesAsRead(message.group_chat_id);
-        }
-        
-        updateGroupWithNewMessage(message.group_chat_id, decryptedContent, message.created_at);
-    });
+            
+            // Update group list with the new message
+            updateGroupWithNewMessage(message.group_chat_id, decryptedContent, utcTimestamp);
+        })
+        .catch(error => {
+            console.error('❌ Error processing group message:', error);
+        });
 }
 
 // CHECK AND DISABLE GROUP CHAT IF ARCHIVED
@@ -5238,7 +5927,9 @@ function renderGroupMembers(members) {
     }
     
     container.innerHTML = members.map(member => {
-        const isAdmin = member.role === 'admin';
+        // ✅ Use the new flags
+        const isGroupAdmin = member.is_group_admin || false;  // Has group permissions
+        const isSystemAdmin = member.is_system_admin || false;  // Is a system admin
         const isSelf = member.id == adminId;
         const isCreator = currentGroupInfo && currentGroupInfo.created_by == member.id;
         
@@ -5252,23 +5943,33 @@ function renderGroupMembers(members) {
                     ${member.is_online ? `<span style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--success); border: 2px solid var(--white);"></span>` : ''}
                 </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 0.9rem; color: var(--gray-800); display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="font-weight: 600; font-size: 0.9rem; color: var(--gray-800); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         ${escapeHtml(member.full_name)}
                         ${isSelf ? '<span style="font-size: 0.65rem; color: var(--gray-500); font-weight: 400;">(You)</span>' : ''}
                         ${isCreator ? '<span style="font-size: 0.6rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 1px 8px; border-radius: 8px; font-weight: 700;">Creator</span>' : ''}
+                        ${isSystemAdmin && !isCreator ? '<span style="font-size: 0.6rem; background: var(--nu-blue); color: white; padding: 1px 8px; border-radius: 8px; font-weight: 600;">System Admin</span>' : ''}
+                        ${isGroupAdmin && !isCreator && !isSystemAdmin ? '<span style="font-size: 0.6rem; background: #8b5cf6; color: white; padding: 1px 8px; border-radius: 8px; font-weight: 600;">Group Admin</span>' : ''}
                     </div>
                     <div style="font-size: 0.7rem; color: var(--gray-500);">
-                        ${isAdmin ? 'Channel Admin' : 'Member'}
+                        ${isGroupAdmin ? 'Has management permissions' : 'Member'}
                         ${member.is_online ? ' • Online' : ' • Offline'}
                     </div>
                 </div>
-                ${currentGroupInfo && currentGroupInfo.is_admin && !isSelf && !isCreator ? `
+                ${currentGroupInfo && currentGroupInfo.can_manage && !isSelf && !isCreator ? `
                     <div style="display: flex; gap: 0.375rem;">
-                        <button onclick="updateMemberRole(${member.id}, '${isAdmin ? 'alumni' : 'admin'}')" 
-                            style="background: none; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--gray-600); transition: all var(--transition);"
-                            title="${isAdmin ? 'Demote to Member' : 'Promote to Admin'}">
-                            ${isAdmin ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-crown"></i>'}
-                        </button>
+                        ${isGroupAdmin ? `
+                            <button onclick="updateMemberRole(${member.id}, 'alumni')" 
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--gray-600); transition: all var(--transition);"
+                                title="Remove group admin permissions">
+                                <i class="fa-solid fa-user"></i> Demote
+                            </button>
+                        ` : `
+                            <button onclick="updateMemberRole(${member.id}, 'admin')" 
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--gray-600); transition: all var(--transition);"
+                                title="Give group admin permissions">
+                                <i class="fa-solid fa-crown"></i> Promote
+                            </button>
+                        `}
                         <button onclick="removeGroupMember(${member.id})" 
                             style="background: none; border: 1px solid var(--danger); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--danger); transition: all var(--transition);"
                             title="Remove Member">
@@ -5280,6 +5981,7 @@ function renderGroupMembers(members) {
         `;
     }).join('');
 }
+
 
 // GROUP MEMBER MANAGEMENT
 async function updateMemberRole(memberId, newRole) {
@@ -5689,6 +6391,91 @@ function getGroupAvatarUrl(avatarPath) {
     }
     
     return null;
+}
+
+// ============================================
+// GET SENDER AVATAR INFO FOR GROUP MESSAGES
+// ============================================
+function getSenderAvatarInfo(senderId, senderType) {
+    // Default colors for avatars
+    const colors = [
+        '#32418C', '#4A59A3', '#6B7BC4', '#8B5CF6', 
+        '#6D28D9', '#EC4899', '#F59E0B', '#10B981',
+        '#3B82F6', '#EF4444', '#8B5CF6', '#14B8A6'
+    ];
+    
+    // Default values
+    let result = {
+        full_name: 'Unknown',
+        initials: '?',
+        photo: null,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        is_online: false
+    };
+    
+    // Try to find in contacts
+    if (senderType === 'admin') {
+        const contact = allContacts.find(c => c.id == senderId && c.type === 'admin');
+        if (contact) {
+            result.full_name = contact.full_name || 'Unknown Admin';
+            result.initials = contact.initials || 'AD';
+            result.photo = contact.avatar || null;
+            result.is_online = contact.is_online || false;
+        } else {
+            // Try to fetch from server (async, but we'll return placeholder for now)
+            fetchContactInfoForAvatar(senderId, senderType);
+        }
+    } else {
+        const contact = allContacts.find(c => c.id == senderId && c.type === 'alumni');
+        if (contact) {
+            result.full_name = contact.full_name || 'Unknown Alumni';
+            result.initials = contact.initials || 'AL';
+            result.photo = contact.avatar || null;
+            result.is_online = contact.is_online || false;
+        } else {
+            // Try to fetch from server
+            fetchContactInfoForAvatar(senderId, senderType);
+        }
+    }
+    
+    // Use a consistent color based on sender ID for each sender
+    const colorIndex = senderId % colors.length;
+    result.color = colors[colorIndex];
+    
+    return result;
+}
+
+// ============================================
+// FETCH CONTACT INFO FOR AVATAR (Async)
+// ============================================
+async function fetchContactInfoForAvatar(senderId, senderType) {
+    try {
+        const response = await fetch(`/admin/messages/${senderType}/${senderId}/info`);
+        if (response.ok) {
+            const data = await response.json();
+            if (!allContacts.find(c => c.id == senderId && c.type === senderType)) {
+                allContacts.push({
+                    id: data.id,
+                    type: data.type,
+                    full_name: data.full_name,
+                    initials: data.initials,
+                    avatar: data.avatar || null,
+                    is_online: data.is_online || false,
+                    program: data.program || '',      // ✅ ADD THIS
+                    batch: data.batch || '-',          // ✅ ADD THIS
+                    admin_role: data.admin_role || null, // ✅ ADD THIS
+                    is_archived: false,
+                    is_muted: false,
+                    unread_count: 0,
+                    last_message: null,
+                    last_message_timestamp: null,
+                    last_message_from_me: false,
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching contact info for avatar:', error);
+    }
 }
 
 </script>

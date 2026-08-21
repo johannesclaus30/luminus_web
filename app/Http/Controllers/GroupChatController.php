@@ -91,15 +91,19 @@ class GroupChatController extends Controller
                 // Get member count
                 $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
 
-                // Get creator name
+                // ✅ FIX: Get creator name correctly
                 $creatorName = 'Unknown';
-                $creator = Admin::find($group->created_by);
-                if ($creator) {
-                    $creatorName = trim($creator->admin_first_name . ' ' . $creator->admin_last_name);
+                $creatorId = $group->created_by;
+                
+                // Try to find as admin first
+                $creatorAdmin = Admin::find($creatorId);
+                if ($creatorAdmin) {
+                    $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
                 } else {
-                    $alumni = Alumni::find($group->created_by);
-                    if ($alumni) {
-                        $creatorName = $this->getAlumniFullName($alumni);
+                    // If not found as admin, try as alumni
+                    $creatorAlumni = Alumni::find($creatorId);
+                    if ($creatorAlumni) {
+                        $creatorName = $this->getAlumniFullName($creatorAlumni);
                     }
                 }
 
@@ -124,10 +128,10 @@ class GroupChatController extends Controller
                     'type' => 'group',
                     'name' => $group->name,
                     'initials' => $this->getInitials($group->name),
-                    'avatar' => $avatarUrl, // ✅ Now uses signed URL
+                    'avatar' => $avatarUrl,
                     'member_count' => $memberCount,
                     'created_by' => $group->created_by,
-                    'created_by_name' => $creatorName,
+                    'created_by_name' => $creatorName, // ✅ Now properly resolved
                     'last_message' => $lastMessageContent,
                     'last_message_timestamp' => $lastMessageTimestamp,
                     'last_message_from_me' => $lastMessageFromMe,
@@ -189,28 +193,28 @@ class GroupChatController extends Controller
                     continue;
                 }
                 
-                if ($userType === 'admin') {
-                    $admin = Admin::find($memberId);
-                    if ($admin) {
-                        $validMembers[] = [
-                            'id' => $memberId,
-                            'user_type' => 'admin'
-                        ];
-                    }
-                } else {
-                    $alumni = Alumni::find($memberId);
-                    if ($alumni) {
-                        $validMembers[] = [
-                            'id' => $memberId,
-                            'user_type' => 'alumni'
-                        ];
-                    }
+                // Check if this is a system admin
+                $admin = Admin::find($memberId);
+                if ($admin) {
+                    // System admin - they get group admin permissions
+                    $validMembers[] = [
+                        'id' => $memberId,
+                        'user_type' => 'admin',  // System admin account type
+                        'role' => 'admin'        // Group admin permissions
+                    ];
+                    continue;
                 }
-            }
-
-            // Count total valid members
-            if (count($validMembers) < 2) {
-                return response()->json(['error' => 'Invalid members selected (need at least 2)'], 400);
+                
+                // Check if alumni exists
+                $alumni = Alumni::find($memberId);
+                if ($alumni) {
+                    // Regular alumni - they get no group permissions
+                    $validMembers[] = [
+                        'id' => $memberId,
+                        'user_type' => 'alumni',
+                        'role' => 'alumni'  // No permissions
+                    ];
+                }
             }
 
             // Create group
@@ -238,82 +242,33 @@ class GroupChatController extends Controller
                 }
             }
 
-            // ============================================
-            // ✅ FIXED: ADD THE CREATOR ADMIN FIRST
-            // ============================================
-            try {
-                // Check if creator already exists
-                $creatorExists = GroupChatMember::where('group_chat_id', $group->id)
-                    ->where('alumni_id', $adminId)
-                    ->where('member_type', 'admin')
-                    ->exists();
-                
-                if (!$creatorExists) {
-                    GroupChatMember::create([
-                        'group_chat_id' => $group->id,
-                        'alumni_id' => $adminId,
-                        'member_type' => 'admin',
-                        'role' => 'admin',
-                        'archived' => false,
-                        'muted' => false,
-                    ]);
-                    Log::info('✅ Creator admin ' . $adminId . ' added to group ' . $group->id);
-                } else {
-                    Log::info('Creator admin already exists in group');
-                }
-            } catch (\Exception $e) {
-                Log::error('Failed to add creator admin: ' . $e->getMessage());
-                // Try without member_type filter if unique constraint fails
-                try {
-                    // Check if exists with any member_type
-                    $existsAny = GroupChatMember::where('group_chat_id', $group->id)
-                        ->where('alumni_id', $adminId)
-                        ->exists();
-                    
-                    if (!$existsAny) {
-                        GroupChatMember::create([
-                            'group_chat_id' => $group->id,
-                            'alumni_id' => $adminId,
-                            'member_type' => 'admin',
-                            'role' => 'admin',
-                            'archived' => false,
-                            'muted' => false,
-                        ]);
-                        Log::info('✅ Creator admin ' . $adminId . ' added on second attempt');
-                    }
-                } catch (\Exception $e2) {
-                    Log::error('Failed to add creator admin on second attempt: ' . $e2->getMessage());
-                }
-            }
+        $creatorIsSystemAdmin = Admin::find($adminId) ? true : false;
 
-            // ============================================
-            // ADD THE REST OF THE MEMBERS
-            // ============================================
-            foreach ($validMembers as $member) {
-                try {
-                    $exists = GroupChatMember::where('group_chat_id', $group->id)
-                        ->where('alumni_id', $member['id'])
-                        ->where('member_type', $member['user_type'])
-                        ->exists();
-                    
-                    if ($exists) {
-                        Log::info('Member already exists, skipping: ' . $member['id']);
-                        continue;
-                    }
-                    
-                    GroupChatMember::create([
-                        'group_chat_id' => $group->id,
-                        'alumni_id' => $member['id'],
-                        'member_type' => $member['user_type'],
-                        'role' => 'alumni',
-                        'archived' => false,
-                        'muted' => false,
-                    ]);
-                    Log::info('✅ Member added: ' . $member['id'] . ' (' . $member['user_type'] . ')');
-                } catch (\Exception $e) {
-                    Log::error('Failed to add member ' . $member['id'] . ': ' . $e->getMessage());
-                }
-            }
+        GroupChatMember::create([
+            'group_chat_id' => $group->id,
+            'alumni_id' => $adminId,
+            'member_type' => $creatorIsSystemAdmin ? 'admin' : 'alumni',
+            'role' => 'admin',
+            'archived' => false,
+            'muted' => false,
+        ]);
+
+        $creatorName = $creatorIsSystemAdmin 
+            ? trim(Admin::find($adminId)->admin_first_name . ' ' . Admin::find($adminId)->admin_last_name)
+            : Alumni::find($adminId)->first_name . ' ' . Alumni::find($adminId)->last_name;    
+
+
+        // ✅ ADD OTHER MEMBERS
+        foreach ($validMembers as $member) {
+            GroupChatMember::create([
+                'group_chat_id' => $group->id,
+                'alumni_id' => $member['id'],
+                'member_type' => $member['user_type'],  // 'admin' or 'alumni'
+                'role' => $member['role'] ?? 'alumni',  // 'admin' if system admin, else 'alumni'
+                'archived' => false,
+                'muted' => false,
+            ]);
+        }
 
             // ============================================
             // VERIFY MEMBERS WERE ADDED
@@ -328,9 +283,6 @@ class GroupChatController extends Controller
                 ->exists();
             
             Log::info('Creator admin check: ' . ($creatorCheck ? '✅ EXISTS' : '❌ NOT FOUND'));
-
-            $creator = Admin::find($adminId);
-            $creatorName = $creator ? trim($creator->admin_first_name . ' ' . $creator->admin_last_name) : 'You';
 
             // ✅ FIXED: Use getGroupAvatarUrl() instead of getSupabaseStorageUrl()
             $avatarUrl = $group->avatar_url ? $this->getGroupAvatarUrl($group->avatar_url) : null;
@@ -404,6 +356,15 @@ class GroupChatController extends Controller
                         $initials = strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1));
                         $avatar = $this->resolveAdminPhotoUrl($admin->photo);
                         $isOnline = true;
+                    } else {
+                        // ✅ FIX: If admin not found, try to find as alumni
+                        $alumni = Alumni::find($member->alumni_id);
+                        if ($alumni) {
+                            $fullName = $this->getAlumniFullName($alumni);
+                            $initials = $this->getAlumniInitials($alumni);
+                            $avatar = $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null;
+                            $isOnline = $alumni->is_online ?? false;
+                        }
                     }
                 } else {
                     $alumni = Alumni::find($member->alumni_id);
@@ -426,6 +387,25 @@ class GroupChatController extends Controller
                 ];
             }
 
+            // ✅ FIX: Determine creator correctly
+            $creatorName = 'Unknown';
+            $creatorId = $group->created_by;
+            
+            // Try to find as admin first
+            $creatorAdmin = Admin::find($creatorId);
+            if ($creatorAdmin) {
+                $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
+            } else {
+                // If not found as admin, try as alumni
+                $creatorAlumni = Alumni::find($creatorId);
+                if ($creatorAlumni) {
+                    $creatorName = $this->getAlumniFullName($creatorAlumni);
+                }
+            }
+            
+            // ✅ FIX: Check if current user is the creator (regardless of type)
+            $isCreator = ($group->created_by == $adminId);
+
             $isGroupAdmin = GroupChatMember::where('group_chat_id', $groupId)
                 ->where('alumni_id', $adminId)
                 ->where('member_type', 'admin')
@@ -441,13 +421,14 @@ class GroupChatController extends Controller
             return response()->json([
                 'id' => (int)$group->id,
                 'name' => $group->name,
-                'avatar' => $avatarUrl, // ✅ Now uses signed URL
+                'avatar' => $avatarUrl,
                 'member_count' => count($members),
                 'members' => $members,
-                'is_admin' => $isGroupAdmin,
+                'is_admin' => $isGroupAdmin || $isCreator, // Creator is always admin
                 'is_archived' => $memberSetting ? $memberSetting->archived : false,
                 'is_muted' => $memberSetting ? $memberSetting->muted : false,
                 'created_by' => $group->created_by,
+                'created_by_name' => $creatorName, // ✅ Add creator name to response
             ]);
 
         } catch (\Exception $e) {
@@ -975,9 +956,6 @@ class GroupChatController extends Controller
         }
     }
 
-    // ============================================
-    // SEARCH ALUMNI FOR GROUP
-    // ============================================
     public function searchAlumniForGroup(Request $request)
     {
         try {
@@ -989,15 +967,65 @@ class GroupChatController extends Controller
 
             $searchTerm = '%' . $query . '%';
 
-            // Search Alumni
+            // Search System Admins
+            $admins = Admin::where(function($q) use ($searchTerm) {
+                    $q->where('admin_first_name', 'LIKE', $searchTerm)
+                    ->orWhere('admin_last_name', 'LIKE', $searchTerm)
+                    ->orWhere('admin_email', 'LIKE', $searchTerm)
+                    ->orWhere('admin_role', 'LIKE', $searchTerm)
+                    ->orWhereRaw("CONCAT(admin_first_name, ' ', admin_last_name) LIKE ?", [$searchTerm]);
+                })
+                ->where('account_status', 1)
+                ->limit(10)
+                ->get()
+                ->map(function ($admin) {
+                    $fullName = trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? ''));
+                    $initials = strtoupper(
+                        substr($admin->admin_first_name ?? 'A', 0, 1) . 
+                        substr($admin->admin_last_name ?? 'A', 0, 1)
+                    );
+                    
+                    $avatar = null;
+                    if ($admin->photo) {
+                        if (filter_var($admin->photo, FILTER_VALIDATE_URL)) {
+                            $avatar = $admin->photo;
+                        } else {
+                            $bucket = 'luminus_assets';
+                            $baseUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucket;
+                            $path = ltrim($admin->photo, '/');
+                            if (!str_starts_with($path, 'admin_photos/')) {
+                                $path = 'admin_photos/' . $path;
+                            }
+                            $avatar = $baseUrl . '/' . $path;
+                        }
+                    }
+                    
+                    $adminRole = $admin->admin_role ?? 'Admin';
+
+                    return [
+                        'id' => $admin->id,
+                        'user_type' => 'admin',  // System admin account type
+                        'full_name' => $fullName ?: 'Unknown Admin',
+                        'initials' => $initials ?: 'AD',
+                        'program' => $adminRole,
+                        'batch' => '-',
+                        'student_id' => 'N/A',
+                        'is_online' => true,
+                        'avatar' => $avatar,
+                        'admin_role' => $adminRole,
+                        'is_system_admin' => true,  // ✅ Flag to identify system admins
+                    ];
+                });
+
+            // Search Regular Alumni
             $alumni = Alumni::where(function($q) use ($searchTerm) {
                     $q->where('first_name', 'LIKE', $searchTerm)
-                      ->orWhere('last_name', 'LIKE', $searchTerm)
-                      ->orWhere('middle_name', 'LIKE', $searchTerm)
-                      ->orWhere('student_id_number', 'LIKE', $searchTerm)
-                      ->orWhere('email', 'LIKE', $searchTerm)
-                      ->orWhere('program', 'LIKE', $searchTerm)
-                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm]);
+                    ->orWhere('last_name', 'LIKE', $searchTerm)
+                    ->orWhere('middle_name', 'LIKE', $searchTerm)
+                    ->orWhere('student_id_number', 'LIKE', $searchTerm)
+                    ->orWhere('email', 'LIKE', $searchTerm)
+                    ->orWhere('program', 'LIKE', $searchTerm)
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm]);
                 })
                 ->whereNull('deleted_at')
                 ->where('account_status', 1)
@@ -1023,7 +1051,7 @@ class GroupChatController extends Controller
                     
                     return [
                         'id' => $alumni->id,
-                        'user_type' => 'alumni',
+                        'user_type' => 'alumni',  // Regular alumni account type
                         'full_name' => $fullName ?: 'Unknown Alumni',
                         'initials' => $initials ?: 'AL',
                         'program' => $alumni->program ?? 'N/A',
@@ -1031,56 +1059,7 @@ class GroupChatController extends Controller
                         'student_id' => $alumni->student_id_number ?? 'N/A',
                         'is_online' => $alumni->is_online ?? false,
                         'avatar' => $avatar,
-                    ];
-                });
-
-            // Search Admins
-            $admins = Admin::where(function($q) use ($searchTerm) {
-                    $q->where('admin_first_name', 'LIKE', $searchTerm)
-                    ->orWhere('admin_last_name', 'LIKE', $searchTerm)
-                    ->orWhere('admin_email', 'LIKE', $searchTerm)
-                    ->orWhere('admin_role', 'LIKE', $searchTerm)
-                    ->orWhereRaw("CONCAT(admin_first_name, ' ', admin_last_name) LIKE ?", [$searchTerm]);
-                })
-                ->where('account_status', 1)
-                ->limit(10)
-                ->get()
-                ->map(function ($admin) {
-                    $fullName = trim(($admin->admin_first_name ?? '') . ' ' . ($admin->admin_last_name ?? ''));
-                    $initials = strtoupper(
-                        substr($admin->admin_first_name ?? 'A', 0, 1) . 
-                        substr($admin->admin_last_name ?? 'A', 0, 1)
-                    );
-                    
-                    // ✅ FIXED: Use the correct bucket for admin photos
-                    $avatar = null;
-                    if ($admin->photo) {
-                        if (filter_var($admin->photo, FILTER_VALIDATE_URL)) {
-                            $avatar = $admin->photo;
-                        } else {
-                            $bucket = 'luminus_assets';
-                            $baseUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucket;
-                            $path = ltrim($admin->photo, '/');
-                            if (!str_starts_with($path, 'admin_photos/')) {
-                                $path = 'admin_photos/' . $path;
-                            }
-                            $avatar = $baseUrl . '/' . $path;
-                        }
-                    }
-                    
-                    $adminRole = $admin->admin_role ?? 'Admin';
-
-                    return [
-                        'id' => $admin->id,
-                        'user_type' => 'admin',
-                        'full_name' => $fullName ?: 'Unknown Admin',
-                        'initials' => $initials ?: 'AD',
-                        'program' => $adminRole,
-                        'batch' => '-',
-                        'student_id' => 'N/A',
-                        'is_online' => true,
-                        'avatar' => $avatar,
-                        'admin_role' => $adminRole,
+                        'is_system_admin' => false,  // ✅ Flag to identify regular alumni
                     ];
                 });
 

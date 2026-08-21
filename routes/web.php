@@ -347,30 +347,37 @@ Route::prefix('admin')->group(function () {
         Route::get('/messages/groups/search/alumni', [GroupChatController::class, 'searchAlumniForGroup'])->name('messages.groups.search.alumni');
 
         // ============================================
-        // INDIVIDUAL MESSAGE ROUTES - PUT THESE AFTER
+        // INDIVIDUAL MESSAGE ROUTES
         // ============================================
 
+        // Static routes (NO wildcards) - these MUST come first
         Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
         Route::get('/messages/conversations', [MessageController::class, 'getConversations'])->name('messages.conversations');
         Route::get('/messages/search/alumni', [MessageController::class, 'searchAlumni'])->name('messages.search');
-        Route::get('/messages/{type}/{id}', [MessageController::class, 'getMessages'])->name('messages.get');
         Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
         Route::post('/messages/decrypt', [MessageController::class, 'decryptMessage'])->name('messages.decrypt');
         Route::post('/messages/mark-read', [MessageController::class, 'markAsRead']);
         Route::post('/messages/send-with-attachments', [MessageController::class, 'sendWithAttachments']);
-        Route::middleware('auth:sanctum')->group(function () {
-            Route::get('/messages/attachments/{id}/url', [MessageController::class, 'getAttachmentUrl']);
-        });
-
-        // Get alumni info by ID (for chat redirect and new message)
-        Route::get('/messages/{type}/{id}/info', [MessageController::class, 'getContactInfo'])
-            ->where(['type' => 'alumni|admin'])
-            ->name('messages.contact-info');
-
         Route::post('/messages/archive', [MessageController::class, 'archiveChat']);
         Route::post('/messages/mute', [MessageController::class, 'muteChat']);
         Route::post('/messages/delete', [MessageController::class, 'deleteChat']);
         Route::get('/messages/dm-settings', [MessageController::class, 'getDmSettings'])->name('messages.dm-settings');
+        // ✅ Add this route to fetch attachments for a specific message
+        Route::get('/messages/attachments/message/{messageId}', [MessageController::class, 'getAttachmentsForMessage']);
+
+        // ✅ Attachment URL route (for AJAX calls)
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('/messages/attachments/{id}/url', [MessageController::class, 'getAttachmentUrl']);
+        });
+
+        // ⚠️ WILDCARD ROUTES - MUST BE LAST!
+        Route::get('/messages/{type}/{id}', [MessageController::class, 'getMessages'])
+            ->where(['type' => 'alumni|admin'])
+            ->name('messages.get');
+
+        Route::get('/messages/{type}/{id}/info', [MessageController::class, 'getContactInfo'])
+            ->where(['type' => 'alumni|admin'])
+            ->name('messages.contact-info');
 
         // Preview bulk import file
         Route::post('/alumni/preview-bulk', [AdminController::class, 'previewBulkImport'])

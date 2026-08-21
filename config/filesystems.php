@@ -75,15 +75,16 @@ return [
 
         'supabase_private_messages' => [
             'driver' => 's3',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'region' => env('AWS_DEFAULT_REGION'),
+            'key' => env('AWS_ACCESS_KEY_ID'),           // ✅ Uses the same S3 credentials
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),   // ✅ Uses the same S3 credentials
+            'region' => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
             'bucket' => env('SUPABASE_MESSAGES_BUCKET', 'luminus_messages_attachments'),
-            'url' => env('AWS_ENDPOINT'), // MUST be the S3 endpoint for signed URLs to work
-            'endpoint' => env('AWS_ENDPOINT'),
+            'url' => env('AWS_ENDPOINT'),               // ✅ Must be set
+            'endpoint' => env('AWS_ENDPOINT'),          // ✅ Must be set
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', true),
             'throw' => false,
             'report' => false,
+            'visibility' => 'private',
         ],
 
     ],

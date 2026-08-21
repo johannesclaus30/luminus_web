@@ -961,6 +961,12 @@ public function getMessages($type, $id, Request $request)
 
     public function sendWithAttachments(Request $request)
     {
+        // ✅ DEBUG: Log everything
+        Log::info('📤 sendWithAttachments called');
+        Log::info('📤 All request data:', $request->all());
+        Log::info('📤 Files:', $request->allFiles());
+        Log::info('📤 Has files?', ['hasFiles' => $request->hasFile('attachments')]);
+
         $request->validate([
             'receiver_id' => 'required|integer',
             'receiver_type' => 'required|in:alumni,admin',
@@ -1018,11 +1024,22 @@ public function getMessages($type, $id, Request $request)
                     'message_id' => $message->id,
                     'attachment_type' => $attachmentType,
                     'attachment_path' => $fullPath, 
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize(), 
                 ]);
                 
                 // 6. Generate signed URL for immediate frontend display
                 $signedUrl = $this->getSecureAttachmentUrl($attachment);
                 
+                // ✅ ADD THIS LOGGING
+                Log::info('📎 Attachment created:', [
+                    'id' => $attachment->id,
+                    'type' => $attachmentType,
+                    'path' => $fullPath,
+                    'signed_url' => $signedUrl,
+                    'name' => $file->getClientOriginalName(),
+                ]);
+
                 $attachments[] = [
                     'id' => $attachment->id,
                     'type' => $attachmentType,
@@ -1032,6 +1049,9 @@ public function getMessages($type, $id, Request $request)
                 ];
             }
         }
+
+        Log::info('📦 Final response attachments count: ' . count($attachments));
+    Log::info('📦 Final response attachments:', $attachments);
         
         return response()->json([
             'success' => true,
@@ -1386,23 +1406,77 @@ public function archiveChat(Request $request)
         ]);
     }
 
-    /**
-     * Helper to generate a temporary signed URL (Valid for 15 minutes)
-     */
     private function getSecureAttachmentUrl($attachment)
     {
         try {
-            // Laravel's S3 driver temporaryUrl works perfectly with Supabase Storage
-            return Storage::disk('supabase_private_messages')->temporaryUrl(
+            // ✅ Log the path we're trying to access
+            Log::info('🔐 Generating signed URL for attachment:', [
+                'id' => $attachment->id,
+                'path' => $attachment->attachment_path,
+                'full_path_exists' => Storage::disk('supabase_private_messages')->exists($attachment->attachment_path)
+            ]);
+            
+            // ✅ Check if the file exists before generating URL
+            if (!Storage::disk('supabase_private_messages')->exists($attachment->attachment_path)) {
+                Log::error('❌ File does not exist at path: ' . $attachment->attachment_path);
+                return null;
+            }
+            
+            $url = Storage::disk('supabase_private_messages')->temporaryUrl(
                 $attachment->attachment_path,
-                now()->addMinutes(15) 
+                now()->addMinutes(15)
             );
+            
+            Log::info('✅ Signed URL generated successfully');
+            return $url;
+            
         } catch (\Exception $e) {
-            Log::error('Failed to generate signed URL: ' . $e->getMessage());
+            Log::error('❌ Failed to generate signed URL: ' . $e->getMessage());
             return null;
         }
     }
     
+    /**
+ * Get all attachments for a specific message
+ */
+public function getAttachmentsForMessage($messageId, Request $request)
+{
+    try {
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        
+        $message = Message::find($messageId);
+        if (!$message) {
+            return response()->json(['error' => 'Message not found'], 404);
+        }
+        
+        // Check if admin is part of this conversation
+        if ($message->sender_id != $adminId && $message->receiver_id != $adminId) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+        
+        $attachments = MessagesAttachment::where('message_id', $messageId)->get();
+        $result = [];
+        
+        foreach ($attachments as $attachment) {
+            $result[] = [
+                'id' => $attachment->id,
+                'attachment_type' => $attachment->attachment_type,
+                'file_name' => $attachment->file_name ?? pathinfo($attachment->attachment_path, PATHINFO_BASENAME),
+                'file_size' => $attachment->file_size,
+                'url' => $this->getSecureAttachmentUrl($attachment),
+            ];
+        }
+        
+        return response()->json($result);
+    } catch (\Exception $e) {
+        Log::error('Error fetching attachments: ' . $e->getMessage());
+        return response()->json(['error' => 'Failed to fetch attachments'], 500);
+    }
+}
+
 
 }
 

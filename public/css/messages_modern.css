@@ -2283,4 +2283,140 @@ body {
     color: #d97706 !important;
 }
 
+/* ============================================
+   GROUP CHAT SENDER AVATARS
+   ============================================ */
+
+/* Avatar circle for group message sender */
+.message-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: white;
+    cursor: default;
+    position: relative;
+    transition: all var(--transition);
+    box-shadow: var(--shadow-sm);
+    margin-top: 0.25rem;
+}
+
+/* Avatar image */
+.message-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Name tooltip on hover */
+.message-avatar .sender-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    background: var(--gray-800);
+    color: var(--white);
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-lg);
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Tooltip arrow */
+.message-avatar .sender-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--gray-800);
+}
+
+/* Show tooltip on hover */
+.message-avatar:hover .sender-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+
+/* Group message wrapper - flex row with avatar */
+.message-group.received .message-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 75%;
+}
+
+/* Message bubble with avatar layout */
+.message-group.received .message-wrapper .message-bubble {
+    max-width: 100%;
+    flex: 1;
+}
+
+/* Consecutive messages from same sender - hide avatar */
+.message-group.received.same-sender .message-avatar {
+    visibility: hidden;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+/* Still keep the space for alignment */
+.message-group.received.same-sender .message-wrapper {
+    padding-left: 36px; /* 28px avatar + 8px gap */
+}
+
+/* Online status indicator on avatar */
+.message-avatar .online-indicator {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--success);
+    border: 2px solid var(--white);
+    box-shadow: 0 0 0 2px var(--success-light);
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+    .message-avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 0.6rem;
+    }
+    
+    .message-group.received.same-sender .message-wrapper {
+        padding-left: 32px;
+    }
+    
+    .message-avatar .sender-tooltip {
+        font-size: 0.6rem;
+        padding: 3px 8px;
+    }
+}
+
+/* Dark mode support if needed */
+@media (prefers-color-scheme: dark) {
+    .message-avatar .sender-tooltip {
+        background: var(--gray-700);
+    }
+    .message-avatar .sender-tooltip::after {
+        border-top-color: var(--gray-700);
+    }
+}
+
 /* This is the messages_modern.css */
