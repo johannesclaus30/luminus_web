@@ -2532,4 +2532,53 @@ body {
     font-size: 0.85rem;
 }
 
+/* --- FIX: Message group layout --- */
+.message-group {
+    display: flex;
+    width: 100%;
+    margin-bottom: 0.25rem;
+    animation: messageSlideIn 0.3s ease-out;
+}
+
+/* Sent messages - full width with right alignment */
+.message-group.sent {
+    justify-content: flex-end;
+}
+
+.message-group.sent .message-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    max-width: 80%; /* Controls max width of sent messages */
+}
+
+.message-group.sent .message-wrapper .message-bubble {
+    max-width: 100%;
+    width: fit-content;
+    word-break: break-word;
+}
+
+/* Received messages - with avatar */
+.message-group.received .message-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 75%;
+}
+
+.message-group.received .message-wrapper .message-bubble {
+    max-width: 100%;
+}
+
+/* Same sender - hide avatar */
+.message-group.received.same-sender .message-wrapper {
+    padding-left: 36px;
+}
+
+.message-group.received.same-sender .message-avatar {
+    visibility: hidden;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
 /* This is the test_messages.css */

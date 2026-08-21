@@ -514,6 +514,7 @@ class GroupChatController extends Controller
                         ];
                     }
 
+                    // In getMessages() method, remove the 'time' field
                     return [
                         'id' => $message->id,
                         'content' => $decryptedContent,
@@ -522,7 +523,7 @@ class GroupChatController extends Controller
                         'sender_name' => $senderName,
                         'group_chat_id' => $message->group_chat_id,
                         'created_at' => $message->created_at ? $message->created_at->toISOString() : null,
-                        'time' => $message->created_at ? $message->created_at->format('g:i A') : null,
+                        // ❌ REMOVE: 'time' => $message->created_at ? $message->created_at->format('g:i A') : null,
                         'attachments' => $attachmentsData,
                     ];
                 });
@@ -665,6 +666,8 @@ class GroupChatController extends Controller
                         'group_message_id' => $message->id,
                         'attachment_type' => $attachmentType,
                         'attachment_path' => $fullPath,
+                        'file_name' => $file->getClientOriginalName(),  // ✅ Add this
+                        'file_size' => $file->getSize(),               // ✅ Add this
                     ]);
                     
                     $signedUrl = $this->getSecureAttachmentUrl($attachment);
@@ -1527,6 +1530,51 @@ private function getGroupAvatarUrl($path)
             return response()->json(['error' => 'Failed to update role'], 500);
         }
     }
+
+    /**
+ * Get all attachments for a specific group message
+ */
+public function getGroupMessageAttachments($messageId, Request $request)
+{
+    try {
+        $adminId = $this->getAdminId();
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+        
+        $message = GroupMessage::find($messageId);
+        if (!$message) {
+            return response()->json(['error' => 'Message not found'], 404);
+        }
+        
+        // Check if admin is a member of this group
+        $isMember = GroupChatMember::where('group_chat_id', $message->group_chat_id)
+            ->where('alumni_id', $adminId)
+            ->exists();
+        
+        if (!$isMember) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+        
+        $attachments = GroupMessagesAttachment::where('group_message_id', $messageId)->get();
+        $result = [];
+        
+        foreach ($attachments as $attachment) {
+            $result[] = [
+                'id' => $attachment->id,
+                'attachment_type' => $attachment->attachment_type,
+                'file_name' => $attachment->file_name ?? pathinfo($attachment->attachment_path, PATHINFO_BASENAME),
+                'file_size' => $attachment->file_size,
+                'url' => $this->getSecureAttachmentUrl($attachment),
+            ];
+        }
+        
+        return response()->json($result);
+    } catch (\Exception $e) {
+        Log::error('Error fetching group attachments: ' . $e->getMessage());
+        return response()->json(['error' => 'Failed to fetch attachments'], 500);
+    }
+}
 
 
 }

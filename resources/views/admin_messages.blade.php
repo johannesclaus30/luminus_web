@@ -1029,10 +1029,12 @@ function initSupabase() {
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
     
     // ============================================
-    // REALTIME: Message changes
+    // ✅ CORRECT: Add ALL listeners BEFORE subscribe
     // ============================================
     supabaseRealtimeChannel = supabaseClient
         .channel('admin-messages-' + adminId)
+        
+        // ✅ Listener 1: Incoming messages
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
@@ -1042,6 +1044,8 @@ function initSupabase() {
             console.log('📨 New incoming message:', payload.new);
             handleIncomingMessage(payload.new);
         })
+        
+        // ✅ Listener 2: Outgoing messages from other sessions
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
@@ -1051,6 +1055,19 @@ function initSupabase() {
             console.log('📤 Message sent (from another session):', payload.new);
             handleOutgoingMessageFromOtherSession(payload.new);
         })
+        
+        // ✅ Listener 3: Attachments (moved BEFORE subscribe)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages_attachments',
+        }, (payload) => {
+            console.log('📎 New attachment inserted (realtime):', payload.new);
+            console.log('📎 Current chat:', currentChat);
+            handleAttachmentInsert(payload.new);
+        })
+        
+        // ✅ NOW subscribe after ALL listeners are added
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 console.log('✅ Supabase Realtime connected');
@@ -1061,22 +1078,7 @@ function initSupabase() {
         });
     
     // ============================================
-    // 🔥 REALTIME: Attachment changes (SAME channel)
-    // ============================================
-    // Use the SAME channel for attachments too
-    supabaseRealtimeChannel
-        .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages_attachments',
-        }, (payload) => {
-            console.log('📎 New attachment inserted (realtime):', payload.new);
-            console.log('📎 Current chat:', currentChat);
-            handleAttachmentInsert(payload.new);
-        });
-    
-    // ============================================
-    // BROADCAST: Typing indicators
+    // BROADCAST: Typing indicators (separate channel)
     // ============================================
     typingChannel = supabaseClient.channel('typing-indicators', {
         config: {
@@ -1098,7 +1100,7 @@ function initSupabase() {
     initPresence();
     
     // ============================================
-    // REALTIME: Alumni online status changes
+    // REALTIME: Alumni online status changes (separate channel)
     // ============================================
     supabaseClient
         .channel('alumni-presence')
@@ -1112,6 +1114,57 @@ function initSupabase() {
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 console.log('✅ Alumni presence tracking connected');
+            }
+        });
+}
+
+function initGroupRealtime() {
+    console.log('🚀🚀🚀 initGroupRealtime CALLED!');
+    
+    if (groupRealtimeChannel) {
+        console.log('⚠️ Existing group channel found, removing...');
+        try {
+            supabaseClient.removeChannel(groupRealtimeChannel);
+        } catch (e) {}
+        groupRealtimeChannel = null;
+    }
+    
+    if (!supabaseClient) {
+        console.warn('⚠️ Supabase not initialized');
+        return;
+    }
+    
+    console.log('📡 Creating GROUP realtime channel...');
+    
+    // ✅ Use the EXACT same approach as the test channel
+    groupRealtimeChannel = supabaseClient
+        .channel('group-messages-all')
+        .on('postgres_changes', 
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'group_messages'
+            },
+            (payload) => {
+                console.log('🔥🔥🔥 GROUP MESSAGE RECEIVED!', payload);
+                const message = payload.new;
+                
+                // Check if we're viewing this group
+                if (currentChat && 
+                    currentChat.type === 'group' && 
+                    currentChat.id == message.group_chat_id) {
+                    console.log('✅ Viewing this group, processing message');
+                    handleNewGroupMessage(message);
+                } else {
+                    console.log('⏭️ Not viewing this group, updating unread count');
+                    updateGroupWithNewMessage(message.group_chat_id, message.content, message.created_at);
+                }
+            }
+        )
+        .subscribe((status) => {
+            console.log('📡 Group channel status:', status);
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Subscribed to ALL group messages');
             }
         });
 }
@@ -1604,7 +1657,7 @@ function handleOutgoingMessageFromOtherSession(message) {
                     receiver_type: message.receiver_type,
                     is_read: message.is_read,
                     created_at: utcTimestamp,
-                    time: formatTime(new Date(utcTimestamp)),
+                    
                     attachments: attachments
                 });
                 scrollToBottom();
@@ -1621,7 +1674,7 @@ function handleOutgoingMessageFromOtherSession(message) {
                     receiver_type: message.receiver_type,
                     is_read: message.is_read,
                     created_at: utcTimestamp,
-                    time: formatTime(new Date(utcTimestamp)),
+                    
                     attachments: []
                 });
                 scrollToBottom();
@@ -1630,56 +1683,56 @@ function handleOutgoingMessageFromOtherSession(message) {
     }
 }
 
-    function ensureUTCTimestamp(timestamp) {
-        if (!timestamp) return new Date().toISOString();
-        
-        // If it's already an ISO string with Z or + timezone, return as-is
-        if (typeof timestamp === 'string') {
-            // Already has timezone indicator (Z, +08:00, etc.)
-            if (timestamp.endsWith('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
-                return timestamp;
-            }
-            
-            // Missing timezone - assume UTC by appending Z
-            if (timestamp.includes('T')) {
-                return timestamp + 'Z';
-            }
-            
-            // If it's just a date string, create a proper UTC ISO string
-            const date = new Date(timestamp + 'Z');
-            return date.toISOString();
+function ensureUTCTimestamp(timestamp) {
+    if (!timestamp) return new Date().toISOString();
+    
+    // If it's already an ISO string
+    if (typeof timestamp === 'string') {
+        // If it has a timezone indicator (Z, +08:00, etc.), parse it directly
+        if (timestamp.endsWith('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
+            return timestamp;
         }
         
-        // If it's already a Date object or number, convert to ISO string
-        return new Date(timestamp).toISOString();
+        // If it's just a date string without timezone, treat as UTC
+        if (timestamp.includes('T')) {
+            return timestamp + 'Z';
+        }
+        
+        // If it's just a date, convert properly
+        const date = new Date(timestamp + 'Z');
+        if (!isNaN(date.getTime())) {
+            return date.toISOString();
+        }
     }
+    
+    // If it's a Date object or number, convert to ISO string
+    try {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+            return date.toISOString();
+        }
+    } catch (e) {}
+    
+    return new Date().toISOString();
+}
 
-    // ============================================
-    // NEW: UPDATE CONTACT IN PANEL WITHOUT FULL RELOAD
-    // ============================================
     function updateContactWithNewMessage(contactId, contactType, content, timestamp, isUnread = false) {
         let contact = allContacts.find(c => c.id == contactId && c.type === contactType);
         
         if (!contact) {
-            console.log('📋 New contact detected, fetching info...');
             fetchContactInfo(contactId, contactType, content, timestamp, isUnread);
             return;
         }
         
-        // 🔧 Ensure timestamp is proper UTC ISO string
-        const utcTimestamp = ensureUTCTimestamp(timestamp);
-        const messageDate = new Date(utcTimestamp);
-        
+        // Store the raw ISO timestamp (will be formatted by formatContactTime)
         contact.last_message = content;
-        contact.last_message_time = formatTime(messageDate);
-        contact.last_message_timestamp = utcTimestamp; // Store the fixed UTC string
+        contact.last_message_timestamp = timestamp; // Keep as ISO string
         contact.last_message_from_me = !isUnread;
         
         if (isUnread && (!currentChat || currentChat.id != contactId || currentChat.type !== contactType)) {
             contact.unread_count = (contact.unread_count || 0) + 1;
         }
         
-        // Move this contact to the top of the list
         allContacts = allContacts.filter(c => !(c.id == contactId && c.type === contactType));
         allContacts.unshift(contact);
         
@@ -2058,8 +2111,7 @@ function renderContacts(contacts) {
                             ${isMuted ? '<span class="muted-indicator"><i class="fa-solid fa-bell-slash"></i></span>' : ''}
                             ${isGroup ? `<span class="group-badge"><i class="fa-solid fa-users"></i></span>` : ''}
                         </span>
-                        <span class="contact-time">${displayTime}</span>
-                    </div>
+                        <span class="contact-time">${contact.last_message_timestamp ? formatContactTime(contact.last_message_timestamp) : ''}</span>                    </div>
                     <div class="contact-row-2">${rowTwo}</div>
                     <div class="contact-row-3">
                         <span class="contact-preview">${lastMessagePreview}</span>
@@ -2723,23 +2775,20 @@ function renderGroupMessagesPrepend(messages) {
     let firstExistingSenderId = null;
     if (firstExistingMsg) {
         firstExistingSender = firstExistingMsg.dataset.senderName;
-        // We can't easily get sender_id from the DOM, so we'll store it in a data attribute
         firstExistingSenderId = firstExistingMsg.dataset.senderId;
     }
     
     messages.forEach((msg, index) => {
+        // ✅ Fix UTC timestamp
         let msgDate;
         if (typeof msg.created_at === 'string') {
-            if (!msg.created_at.endsWith('Z') && !msg.created_at.includes('+')) {
-                msgDate = new Date(msg.created_at + 'Z');
-            } else {
-                msgDate = new Date(msg.created_at);
-            }
+            const utcTimestamp = ensureUTCTimestamp(msg.created_at);
+            msgDate = new Date(utcTimestamp);
         } else {
             msgDate = new Date(msg.created_at);
         }
         
-        const localDateStr = msgDate.toLocaleDateString();
+        const localDateStr = msgDate.toISOString().split('T')[0];
         
         if (localDateStr !== lastDate) {
             html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
@@ -2763,6 +2812,9 @@ function renderGroupMessagesPrepend(messages) {
         
         // Get avatar info
         const avatarInfo = getSenderAvatarInfo(msg.sender_id, msg.sender_type);
+        
+        // ✅ Use formatTime() for consistent time display
+        const displayTime = formatTime(msgDate);
         
         let avatarHtml = '';
         if (shouldShowAvatar) {
@@ -2789,7 +2841,7 @@ function renderGroupMessagesPrepend(messages) {
                         <p>${escapeHtml(msg.content)}</p>
                         ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
                         <span class="msg-time">
-                            ${msg.time || formatTime(msgDate)}
+                            ${displayTime}
                             ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
                         </span>
                     </div>
@@ -2859,22 +2911,26 @@ function renderMessagesPrepend(messages) {
         let lastDate = null;
         
         messages.forEach(msg => {
-            const msgDate = new Date(msg.created_at);
+            // ✅ Always use created_at and format it with formatTime
+            const msgDate = msg.created_at ? new Date(msg.created_at) : new Date();
             const localDateStr = msgDate.toLocaleDateString();
             
             if (localDateStr !== lastDate) {
                 html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
                 lastDate = localDateStr;
             }
-            
+
+            // ✅ Always use formatTime to format the date
+            const displayTime = formatTime(msgDate);
             const isSent = msg.sender_id == adminId;
+            
             html += `
                 <div class="message-group ${isSent ? 'sent' : 'received'}" data-msg-id="${msg.id}">
                     <div class="message-bubble">
                         <p>${escapeHtml(msg.content)}</p>
                         ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
                         <span class="msg-time">
-                            ${msg.time || formatTime(msgDate)}
+                            ${displayTime}
                             ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
                         </span>
                     </div>
@@ -2911,15 +2967,12 @@ function appendMessage(msg) {
         }
         
         // ✅ CRITICAL FIX: Remove any temp message with the same content
-        // Find and remove temp messages that match this real message
         const tempMessages = container.querySelectorAll('[data-msg-id^="temp-"]');
         tempMessages.forEach(tempEl => {
-            // Check if the temp message has the same content or was uploaded recently
             const tempBubble = tempEl.querySelector('.message-bubble p');
             const tempContent = tempBubble ? tempBubble.textContent : '';
             const realContent = msg.content || '';
             
-            // If temp has the attachment placeholder or matches content, remove it
             if (tempContent.includes('📎') || tempContent === realContent) {
                 console.log('🗑️ Removing temp message:', tempEl.dataset.msgId);
                 tempEl.remove();
@@ -2928,8 +2981,18 @@ function appendMessage(msg) {
     }
     
     const isSent = msg.sender_id == adminId;
-    const displayTime = msg.time || formatTime(new Date(msg.created_at));
     
+    // ✅ FIXED: Only use created_at to format time
+    let displayTime;
+    if (msg.created_at) {
+        // Ensure it's a proper UTC timestamp
+        const utcTimestamp = ensureUTCTimestamp(msg.created_at);
+        displayTime = formatTime(utcTimestamp);
+    } else {
+        // If no created_at, use current time
+        displayTime = formatTime(new Date().toISOString());
+    }
+
     const isGroupMsg = msg.sender_name && !isSent;
     
     let attachmentsHtml = '';
@@ -2978,7 +3041,6 @@ function appendMessage(msg) {
         const tempRemaining = container.querySelectorAll('[data-msg-id^="temp-"]');
         if (tempRemaining.length > 0) {
             tempRemaining.forEach(el => {
-                // If temp message is old (more than 5 seconds), remove it
                 const timestamp = el.dataset.msgId ? parseInt(el.dataset.msgId.replace('temp-', '')) : 0;
                 if (timestamp && (Date.now() - timestamp > 5000)) {
                     console.log('🗑️ Removing stale temp message:', el.dataset.msgId);
@@ -3314,69 +3376,160 @@ function updateExistingMessageWithAttachments(messageElement, msg) {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     }
     
-    function formatTime(date) {
-        if (typeof date === 'string') {
-            date = new Date(date);
-        }
-        
-        // If date is invalid, return 'Just now'
-        if (isNaN(date.getTime())) {
-            return 'Just now';
-        }
-        
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        
-        // Show "Just now" for messages less than 1 minute old
-        if (diffMins < 1) {
-            return 'Just now';
-        }
-        
-        // Show minutes for messages less than 1 hour old
-        if (diffMins < 60) {
-            return `${diffMins}m ago`;
-        }
-        
-        // Show hours for messages less than 24 hours old
-        const diffHours = Math.floor(diffMins / 60);
-        if (diffHours < 24) {
-            return `${diffHours}h ago`;
-        }
-        
-        // For older messages, show the date and time
-        return date.toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
+    // ============================================
+    // TIME FORMATTING WITH PHILIPPINE TIME (UTC+8)
+    // ============================================
+
+/**
+ * Format time for display with Philippine Time (UTC+8)
+ * - Shows "Just now" for < 1 minute
+ * - Shows "Xm ago" for < 1 hour
+ * - Shows "Xh ago" for < 24 hours
+ * - Shows actual date/time for > 24 hours (in PH time)
+ */
+function formatTime(date) {
+    if (!date) return 'Just now';
+    
+    // Ensure we have a Date object
+    let dateObj;
+    if (typeof date === 'string') {
+        // Parse the ISO string correctly
+        dateObj = new Date(date);
+    } else if (date instanceof Date) {
+        dateObj = date;
+    } else {
+        dateObj = new Date(date);
     }
     
-    function formatDateDivider(date) {
-        // 🔧 If the date is a string from the server (UTC), convert it properly
-        if (typeof date === 'string') {
-            date = new Date(date);
-        }
-        
-        const now = new Date();
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        
-        // 🔧 Compare using local date strings
-        if (date.toLocaleDateString() === now.toLocaleDateString()) {
-            return 'Today';
-        } else if (date.toLocaleDateString() === yesterday.toLocaleDateString()) {
-            return 'Yesterday';
-        } else {
-            return date.toLocaleDateString('en-US', { 
-                month: 'long', 
-                day: 'numeric', 
-                year: 'numeric' 
-            });
-        }
+    // If date is invalid, return 'Just now'
+    if (isNaN(dateObj.getTime())) {
+        return 'Just now';
     }
+    
+    // Get current time in UTC for comparison
+    const now = new Date();
+    const nowUtc = now.getTime();
+    const msgTime = dateObj.getTime();
+    
+    // Calculate difference in milliseconds
+    const diffMs = nowUtc - msgTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    // Show "Just now" for messages less than 1 minute old
+    if (diffMins < 1 && diffMs >= 0) {
+        return 'Just now';
+    }
+    
+    // Show minutes for messages less than 1 hour old
+    if (diffMins < 60 && diffMins > 0) {
+        return `${diffMins}m ago`;
+    }
+    
+    // Show hours for messages less than 24 hours old
+    if (diffHours < 24 && diffHours > 0) {
+        return `${diffHours}h ago`;
+    }
+    
+    // ✅ FIX: For older messages, show the actual date and time in PH time
+    // Convert UTC to Philippine Time (UTC+8) by adding 8 hours
+    const phTimeMs = dateObj.getTime() + (8 * 60 * 60 * 1000);
+    const phTime = new Date(phTimeMs);
+    
+    // ✅ Use UTC methods since we already shifted the timestamp
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[phTime.getUTCMonth()];
+    const day = phTime.getUTCDate();
+    const year = phTime.getUTCFullYear();
+    
+    let hours = phTime.getUTCHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    const minutes = phTime.getUTCMinutes().toString().padStart(2, '0');
+    
+    return `${month} ${day}, ${year} at ${hours}:${minutes} ${ampm}`;
+}
+
+/**
+ * Format date divider with Philippine Time
+ */
+function formatDateDivider(date) {
+    if (!date) return 'Unknown';
+    
+    let dateObj;
+    if (typeof date === 'string') {
+        dateObj = new Date(date);
+    } else if (date instanceof Date) {
+        dateObj = date;
+    } else {
+        dateObj = new Date(date);
+    }
+    
+    if (isNaN(dateObj.getTime())) return 'Unknown';
+    
+    // ✅ Convert to PH time manually using UTC methods
+    const phTimeMs = dateObj.getTime() + (8 * 60 * 60 * 1000);
+    const phTime = new Date(phTimeMs);
+    
+    const nowMs = new Date().getTime() + (8 * 60 * 60 * 1000);
+    const nowPh = new Date(nowMs);
+    
+    // Compare dates using UTC methods
+    const todayStr = `${nowPh.getUTCFullYear()}-${String(nowPh.getUTCMonth()+1).padStart(2,'0')}-${String(nowPh.getUTCDate()).padStart(2,'0')}`;
+    const dateStr = `${phTime.getUTCFullYear()}-${String(phTime.getUTCMonth()+1).padStart(2,'0')}-${String(phTime.getUTCDate()).padStart(2,'0')}`;
+    
+    const yesterday = new Date(nowPh);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth()+1).padStart(2,'0')}-${String(yesterday.getUTCDate()).padStart(2,'0')}`;
+    
+    if (dateStr === todayStr) {
+        return 'Today';
+    } else if (dateStr === yesterdayStr) {
+        return 'Yesterday';
+    } else {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        return `${months[phTime.getUTCMonth()]} ${phTime.getUTCDate()}, ${phTime.getUTCFullYear()}`;
+    }
+}
+
+/**
+ * Format time for display in the contact list
+ */
+function formatContactTime(timestamp) {
+    if (!timestamp) return '';
+    
+    // Parse the timestamp correctly
+    let dateObj;
+    if (typeof timestamp === 'string') {
+        dateObj = new Date(timestamp);
+    } else {
+        dateObj = new Date(timestamp);
+    }
+    
+    if (isNaN(dateObj.getTime())) return '';
+    
+    // Get current time in UTC for comparison
+    const now = new Date();
+    const nowUtc = now.getTime();
+    const msgTime = dateObj.getTime();
+    
+    const diffMs = nowUtc - msgTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1 && diffMs >= 0) return 'Just now';
+    if (diffMins < 60 && diffMins > 0) return `${diffMins}m ago`;
+    if (diffHours < 24 && diffHours > 0) return `${diffHours}h ago`;
+    if (diffDays < 7 && diffDays > 0) return `${diffDays}d ago`;
+    
+    // ✅ For older messages, show the date in PH time
+    const phTimeMs = dateObj.getTime() + (8 * 60 * 60 * 1000);
+    const phTime = new Date(phTimeMs);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[phTime.getUTCMonth()]} ${phTime.getUTCDate()}, ${phTime.getUTCFullYear()}`;
+}
     
     // ============================================
     // MOBILE MENU TOGGLE
@@ -3389,117 +3542,163 @@ function updateExistingMessageWithAttachments(messageElement, msg) {
         document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
     }
     
-    document.addEventListener('DOMContentLoaded', async function() {
-        console.log('🚀 Initializing messages module...');
-        
-        // Load all conversations (individual + groups)
-        await loadConversations();
-        
-        // Initialize Supabase
-        initSupabase();
-        
-        // Check for URL parameter to auto-open chat
-        handleUrlChatRedirect();
-    });
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 Initializing messages module...');
+    
+    // Load all conversations
+    await loadConversations();
+    
+    // Initialize Supabase
+    initSupabase();
+    
+    // ✅ Initialize GROUP realtime
+    initGroupRealtime();
+    
+    // ✅ Check for URL parameter to auto-open chat
+    await handleUrlChatRedirect();  // Make sure this is awaited
+    
+    // ✅ AFTER the redirect, check if we're in a group chat
+    if (currentChat && currentChat.type === 'group') {
+        console.log('✅ Group chat is already open, currentChat set to:', currentChat);
+    }
+    
+    // Check for URL parameter (fallback)
+    handleUrlChatRedirect();
+});
 
-    // Handle chat redirect from URL parameter
     async function handleUrlChatRedirect() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const chatId = urlParams.get('chat');
-        
-        if (!chatId) {
-            console.log('📋 No chat parameter in URL');
-            return;
-        }
-        
-        console.log('📋 Found chat parameter:', chatId);
-        
-        // Clean up URL immediately
-        if (window.history && window.history.replaceState) {
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
-        }
-        
-        // Wait for conversations to load (max 3 seconds)
-        let attempts = 0;
-        const maxAttempts = 30;
-        
-        while (attempts < maxAttempts) {
-            if (allContacts.length > 0 || attempts > 10) {
-                console.log('✅ Checking for contact:', chatId);
-                
-                // Try to find the contact in existing conversations
-                const existingContact = allContacts.find(c => c.id == chatId && c.type === 'alumni');
-                
-                if (existingContact) {
-                    console.log('✅ Found existing contact, opening chat');
-                    openChat(chatId, 'alumni');
-                    return;
-                }
-                
-                // Fetch alumni info directly from the server
-                console.log('⚠️ Contact not in conversations, fetching alumni info...');
-                try {
-                    const response = await fetch(`/admin/messages/alumni/${chatId}/info`);
-                    
-                    if (response.ok) {
-                        const alumni = await response.json();
-                        console.log('✅ Found alumni:', alumni.full_name);
-                        
-                        allContacts.unshift({
-                            id: alumni.id,
-                            type: 'alumni',
-                            full_name: alumni.full_name,
-                            initials: alumni.initials,
-                            program: alumni.program || '',
-                            batch: alumni.batch || '-',
-                            is_online: alumni.is_online || false,
-                            last_message: null,
-                            last_message_time: null,
-                            unread_count: 0,
-                            avatar: alumni.avatar || null
-                        });
-                        
-                        renderContacts(allContacts);
-                        openChat(alumni.id, 'alumni');
-                    } else {
-                        console.log('⚠️ Failed to fetch alumni, creating placeholder');
-                        createPlaceholder(chatId);
-                    }
-                } catch (error) {
-                    console.error('❌ Error fetching alumni:', error);
-                    createPlaceholder(chatId);
-                }
-                
+    const urlParams = new URLSearchParams(window.location.search);
+    const chatId = urlParams.get('chat');
+    
+    if (!chatId) {
+        console.log('📋 No chat parameter in URL');
+        return;
+    }
+    
+    console.log('📋 Found chat parameter:', chatId);
+    
+    // Clean up URL immediately
+    if (window.history && window.history.replaceState) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // Wait for conversations to load (max 3 seconds)
+    let attempts = 0;
+    const maxAttempts = 30;
+    
+    while (attempts < maxAttempts) {
+        if (allContacts.length > 0 || allGroups.length > 0 || attempts > 10) {
+            console.log('✅ Checking for contact/group:', chatId);
+            
+            // ✅ Check if it's a GROUP first
+            const existingGroup = allGroups.find(g => g.id == chatId);
+            if (existingGroup) {
+                console.log('✅ Found existing group, opening');
+                await openGroupChat(chatId);
                 return;
             }
             
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        
-        console.warn('⚠️ Timed out, creating placeholder');
-        createPlaceholder(chatId);
-        
-        function createPlaceholder(id) {
-            allContacts.unshift({
-                id: parseInt(id),
-                type: 'alumni',
-                full_name: 'Alumni #' + id,
-                initials: 'AU',
-                program: '',
-                batch: '-',
-                is_online: false,
-                last_message: null,
-                last_message_time: null,
-                unread_count: 0,
-                avatar: null
-            });
+            // Then check if it's an individual contact
+            const existingContact = allContacts.find(c => c.id == chatId && c.type === 'alumni');
+            if (existingContact) {
+                console.log('✅ Found existing contact, opening chat');
+                await openChat(chatId, 'alumni');
+                return;
+            }
             
-            renderContacts(allContacts);
-            openChat(id, 'alumni');
+            // If not found, try fetching from server
+            console.log('⚠️ Contact not in conversations, fetching info...');
+            try {
+                // Try group first
+                const groupResponse = await fetch(`/admin/messages/groups/${chatId}/info`);
+                if (groupResponse.ok) {
+                    const group = await groupResponse.json();
+                    allGroups.unshift({
+                        ...group,
+                        type: 'group',
+                        id: parseInt(group.id),
+                        is_archived: group.is_archived || false,
+                        is_muted: group.is_muted || false,
+                        unread_count: 0,
+                        last_message: null,
+                        last_message_timestamp: null,
+                        last_message_from_me: false,
+                        member_count: group.member_count || 0,
+                        name: group.name || 'Unnamed Channel',
+                        initials: group.initials || 'GC',
+                        avatar: group.avatar || null,
+                        created_by: group.created_by || null,
+                        created_by_name: group.created_by_name || 'Unknown',
+                    });
+                    renderContacts(allContacts);
+                    await openGroupChat(chatId);
+                    return;
+                }
+            } catch (e) {}
+            
+            // Try alumni
+            try {
+                const response = await fetch(`/admin/messages/alumni/${chatId}/info`);
+                if (response.ok) {
+                    const alumni = await response.json();
+                    console.log('✅ Found alumni:', alumni.full_name);
+                    
+                    allContacts.unshift({
+                        id: alumni.id,
+                        type: 'alumni',
+                        full_name: alumni.full_name,
+                        initials: alumni.initials,
+                        program: alumni.program || '',
+                        batch: alumni.batch || '-',
+                        is_online: alumni.is_online || false,
+                        last_message: null,
+                        last_message_time: null,
+                        unread_count: 0,
+                        avatar: alumni.avatar || null,
+                        is_archived: false,
+                        is_muted: false
+                    });
+                    
+                    renderContacts(allContacts);
+                    await openChat(alumni.id, 'alumni');
+                    return;
+                }
+            } catch (e) {}
+            
+            // Create placeholder
+            createPlaceholder(chatId);
+            return;
         }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
     }
+    
+    console.warn('⚠️ Timed out, creating placeholder');
+    createPlaceholder(chatId);
+    
+    function createPlaceholder(id) {
+        allContacts.unshift({
+            id: parseInt(id),
+            type: 'alumni',
+            full_name: 'Alumni #' + id,
+            initials: 'AU',
+            program: '',
+            batch: '-',
+            is_online: false,
+            last_message: null,
+            last_message_time: null,
+            unread_count: 0,
+            avatar: null,
+            is_archived: false,
+            is_muted: false
+        });
+        
+        renderContacts(allContacts);
+        openChat(id, 'alumni');
+    }
+}
     
     // Close sidebar when clicking on a nav item (mobile)
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -4577,8 +4776,8 @@ async function sendMessageWithAttachments(content) {
         sender_id: adminId,
         sender_type: 'admin',
         is_read: false,
-        created_at: new Date().toISOString(),
-        time: formatTime(new Date()),
+        created_at: new Date().toISOString(), // Store as UTC ISO
+        
         attachments: tempAttachments
     };
     
@@ -4642,6 +4841,16 @@ async function sendMessageWithAttachments(content) {
             const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
             if (tempElement) tempElement.remove();
             
+            // ✅ Ensure created_at is set properly
+            let serverCreatedAt = data.message.created_at;
+            if (!serverCreatedAt) {
+                // If the server didn't return created_at, use the current time in UTC
+                serverCreatedAt = new Date().toISOString();
+            } else {
+                // Ensure it's a proper UTC timestamp
+                serverCreatedAt = ensureUTCTimestamp(serverCreatedAt);
+            }
+                    
             // ✅ IMPORTANT: Get attachments from the server response
             let finalAttachments = [];
             if (data.message.attachments && data.message.attachments.length > 0) {
@@ -4679,7 +4888,6 @@ async function sendMessageWithAttachments(content) {
                 }
             }
             
-            // ✅ Create final message with proper attachments
             const finalMessage = {
                 id: data.message.id,
                 content: data.message.content || content || '📎 Attachment',
@@ -4688,8 +4896,7 @@ async function sendMessageWithAttachments(content) {
                 receiver_id: data.message.receiver_id || currentChat.id,
                 receiver_type: data.message.receiver_type || currentChat.type,
                 is_read: data.message.is_read || false,
-                created_at: data.message.created_at || new Date().toISOString(),
-                time: formatTime(new Date(data.message.created_at || new Date())),
+                created_at: serverCreatedAt, // Use the ensured timestamp
                 attachments: finalAttachments
             };
             
@@ -4739,7 +4946,7 @@ async function sendTextMessage(content) {
         sender_type: 'admin',
         is_read: false,
         created_at: now.toISOString(),
-        time: formatTime(now),
+        // ✅ NO 'time' field - let appendMessage calculate it
         attachments: []
     };
     
@@ -4784,10 +4991,27 @@ async function sendTextMessage(content) {
             const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
             if (tempElement) tempElement.remove();
             
-            if (!data.message.time) {
-                data.message.time = formatTime(new Date(data.message.created_at));
+            // ✅ Ensure created_at is set properly
+            let serverCreatedAt = data.message.created_at;
+            if (!serverCreatedAt) {
+                serverCreatedAt = new Date().toISOString();
+            } else {
+                serverCreatedAt = ensureUTCTimestamp(serverCreatedAt);
             }
-            
+
+            // ✅ Use the ensured timestamp
+            const finalMessage = {
+                id: data.message.id,
+                content: data.message.content,
+                sender_id: data.message.sender_id,
+                sender_type: data.message.sender_type,
+                receiver_id: data.message.receiver_id,
+                receiver_type: data.message.receiver_type,
+                is_read: data.message.is_read,
+                created_at: serverCreatedAt,
+                attachments: data.message.attachments || []
+            };
+                    
             appendMessage(data.message);
             scrollToBottom();
             
@@ -4864,7 +5088,6 @@ async function loadGroupConversations() {
     }
 }
 
-// OPEN GROUP CHAT
 async function openGroupChat(groupId) {
     lastMessageId = 0;
     currentChat = { id: groupId, type: 'group' };
@@ -4921,6 +5144,11 @@ async function openGroupChat(groupId) {
             ${group.member_count || 0} members
         `;
     }
+
+    // ✅ Initialize the global group channel if it doesn't exist
+    if (!groupRealtimeChannel) {
+        initGroupRealtime();
+    }
     
     // Load messages
     await loadGroupMessages(groupId);
@@ -4930,9 +5158,6 @@ async function openGroupChat(groupId) {
     
     // Check archive status and update input
     checkAndDisableGroupChat(groupId);
-    
-    // Subscribe to real-time
-    subscribeToGroupMessages(groupId);
     
     // Show on mobile
     showChatOnMobile();
@@ -5036,16 +5261,15 @@ function renderGroupMessages(messages) {
         // ✅ Handle both string and Date objects for created_at
         let msgDate;
         if (typeof msg.created_at === 'string') {
-            if (!msg.created_at.endsWith('Z') && !msg.created_at.includes('+')) {
-                msgDate = new Date(msg.created_at + 'Z');
-            } else {
-                msgDate = new Date(msg.created_at);
-            }
+            // Ensure UTC timestamp
+            const utcTimestamp = ensureUTCTimestamp(msg.created_at);
+            msgDate = new Date(utcTimestamp);
         } else {
             msgDate = new Date(msg.created_at);
         }
         
-        const localDateStr = msgDate.toLocaleDateString();
+        // ✅ Use the same date formatting as user-to-user messages
+        const localDateStr = msgDate.toISOString().split('T')[0];
         
         if (localDateStr !== lastDate) {
             html += `<div class="date-divider"><span>${formatDateDivider(msgDate)}</span></div>`;
@@ -5079,6 +5303,9 @@ function renderGroupMessages(messages) {
             `;
         }
         
+        // ✅ Use formatTime() for consistent time display
+        const displayTime = formatTime(msgDate);
+        
         html += `
             <div class="message-group ${isSent ? 'sent' : 'received'} ${!isSent && isSameSender ? 'same-sender' : ''}" 
                  data-msg-id="${msg.id}" 
@@ -5089,7 +5316,7 @@ function renderGroupMessages(messages) {
                         <p>${escapeHtml(msg.content)}</p>
                         ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
                         <span class="msg-time">
-                            ${msg.time || formatTime(msgDate)}
+                            ${displayTime}
                             ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
                         </span>
                     </div>
@@ -5120,12 +5347,29 @@ function appendGroupMessage(msg) {
         const existingMsg = document.querySelector(`[data-msg-id="${msg.id}"]`);
         if (existingMsg) {
             console.log('⚠️ Duplicate message prevented:', msg.id);
+            if (msg.attachments && msg.attachments.length > 0) {
+                const existingAttach = existingMsg.querySelector('.message-attachment');
+                if (!existingAttach || existingAttach.classList.contains('uploading')) {
+                    updateExistingGroupMessageWithAttachments(existingMsg, msg);
+                }
+            }
             return;
         }
     }
     
     const isSent = msg.sender_id == adminId;
-    const displayTime = msg.time || formatTime(new Date(msg.created_at));
+    
+    // ✅ Fix UTC timestamp for display
+    let msgDate;
+    if (msg.created_at) {
+        const utcTimestamp = ensureUTCTimestamp(msg.created_at);
+        msgDate = new Date(utcTimestamp);
+    } else {
+        msgDate = new Date();
+    }
+    
+    // ✅ Use formatTime() for consistent time display
+    const displayTime = formatTime(msgDate);
     const senderName = msg.sender_name || 'Unknown';
     
     // Check if previous message is from same sender (for avatar hiding)
@@ -5159,6 +5403,21 @@ function appendGroupMessage(msg) {
         }
     }
     
+    // Render attachments with proper URLs
+    let attachmentsHtml = '';
+    if (msg.attachments && msg.attachments.length > 0) {
+        attachmentsHtml = renderAttachments(msg.attachments, isSent);
+    }
+    
+    // ✅ If there's no content but there are attachments, show a placeholder
+    let contentHtml = '';
+    if (msg.content && msg.content.trim() !== '') {
+        contentHtml = `<p>${escapeHtml(msg.content)}</p>`;
+    } else if (msg.attachments && msg.attachments.length > 0) {
+        // No text content, but has attachments - show a small indicator
+        contentHtml = ''; // The attachments will show
+    }
+    
     const messageHtml = `
         <div class="message-group ${isSent ? 'sent' : 'received'} ${!isSent && isSameSender ? 'same-sender' : ''}" 
              data-msg-id="${msg.id}" 
@@ -5166,8 +5425,8 @@ function appendGroupMessage(msg) {
             <div class="message-wrapper">
                 ${!isSent ? avatarHtml : ''}
                 <div class="message-bubble">
-                    <p>${escapeHtml(msg.content)}</p>
-                    ${msg.attachments && msg.attachments.length > 0 ? renderAttachments(msg.attachments, isSent) : ''}
+                    ${contentHtml}
+                    ${attachmentsHtml}
                     <span class="msg-time">
                         ${displayTime}
                         ${isSent ? '<i class="fa-solid fa-check-double read-check"></i>' : ''}
@@ -5185,12 +5444,36 @@ function appendGroupMessage(msg) {
     
     // Update the last message tracking
     if (!isSent) {
-        // Update the group's last message in the list
         updateGroupWithNewMessage(msg.group_chat_id, msg.content, msg.created_at);
     }
 }
 
+// Helper: Update existing group message with attachments
+function updateExistingGroupMessageWithAttachments(messageElement, msg) {
+    const bubble = messageElement.querySelector('.message-bubble');
+    if (!bubble) return;
+    
+    // Remove any existing attachment containers (especially uploading ones)
+    const existingAttach = bubble.querySelector('.message-attachment');
+    if (existingAttach) existingAttach.remove();
+    
+    // Add the new attachments
+    if (msg.attachments && msg.attachments.length > 0) {
+        const attachmentsHtml = renderAttachments(msg.attachments, true);
+        if (attachmentsHtml) {
+            const timeElement = bubble.querySelector('.msg-time');
+            if (timeElement) {
+                timeElement.insertAdjacentHTML('beforebegin', attachmentsHtml);
+            } else {
+                bubble.insertAdjacentHTML('beforeend', attachmentsHtml);
+            }
+        }
+    }
+}
+
+// ============================================
 // SEND GROUP MESSAGE (with attachments support)
+// ============================================
 async function sendGroupMessage() {
     const input = document.getElementById('messageInput');
     const content = input.value.trim();
@@ -5213,6 +5496,16 @@ async function sendGroupMessage() {
         const fileNames = selectedFiles.map(f => f.name).join(', ');
         const tempContent = content || `📎 ${fileNames}`;
         
+        // Create temp attachments with uploading state
+        const tempAttachments = selectedFiles.map(f => ({
+            id: 'temp-' + Date.now() + '-' + Math.random(),
+            type: f.type.startsWith('image/') ? 'image' : 'document',
+            name: f.name,
+            size: f.size,
+            uploading: true,
+            url: null
+        }));
+        
         const tempMessage = {
             id: tempId,
             content: tempContent,
@@ -5221,13 +5514,7 @@ async function sendGroupMessage() {
             sender_name: 'You',
             group_chat_id: currentChat.id,
             created_at: new Date().toISOString(),
-            time: formatTime(new Date()),
-            attachments: selectedFiles.map(f => ({
-                name: f.name,
-                size: f.size,
-                type: f.type,
-                uploading: true
-            }))
+            attachments: tempAttachments
         };
         
         appendGroupMessage(tempMessage);
@@ -5261,6 +5548,7 @@ async function sendGroupMessage() {
                 formData.append('attachments[]', file);
             });
             
+            // ✅ This URL is correct - it matches the route
             const response = await fetch(`/admin/messages/groups/${currentChat.id}/send-attachments`, {
                 method: 'POST',
                 headers: {
@@ -5270,30 +5558,72 @@ async function sendGroupMessage() {
                 body: formData
             });
             
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to send files');
+            const responseText = await response.text();
+            console.log('📤 Group send-attachments response:', responseText);
+            
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error('❌ Failed to parse response:', responseText);
+                throw new Error('Server returned invalid response');
             }
             
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || `Server error: ${response.status}`);
+            }
             
-            if (data.success) {
+            if (data.success && data.message) {
+                // Remove temp message
                 const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
                 if (tempElement) tempElement.remove();
                 
                 // Fix UTC timestamp
                 const utcTimestamp = ensureUTCTimestamp(data.message.created_at);
-                data.message.created_at = utcTimestamp;
-                data.message.time = formatTime(new Date(utcTimestamp));
                 
-                appendGroupMessage(data.message);
+                // Get sender name for the message
+                let senderName = 'You';
+                if (data.message.sender_id != adminId) {
+                    const contact = allContacts.find(c => c.id == data.message.sender_id && c.type === data.message.sender_type);
+                    senderName = contact ? contact.full_name : 'Unknown';
+                }
+                
+                // Process attachments from server response
+                let finalAttachments = [];
+                if (data.message.attachments && data.message.attachments.length > 0) {
+                    finalAttachments = data.message.attachments.map(att => ({
+                        id: att.id,
+                        type: att.type || 'document',
+                        name: att.name || 'File',
+                        size: att.size || 0,
+                        url: att.url || null,
+                        uploading: false
+                    }));
+                    console.log('📎 Final attachments from server:', finalAttachments);
+                }
+                
+                const finalMessage = {
+                    id: data.message.id,
+                    content: data.message.content || content || '📎 Attachment',
+                    sender_id: data.message.sender_id || adminId,
+                    sender_type: data.message.sender_type || 'admin',
+                    sender_name: senderName,
+                    group_chat_id: data.message.group_chat_id || currentChat.id,
+                    created_at: utcTimestamp,
+                    time: formatTime(new Date(utcTimestamp)),
+                    attachments: finalAttachments
+                };
+                
+                appendGroupMessage(finalMessage);
                 scrollToBottom();
                 
                 // Update group in list
-                updateGroupWithNewMessage(currentChat.id, data.message.content, utcTimestamp);
+                updateGroupWithNewMessage(currentChat.id, finalMessage.content, utcTimestamp);
+                
+                showToast('Message sent successfully');
             }
         } catch (error) {
-            console.error('Error sending files:', error);
+            console.error('❌ Error sending files:', error);
             const tempElement = document.querySelector(`[data-msg-id="${tempId}"]`);
             if (tempElement) tempElement.remove();
             showToast('Failed to send files. Please try again.', 'error');
@@ -5318,7 +5648,6 @@ async function sendGroupMessage() {
         sender_name: 'You',
         group_chat_id: currentChat.id,
         created_at: now.toISOString(),
-        time: formatTime(now),
         attachments: []
     };
     
@@ -5409,7 +5738,7 @@ async function markGroupMessagesAsRead(groupId) {
 }
 
 function subscribeToGroupMessages(groupId) {
-    // Unsubscribe from previous
+    // Unsubscribe from previous group channel
     if (groupRealtimeChannel) {
         try {
             supabaseClient.removeChannel(groupRealtimeChannel);
@@ -5427,8 +5756,11 @@ function subscribeToGroupMessages(groupId) {
     
     console.log(`📡 Subscribing to group ${groupId} messages...`);
     
+    // ✅ CORRECT: Add ALL listeners BEFORE subscribe
     groupRealtimeChannel = supabaseClient
-        .channel(`group-messages-${groupId}`)
+        .channel(`group-realtime-${groupId}`)
+        
+        // ✅ Listener 1: Group messages
         .on(
             'postgres_changes',
             {
@@ -5439,31 +5771,150 @@ function subscribeToGroupMessages(groupId) {
             },
             (payload) => {
                 console.log('📨 New group message (realtime):', payload.new);
-                // Call the handler directly
+                console.log('🔍 Payload table:', payload.table);
+                console.log('🔍 Payload schema:', payload.schema);
                 handleNewGroupMessage(payload.new);
             }
         )
-        .subscribe((status) => {
+        
+        // ✅ Listener 2: Group attachments (added BEFORE subscribe)
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'group_messages_attachments',
+            },
+            (payload) => {
+                console.log('📎 New group attachment (realtime):', payload.new);
+                handleGroupAttachmentInsert(payload.new);
+            }
+        )
+        
+        // ✅ NOW subscribe after ALL listeners are added
+        .subscribe((status, err) => {
             console.log(`📡 Group ${groupId} subscription status:`, status);
+            if (err) {
+                console.error('❌ Subscription error:', err);
+            }
             if (status === 'SUBSCRIBED') {
                 console.log(`✅ Subscribed to group ${groupId} messages`);
-                // Stop polling if it was running
                 if (groupPollingInterval) {
                     clearInterval(groupPollingInterval);
                     groupPollingInterval = null;
-                    console.log('🛑 Group polling stopped (realtime connected)');
                 }
             } else if (status === 'CHANNEL_ERROR') {
                 console.error(`❌ Failed to subscribe to group ${groupId} messages`);
-                // Fallback to polling
                 startGroupPolling(groupId);
             }
         });
 }
 
-// ============================================
+function handleGroupAttachmentInsert(attachment) {
+    console.log('🔄 Processing new group attachment:', attachment);
+    
+    // ✅ Find the message element by ID - try multiple times with delay
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    function tryFindAndUpdate() {
+        const messageElement = document.querySelector(`[data-msg-id="${attachment.group_message_id}"]`);
+        
+        if (messageElement) {
+            console.log('✅ Message found, updating attachment');
+            // Check if this attachment is already rendered
+            const existingAttach = messageElement.querySelector('.message-attachment');
+            if (existingAttach && !existingAttach.classList.contains('uploading') && !existingAttach.classList.contains('loading')) {
+                console.log('⏭️ Attachment already rendered for message:', attachment.group_message_id);
+                return;
+            }
+            
+            // Fetch and update
+            fetchGroupAttachments(attachment.group_message_id);
+            return;
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+            console.log(`⏳ Message not found, retry ${attempts}/${maxAttempts}...`);
+            setTimeout(tryFindAndUpdate, 500 * attempts);
+        } else {
+            console.log('⚠️ Message not found after retries, trying via polling fallback');
+            // Try polling as fallback
+            fetchGroupAttachments(attachment.group_message_id);
+        }
+    }
+    
+    tryFindAndUpdate();
+}
+
+function fetchGroupAttachments(messageId) {
+    console.log('📎 Fetching attachments for message:', messageId);
+    
+    fetch(`/admin/messages/groups/attachments/message/${messageId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to get attachment URL');
+            return response.json();
+        })
+        .then(attachments => {
+            if (attachments && attachments.length > 0) {
+                console.log('✅ Got attachments:', attachments);
+                updateGroupMessageWithAttachments(messageId, attachments);
+            } else {
+                console.warn('⚠️ No attachments returned for message:', messageId);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error fetching attachment URL:', error);
+        });
+}
+
+function updateGroupMessageWithAttachments(messageId, attachments) {
+    console.log('🔍 Updating group message with attachments:', messageId, attachments);
+    
+    const messageElement = document.querySelector(`[data-msg-id="${messageId}"]`);
+    if (!messageElement) {
+        console.log('⚠️ Message element not found for update:', messageId);
+        return;
+    }
+    
+    const bubble = messageElement.querySelector('.message-bubble');
+    if (!bubble) {
+        console.log('⚠️ No message bubble found');
+        return;
+    }
+    
+    // Remove any existing attachment containers (especially loading ones)
+    const existingAttach = bubble.querySelector('.message-attachment');
+    if (existingAttach) {
+        existingAttach.remove();
+    }
+    
+    // Format attachments for rendering
+    const formattedAttachments = attachments.map(att => ({
+        id: att.id,
+        type: att.attachment_type || 'document',
+        name: att.file_name || 'File',
+        size: att.file_size || 0,
+        url: att.url || null,
+        uploading: false
+    }));
+    
+    // Render attachments
+    const attachmentsHtml = renderAttachments(formattedAttachments, false);
+    if (attachmentsHtml) {
+        // Insert before the time element or at the end
+        const timeElement = bubble.querySelector('.msg-time');
+        if (timeElement) {
+            timeElement.insertAdjacentHTML('beforebegin', attachmentsHtml);
+        } else {
+            bubble.insertAdjacentHTML('beforeend', attachmentsHtml);
+        }
+        console.log('✅ Attachments rendered for message:', messageId);
+    }
+}
+
 // GROUP POLLING FALLBACK
-// ============================================
 let groupPollingInterval = null;
 
 function startGroupPolling(groupId) {
@@ -5513,10 +5964,32 @@ async function checkForNewGroupMessages(groupId) {
                         decryptedContent = await decryptContent(msg.content, msg.sender_type, 'admin');
                     }
                     
+                    // ✅ FETCH ATTACHMENTS for polling too
+                    let attachments = [];
+                    try {
+                        const attachResponse = await fetch(`/admin/messages/groups/attachments/message/${msg.id}`);
+                        if (attachResponse.ok) {
+                            const attachData = await attachResponse.json();
+                            if (attachData && attachData.length > 0) {
+                                attachments = attachData.map(att => ({
+                                    id: att.id,
+                                    type: att.attachment_type || 'document',
+                                    name: att.file_name || 'File',
+                                    size: att.file_size || 0,
+                                    url: att.url || null,
+                                    uploading: false
+                                }));
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch attachments for polled message:', e);
+                    }
+                    
                     const formattedMsg = {
                         ...msg,
                         content: decryptedContent,
-                        time: msg.time || formatTime(new Date(msg.created_at))
+                        time: msg.time || formatTime(new Date(msg.created_at)),
+                        attachments: attachments
                     };
                     
                     appendGroupMessage(formattedMsg);
@@ -5536,9 +6009,15 @@ async function checkForNewGroupMessages(groupId) {
 }
 
 function handleNewGroupMessage(message) {
-    console.log('🔄 Processing new group message:', message);
+    console.log('🔥 handleNewGroupMessage called with:', message);
     
-    // Don't process if message is from current user
+    // 🔥 CRITICAL: Verify the message has the right structure
+    if (!message || !message.id) {
+        console.error('❌ Invalid message payload:', message);
+        return;
+    }
+    
+    // ✅ Don't process if message is from current user
     if (message.sender_id == adminId && message.sender_type === 'admin') {
         console.log('⏭️ Skipping own message');
         return;
@@ -5551,15 +6030,34 @@ function handleNewGroupMessage(message) {
         return;
     }
     
-    console.log('📝 New message from user:', message.sender_id, 'type:', message.sender_type);
-    
-    // Update group list to show unread count (even if not viewing)
-    updateGroupWithNewMessage(message.group_chat_id, message.content, message.created_at);
-    
-    // Only process if we're viewing this group
+    // 🔥 CRITICAL: Check if we're currently viewing this group
     if (!currentChat || currentChat.type !== 'group' || currentChat.id != message.group_chat_id) {
         console.log('⏭️ Not viewing this group, only updating list');
+        // Still update the unread count
+        updateGroupWithNewMessage(message.group_chat_id, message.content, message.created_at);
         return;
+    }
+    
+    console.log('✅ Viewing this group, processing message');
+    
+    // ✅ Get sender name
+    let senderName = 'Unknown';
+    if (message.sender_type === 'alumni') {
+        const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'alumni');
+        if (contact) {
+            senderName = contact.full_name;
+        } else {
+            fetchContactInfoForAvatar(message.sender_id, 'alumni');
+            senderName = 'Alumni #' + message.sender_id;
+        }
+    } else if (message.sender_type === 'admin') {
+        const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'admin');
+        if (contact) {
+            senderName = contact.full_name;
+        } else {
+            fetchContactInfoForAvatar(message.sender_id, 'admin');
+            senderName = 'Admin #' + message.sender_id;
+        }
     }
     
     // Decrypt content
@@ -5567,54 +6065,65 @@ function handleNewGroupMessage(message) {
         .then(decryptedContent => {
             console.log('🔓 Decrypted content:', decryptedContent);
             
-            // Get sender name
-            let senderName = 'Unknown';
-            if (message.sender_type === 'alumni') {
-                const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'alumni');
-                if (contact) {
-                    senderName = contact.full_name;
-                } else {
-                    // Try to fetch contact info
-                    fetchContactInfoForAvatar(message.sender_id, 'alumni');
-                    senderName = 'Alumni #' + message.sender_id;
-                }
-            } else if (message.sender_type === 'admin') {
-                const contact = allContacts.find(c => c.id == message.sender_id && c.type === 'admin');
-                if (contact) {
-                    senderName = contact.full_name;
-                } else {
-                    fetchContactInfoForAvatar(message.sender_id, 'admin');
-                    senderName = 'Admin #' + message.sender_id;
-                }
-            }
-            
             // Fix UTC timestamp
             const utcTimestamp = ensureUTCTimestamp(message.created_at);
             
-            const formattedMessage = {
-                id: message.id,
-                content: decryptedContent,
-                sender_id: message.sender_id,
-                sender_type: message.sender_type,
-                sender_name: senderName,
-                group_chat_id: message.group_chat_id,
-                created_at: utcTimestamp,
-                time: formatTime(new Date(utcTimestamp)),
-                attachments: []
-            };
-            
-            console.log('📤 Appending group message:', formattedMessage);
-            appendGroupMessage(formattedMessage);
-            scrollToBottom();
-            
-            // Mark as read
-            markGroupMessagesAsRead(message.group_chat_id);
-            
-            // Update group list with the new message
-            updateGroupWithNewMessage(message.group_chat_id, decryptedContent, utcTimestamp);
+            // Fetch attachments
+            return fetchAttachmentsForMessage(message.id).then(attachments => {
+                const formattedMessage = {
+                    id: message.id,
+                    content: decryptedContent,
+                    sender_id: message.sender_id,
+                    sender_type: message.sender_type,
+                    sender_name: senderName,
+                    group_chat_id: message.group_chat_id,
+                    created_at: utcTimestamp,
+                    time: formatTime(new Date(utcTimestamp)),
+                    attachments: attachments
+                };
+                
+                console.log('📤 Appending group message with attachments:', formattedMessage);
+                console.log('📎 Attachments count:', attachments.length);
+                
+                appendGroupMessage(formattedMessage);
+                scrollToBottom();
+                
+                // Mark as read
+                markGroupMessagesAsRead(message.group_chat_id);
+                
+                // Update group list with the new message
+                updateGroupWithNewMessage(message.group_chat_id, decryptedContent, utcTimestamp);
+            });
         })
         .catch(error => {
             console.error('❌ Error processing group message:', error);
+        });
+}
+// Helper function to fetch attachments for a message
+function fetchAttachmentsForMessage(messageId) {
+    console.log('📎 fetchAttachmentsForMessage called for:', messageId);
+    return fetch(`/admin/messages/groups/attachments/message/${messageId}`)
+        .then(response => {
+            if (response.ok) return response.json();
+            return [];
+        })
+        .then(attachData => {
+            console.log('📎 Attachments for message:', attachData);
+            if (attachData && attachData.length > 0) {
+                return attachData.map(att => ({
+                    id: att.id,
+                    type: att.attachment_type || 'document',
+                    name: att.file_name || 'File',
+                    size: att.file_size || 0,
+                    url: att.url || null,
+                    uploading: false
+                }));
+            }
+            return [];
+        })
+        .catch(error => {
+            console.error('❌ Error fetching attachments:', error);
+            return [];
         });
 }
 

@@ -478,7 +478,7 @@ public function getMessages($type, $id, Request $request)
                     'receiver_type' => $message->receiver_type,
                     'is_read' => $message->is_read,
                     'created_at' => $message->created_at->toISOString(),
-                    'time' => $message->created_at->format('g:i A'),
+                    // ✅ REMOVE the 'time' field - let JavaScript handle formatting
                     'attachments' => $attachmentsData,
                 ];
             });
@@ -501,55 +501,55 @@ public function getMessages($type, $id, Request $request)
     }
 }
 
-    public function sendMessage(Request $request)
-    {
-        $request->validate([
-            'receiver_id' => 'required|integer',
-            'receiver_type' => 'required|in:alumni,admin',
-            'content' => 'required|string|max:5000',
-        ]);
-        
-        $adminId = $this->getAdminId();
-        
-        if (!$adminId) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-        
-        if ($request->receiver_type === 'alumni') {
-            $exists = Alumni::where('id', $request->receiver_id)->exists();
-        } else {
-            $exists = Admin::where('id', $request->receiver_id)->exists();
-        }
-        
-        if (!$exists) {
-            return response()->json(['error' => 'Receiver not found'], 404);
-        }
-        
-        $message = Message::create([
-            'sender_id' => $adminId,
-            'receiver_id' => $request->receiver_id,
-            'sender_type' => 'admin',
-            'receiver_type' => $request->receiver_type,
-            'content' => $request->content,
-            'is_read' => false,
-        ]);
-        
-        // 🔧 FIX: Return the ISO 8601 UTC string, let JavaScript convert to local time
-        return response()->json([
-            'success' => true,
-            'message' => [
-                'id' => $message->id,
-                'content' => $request->content,
-                'sender_id' => $adminId,
-                'sender_type' => 'admin',
-                'receiver_id' => $message->receiver_id,
-                'receiver_type' => $message->receiver_type,
-                'is_read' => false,
-                'created_at' => $message->created_at->toISOString(), // 🔧 Always UTC ISO string
-                'time' => $message->created_at->format('g:i A'), // This will be overridden by JS anyway
-            ]
-        ]);
+public function sendMessage(Request $request)
+{
+    $request->validate([
+        'receiver_id' => 'required|integer',
+        'receiver_type' => 'required|in:alumni,admin',
+        'content' => 'required|string|max:5000',
+    ]);
+    
+    $adminId = $this->getAdminId();
+    
+    if (!$adminId) {
+        return response()->json(['error' => 'Unauthorized'], 401);
     }
+    
+    if ($request->receiver_type === 'alumni') {
+        $exists = Alumni::where('id', $request->receiver_id)->exists();
+    } else {
+        $exists = Admin::where('id', $request->receiver_id)->exists();
+    }
+    
+    if (!$exists) {
+        return response()->json(['error' => 'Receiver not found'], 404);
+    }
+    
+    $message = Message::create([
+        'sender_id' => $adminId,
+        'receiver_id' => $request->receiver_id,
+        'sender_type' => 'admin',
+        'receiver_type' => $request->receiver_type,
+        'content' => $request->content,
+        'is_read' => false,
+    ]);
+    
+    // ✅ Return only the ISO 8601 UTC string, let JavaScript format it
+    return response()->json([
+        'success' => true,
+        'message' => [
+            'id' => $message->id,
+            'content' => $request->content,
+            'sender_id' => $adminId,
+            'sender_type' => 'admin',
+            'receiver_id' => $message->receiver_id,
+            'receiver_type' => $message->receiver_type,
+            'is_read' => false,
+            'created_at' => $message->created_at->toISOString(),
+            // ✅ REMOVE the 'time' field
+        ]
+    ]);
+}
 
     public function searchAlumni(Request $request)
     {
@@ -1063,7 +1063,7 @@ public function getMessages($type, $id, Request $request)
                 'receiver_id' => $message->receiver_id,
                 'receiver_type' => $message->receiver_type,
                 'is_read' => false,
-                'created_at' => $message->created_at->toISOString(),
+                'created_at' => $message->created_at->toISOString(), // ✅ Make sure this is here
                 'attachments' => $attachments,
             ]
         ]);

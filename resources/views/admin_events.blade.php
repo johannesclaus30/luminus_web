@@ -355,17 +355,10 @@
                                             <span>{{ $registeredCount }}/{{ $maxCapacity }} registered</span>
                                         @endif
                                     </div>
-                                    {{-- <div class="analytics-item">
-                                        <i class="fa-regular fa-calendar"></i>
-                                        <span>{{ $event->start_date ? $event->start_date->format('M d') : 'TBA' }}</span>
-                                    </div> --}}
                                 </div>
 
                                 <div class="event-actions">
-                                    {{-- Manage Event Registrations Button --}}
-                                    <a href="{{ route('events.registrations', $event) }}" class="btn-action btn-manage" title="Manage Registrations">
-                                        <i class="fa-solid fa-users-gear"></i>
-                                    </a>
+                                    
                                     @if ((int) $event->status === 1 || is_null($event->status))
                                         {{-- Active: Show Edit + Archive --}}
                                         <a href="{{ route('events.edit', $event) }}" class="btn-action btn-edit" title="Edit Event">
@@ -381,6 +374,10 @@
                                                 <i class="fa-solid fa-box-archive"></i>
                                             </button>
                                         </form>
+                                        {{-- Manage Event Registrations Button --}}
+                                        <a href="{{ route('events.registrations', $event) }}" class="btn-action btn-manage" title="Manage Registrations">
+                                            <i class="fa-solid fa-users-gear"></i>
+                                        </a>
                                     @else
                                         {{-- Archived: Show Restore + Permanent Delete --}}
                                         <form action="{{ route('events.restore', $event) }}" 

@@ -330,6 +330,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/messages/groups/{groupId}/messages', [GroupChatController::class, 'getMessages'])->name('messages.groups.messages');
         Route::post('/messages/groups/{groupId}/send', [GroupChatController::class, 'sendMessage'])->name('messages.groups.send');
         Route::post('/messages/groups/{groupId}/send-attachments', [GroupChatController::class, 'sendWithAttachments'])->name('messages.groups.send-attachments');
+        // Get attachments for a specific group message
+        Route::get('/messages/groups/attachments/message/{messageId}', [GroupChatController::class, 'getGroupMessageAttachments']);
 
         // Group Management
         Route::put('/messages/groups/{groupId}', [GroupChatController::class, 'updateGroup'])->name('messages.groups.update');
