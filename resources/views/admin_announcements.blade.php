@@ -213,7 +213,7 @@
                                     <span>{{ (int) $announcement->status === 0 ? 'Archived' : 'Active' }}</span>
                                 </div>
                                 
-                                @if ($announcement->scheduled_post_at && $announcement->scheduled_post_at->timestamp > now()->timestamp && (int) $announcement->status !== 0)
+                                @if ($announcement->scheduled_at && $announcement->scheduled_at->timestamp > now()->timestamp && (int) $announcement->status !== 0)
                                     <div class="announcement-scheduled-badge">
                                         <i class="fa-regular fa-clock"></i>
                                         <span>Scheduled</span>
@@ -231,14 +231,14 @@
                                 <!-- Date Meta -->
                                 <div class="announcement-dates">
                                     @php
-                                        $hasScheduled = $announcement->scheduled_post_at !== null;
-                                        $isScheduledFuture = $hasScheduled && $announcement->scheduled_post_at->timestamp > now()->timestamp;
+                                        $hasScheduled = $announcement->scheduled_at !== null;
+                                        $isScheduledFuture = $hasScheduled && $announcement->scheduled_at->timestamp > now()->timestamp;
                                         $isPublished = $hasScheduled && !$isScheduledFuture;
                                         
                                         // Determine which date to show
                                         if ($isPublished) {
                                             // Was scheduled, now published - show scheduled date as published date
-                                            $displayDate = $announcement->scheduled_post_at;
+                                            $displayDate = $announcement->scheduled_at;
                                             $dateLabel = 'Published';
                                         } elseif (!$hasScheduled) {
                                             // Never scheduled - show date_posted as published
@@ -250,18 +250,18 @@
                                             $dateLabel = 'Posted';
                                         }
                                     @endphp
-                                    
+
                                     <div class="date-item">
                                         <i class="fa-regular fa-calendar"></i>
                                         <span>{{ $dateLabel }}: {{ $displayDate->format('M d, Y') }}</span>
                                     </div>
-                                    
+
                                     {{-- Show countdown ONLY if scheduled for the future --}}
                                     @if ($isScheduledFuture)
                                         <div class="date-item scheduled" 
                                             id="countdown-{{ $announcement->id }}" 
-                                            data-target-utc="{{ $announcement->scheduled_post_at->toIso8601String() }}"
-                                            data-published-date="{{ $announcement->scheduled_post_at->format('M d, Y \a\t h:i A') }}">
+                                            data-target-utc="{{ $announcement->scheduled_at->toIso8601String() }}"
+                                            data-published-date="{{ $announcement->scheduled_at->format('M d, Y \a\t h:i A') }}">
                                             <i class="fa-solid fa-hourglass-half"></i>
                                             <span>Posts in: <span class="countdown-text" style="font-weight: 600;">Loading...</span></span>
                                         </div>

@@ -6609,7 +6609,7 @@ function renderGroupMembers(members) {
             badgeHtml += `<span class="badge group-admin"><i class="fa-solid fa-user-tie" style="font-size: 0.45rem;"></i> Group Admin</span>`;
         }
         
-        // Avatar background color based on user type
+        // Avatar background color based on user type from the server
         const avatarBg = member.user_type === 'admin' 
             ? 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))'
             : 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
@@ -6641,20 +6641,17 @@ function renderGroupMembers(members) {
                     <div class="member-actions" style="display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.2s ease;">
                         ${isGroupAdmin ? `
                             <button onclick="updateMemberRole(${member.id}, 'alumni')" 
-                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
-                                title="Remove group admin permissions">
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;">
                                 <i class="fa-solid fa-user"></i> Demote
                             </button>
                         ` : `
                             <button onclick="updateMemberRole(${member.id}, 'admin')" 
-                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
-                                title="Give group admin permissions">
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;">
                                 <i class="fa-solid fa-crown"></i> Promote
                             </button>
                         `}
                         <button onclick="removeGroupMember(${member.id})" 
-                            style="background: none; border: 1px solid var(--danger); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--danger); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
-                            title="Remove Member">
+                            style="background: none; border: 1px solid var(--danger); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--danger); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;">
                             <i class="fa-solid fa-xmark"></i> Remove
                         </button>
                     </div>
@@ -6663,7 +6660,7 @@ function renderGroupMembers(members) {
         `;
     }).join('');
     
-    // Add hover effect via CSS since we can't use :hover with inline styles
+    // Add hover effect
     container.querySelectorAll('.group-member-item').forEach(item => {
         item.addEventListener('mouseenter', function() {
             const actions = this.querySelector('.member-actions');
@@ -6961,8 +6958,8 @@ function searchAlumniForGroup() {
                     </div>
                     ${a.is_online ? '<span class="online-dot" title="Online"></span>' : ''}
                 </div>
-            `).join('');        
-                        
+            `).join('');
+                    
         } catch (error) {
             console.error('Error searching:', error);
             resultsContainer.innerHTML = '<p style="color: var(--danger); text-align: center;">Error searching. Please try again.</p>';

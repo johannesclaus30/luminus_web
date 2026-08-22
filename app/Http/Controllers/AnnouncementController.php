@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon; 
 
 class AnnouncementController extends Controller
 {
@@ -21,43 +22,43 @@ class AnnouncementController extends Controller
         // Get counts using UTC for consistency
         $nowUtc = now()->utc();
         
-        $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
+        $totalAnnouncements = Announcement::where('status', 1)->count();
         
-        $activeAnnouncements = \App\Models\Announcement::where('status', 1)
+        $activeAnnouncements = Announcement::where('status', 1)
             ->where(function($q) use ($nowUtc) {
-                $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', $nowUtc);
+                $q->whereNull('scheduled_at') // Changed from scheduled_post_at
+                ->orWhere('scheduled_at', '<=', $nowUtc);
             })
             ->count();
             
-        $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
+        $archivedAnnouncements = Announcement::where('status', 0)->count();
         
-        $scheduledAnnouncements = \App\Models\Announcement::where('status', 1)
-            ->whereNotNull('scheduled_post_at')
-            ->where('scheduled_post_at', '>', $nowUtc)
+        $scheduledAnnouncements = Announcement::where('status', 1)
+            ->whereNotNull('scheduled_at') // Changed from scheduled_post_at
+            ->where('scheduled_at', '>', $nowUtc)
             ->count();
         
         // Build query based on filter
-        $query = \App\Models\Announcement::where('status', 1);
+        $query = Announcement::where('status', 1);
         
         if ($filter === 'active') {
             $query->where(function($q) use ($nowUtc) {
-                $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', $nowUtc);
+                $q->whereNull('scheduled_at')
+                ->orWhere('scheduled_at', '<=', $nowUtc);
             });
         } elseif ($filter === 'scheduled') {
-            $query->whereNotNull('scheduled_post_at')
-                ->where('scheduled_post_at', '>', $nowUtc);
+            $query->whereNotNull('scheduled_at')
+                ->where('scheduled_at', '>', $nowUtc);
         }
         
         $announcements = $query->orderByRaw('
             CASE 
-                WHEN scheduled_post_at IS NULL OR scheduled_post_at <= NOW() THEN 0
+                WHEN scheduled_at IS NULL OR scheduled_at <= NOW() THEN 0
                 ELSE 1
             END,
             CASE 
-                WHEN scheduled_post_at IS NULL OR scheduled_post_at <= NOW() THEN COALESCE(date_posted, created_at)
-                ELSE scheduled_post_at
+                WHEN scheduled_at IS NULL OR scheduled_at <= NOW() THEN COALESCE(date_posted, created_at)
+                ELSE scheduled_at
             END DESC
         ')->paginate(6);
         
@@ -77,20 +78,20 @@ class AnnouncementController extends Controller
         
         $nowUtc = now()->utc();
         
-        $totalAnnouncements = \App\Models\Announcement::where('status', 1)->count();
-        $activeAnnouncements = \App\Models\Announcement::where('status', 1)
+        $totalAnnouncements = Announcement::where('status', 1)->count();
+        $activeAnnouncements = Announcement::where('status', 1)
             ->where(function($q) use ($nowUtc) {
-                $q->whereNull('scheduled_post_at')
-                ->orWhere('scheduled_post_at', '<=', $nowUtc);
+                $q->whereNull('scheduled_at')
+                ->orWhere('scheduled_at', '<=', $nowUtc);
             })
             ->count();
-        $archivedAnnouncements = \App\Models\Announcement::where('status', 0)->count();
-        $scheduledAnnouncements = \App\Models\Announcement::whereNotNull('scheduled_post_at')
-            ->where('scheduled_post_at', '>', $nowUtc)
+        $archivedAnnouncements = Announcement::where('status', 0)->count();
+        $scheduledAnnouncements = Announcement::whereNotNull('scheduled_at')
+            ->where('scheduled_at', '>', $nowUtc)
             ->where('status', 1)
             ->count();
         
-        $announcements = \App\Models\Announcement::where('status', 0)
+        $announcements = Announcement::where('status', 0)
             ->orderBy('date_posted', 'desc')
             ->paginate(6);
         
@@ -114,7 +115,7 @@ class AnnouncementController extends Controller
         $rules = [
             'title' => 'required|string|max:255',
             'announcement_description' => 'required|string',
-            'scheduled_post_at' => 'nullable|date', // Removed 'after:now'
+            'scheduled_at' => 'nullable|date', // Changed from scheduled_post_at
             'images' => 'nullable|array|max:5',
             'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . (self::MAX_IMAGE_SIZE_MB * 1024),
             'video' => 'nullable|file|mimetypes:video/mp4|max:' . (self::MAX_VIDEO_SIZE_MB * 1024),
@@ -132,14 +133,18 @@ class AnnouncementController extends Controller
         $adminId = $request->session()->get('admin_id');
         if (!$adminId) abort(403);
 
+        // Parse the scheduled_at in Asia/Manila timezone and convert to UTC
+        $scheduledAt = null;
+        if ($request->scheduled_at) {
+            $scheduledAt = Carbon::parse($request->scheduled_at, 'Asia/Manila')->setTimezone('UTC');
+        }
+
         $announcement = Announcement::create([
             'admin_id' => $adminId,
             'title' => $request->title,
             'announcement_description' => $request->announcement_description,
             'date_posted' => now(),
-            'scheduled_post_at' => $request->scheduled_post_at 
-            ? \Carbon\Carbon::parse($request->scheduled_post_at, 'Asia/Manila')->setTimezone('UTC')
-            : null,
+            'scheduled_at' => $scheduledAt, // Changed from scheduled_post_at
             'status' => 1,
         ]);
 
@@ -173,7 +178,7 @@ class AnnouncementController extends Controller
         $rules = [
             'title' => 'required|string|max:255',
             'announcement_description' => 'required|string',
-            'scheduled_post_at' => 'nullable|date', // Removed 'after:now'
+            'scheduled_at' => 'nullable|date', // Changed from scheduled_post_at
             'deleted_media' => 'nullable|array',
             'images' => 'nullable|array|max:5',
             'images.*' => 'image|mimes:jpg,jpeg,png,webp|max:' . (self::MAX_IMAGE_SIZE_MB * 1024),
@@ -230,12 +235,16 @@ class AnnouncementController extends Controller
             $announcement->images()->create(['image_path' => $path]);
         }
 
+        // Parse the scheduled_at in Asia/Manila timezone and convert to UTC
+        $scheduledAt = null;
+        if ($request->scheduled_at) {
+            $scheduledAt = Carbon::parse($request->scheduled_at, 'Asia/Manila')->setTimezone('UTC');
+        }
+
         $announcement->update([
             'title' => $request->title,
             'announcement_description' => $request->announcement_description,
-            'scheduled_post_at' => $request->scheduled_post_at 
-            ? \Carbon\Carbon::parse($request->scheduled_post_at, 'Asia/Manila')->setTimezone('UTC')
-            : null,
+            'scheduled_at' => $scheduledAt, // Changed from scheduled_post_at
         ]);
 
         return redirect()->route('announcements.index')->with('success', 'Announcement updated successfully!');

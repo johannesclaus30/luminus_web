@@ -117,10 +117,10 @@
                     <label for="announcement_description" class="form-label">Description</label>
                     <textarea id="announcement_description" name="announcement_description" class="form-control" required>{{ old('announcement_description', $announcement->announcement_description) }}</textarea>
                 </div>
-
+                
                 <div class="form-group">
-                    <label for="scheduled_post_at" class="form-label">Schedule Post (Optional)</label>
-                    <input type="datetime-local" id="scheduled_post_at" name="scheduled_post_at" class="form-control" value="{{ old('scheduled_post_at', optional($announcement->scheduled_post_at)->format('Y-m-d\TH:i')) }}">
+                    <label for="scheduled_at" class="form-label">Schedule Post (Optional)</label>
+                    <input type="datetime-local" id="scheduled_at" name="scheduled_at" class="form-control" value="{{ old('scheduled_at', optional($announcement->scheduled_at)->format('Y-m-d\TH:i')) }}">
                     <small style="color: var(--gray-500); font-size: 0.8125rem;">Leave blank to keep this announcement unscheduled.</small>
                 </div>
 
@@ -624,3 +624,5 @@
     </script>
 </body>
 </html>
+
+{{-- This is the edit.blade.php file for editing announcements --}}

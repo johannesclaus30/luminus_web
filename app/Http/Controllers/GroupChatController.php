@@ -87,26 +87,28 @@ public function getGroups(Request $request)
 
             $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
 
-            // ✅ FIX: Use created_by_type from the group table
-            $creatorType = $group->created_by_type ?? 'admin';
-            $creatorName = 'Unknown';
-
-            if ($creatorType === 'admin') {
-                $creatorAdmin = Admin::find($group->created_by);
-                if ($creatorAdmin) {
-                    $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
-                } else {
-                    $creatorAlumni = Alumni::find($group->created_by);
-                    if ($creatorAlumni) {
-                        $creatorName = $this->getAlumniFullName($creatorAlumni);
-                    }
-                }
-            } else {
-                $creatorAlumni = Alumni::find($group->created_by);
-                if ($creatorAlumni) {
-                    $creatorName = $this->getAlumniFullName($creatorAlumni);
-                }
-            }
+// ✅ FIX: Use auto-detection for creator
+$creatorInfo = $this->getUserInfoWithAutoDetect($group->created_by);
+if ($creatorInfo) {
+    $creatorType = $creatorInfo['user_type'];
+    $creatorName = $creatorInfo['full_name'];
+} else {
+    // Fallback: use stored type
+    $creatorType = $group->created_by_type ?? 'admin';
+    $creatorName = 'Unknown';
+    
+    if ($creatorType === 'admin') {
+        $creatorAdmin = Admin::find($group->created_by);
+        if ($creatorAdmin) {
+            $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
+        }
+    } else {
+        $creatorAlumni = Alumni::find($group->created_by);
+        if ($creatorAlumni) {
+            $creatorName = $this->getAlumniFullName($creatorAlumni);
+        }
+    }
+}
 
             $unreadCount = GroupMessage::where('group_chat_id', $group->id)
                 ->where('sender_id', '!=', $adminId)
@@ -194,27 +196,29 @@ public function createGroup(Request $request)
                 continue;
             }
             
-            // ✅ Check if this is a system admin
+            // ✅ IMPROVED: Check if this is a system admin by looking in admins table
             $admin = Admin::find($memberId);
             if ($admin) {
                 Log::info("Member {$memberId} is a system admin");
                 $validMembers[] = [
                     'id' => $memberId,
-                    'user_type' => 'admin',  // ✅ Set to 'admin'
+                    'user_type' => 'admin',  // ✅ FORCE 'admin'
                     'role' => 'admin'        // Group admin permissions
                 ];
                 continue;
             }
             
-            // Check if alumni exists
+            // Then check if alumni exists
             $alumni = Alumni::find($memberId);
             if ($alumni) {
                 Log::info("Member {$memberId} is an alumni");
                 $validMembers[] = [
                     'id' => $memberId,
-                    'user_type' => 'alumni', // ✅ Set to 'alumni'
+                    'user_type' => 'alumni', // ✅ FORCE 'alumni'
                     'role' => 'alumni'       // No permissions
                 ];
+            } else {
+                Log::warning("Member {$memberId} not found in admins or alumnis table");
             }
         }
 
@@ -222,7 +226,7 @@ public function createGroup(Request $request)
         $group = GroupChat::create([
             'name' => $request->name,
             'created_by' => $adminId,
-            'created_by_type' => $adminType, // ✅ 'admin'
+            'created_by_type' => $adminType, // 'admin'
             'avatar_url' => null,
         ]);
 
@@ -243,7 +247,6 @@ public function createGroup(Request $request)
         }
 
         // ✅ ADD CREATOR AS MEMBER with correct type
-        // IMPORTANT: The creator is a system admin, so member_type should be 'admin'
         GroupChatMember::create([
             'group_chat_id' => $group->id,
             'alumni_id' => $adminId,
@@ -253,8 +256,9 @@ public function createGroup(Request $request)
             'muted' => false,
         ]);
 
-        // Get creator name
-        $creatorName = $adminInfo['name'];
+        // Get creator name - always admin since only admins can create groups
+        $creatorInfo = $this->getUserInfoWithAutoDetect($adminId);
+        $creatorName = $creatorInfo ? $creatorInfo['full_name'] : $adminInfo['name'];
 
         // ✅ ADD OTHER MEMBERS with correct member_type
         foreach ($validMembers as $member) {
@@ -275,6 +279,12 @@ public function createGroup(Request $request)
         // Verify the members were added correctly
         $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
         Log::info("Group {$group->id} has {$memberCount} members");
+
+        // Log all members for debugging
+        $allMembers = GroupChatMember::where('group_chat_id', $group->id)->get();
+        foreach ($allMembers as $m) {
+            Log::info("Group {$group->id} member: alumni_id={$m->alumni_id}, member_type={$m->member_type}, role={$m->role}");
+        }
 
         $avatarUrl = $group->avatar_url ? $this->getGroupAvatarUrl($group->avatar_url) : null;
 
@@ -302,6 +312,88 @@ public function createGroup(Request $request)
             'error' => 'Failed to create channel: ' . $e->getMessage()
         ], 500);
     }
+}
+
+/**
+ * Determine if a user is an admin or alumni by checking the database tables
+ */
+private function getUserType($userId)
+{
+    // First check if it's an admin
+    $admin = Admin::find($userId);
+    if ($admin) {
+        return 'admin';
+    }
+    
+    // Then check if it's an alumni
+    $alumni = Alumni::find($userId);
+    if ($alumni) {
+        return 'alumni';
+    }
+    
+    return null; // User not found
+}
+
+/**
+ * Get user info (name, initials, avatar) by ID and type
+ */
+private function getUserInfo($userId, $userType)
+{
+    if ($userType === 'admin') {
+        $admin = Admin::find($userId);
+        if ($admin) {
+            return [
+                'full_name' => trim($admin->admin_first_name . ' ' . $admin->admin_last_name),
+                'initials' => strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1)),
+                'avatar' => $this->resolveAdminPhotoUrl($admin->photo),
+                'is_online' => true,
+            ];
+        }
+    } elseif ($userType === 'alumni') {
+        $alumni = Alumni::find($userId);
+        if ($alumni) {
+            return [
+                'full_name' => $this->getAlumniFullName($alumni),
+                'initials' => $this->getAlumniInitials($alumni),
+                'avatar' => $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null,
+                'is_online' => $alumni->is_online ?? false,
+            ];
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Get user info with automatic type detection (doesn't rely on stored member_type)
+ */
+private function getUserInfoWithAutoDetect($userId)
+{
+    // First check if it's an admin
+    $admin = Admin::find($userId);
+    if ($admin) {
+        return [
+            'full_name' => trim($admin->admin_first_name . ' ' . $admin->admin_last_name),
+            'initials' => strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1)),
+            'avatar' => $this->resolveAdminPhotoUrl($admin->photo),
+            'is_online' => true,
+            'user_type' => 'admin',
+        ];
+    }
+    
+    // Then check if it's an alumni
+    $alumni = Alumni::find($userId);
+    if ($alumni) {
+        return [
+            'full_name' => $this->getAlumniFullName($alumni),
+            'initials' => $this->getAlumniInitials($alumni),
+            'avatar' => $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null,
+            'is_online' => $alumni->is_online ?? false,
+            'user_type' => 'alumni',
+        ];
+    }
+    
+    return null;
 }
 
 public function getGroupInfo($groupId)
@@ -335,80 +427,75 @@ public function getGroupInfo($groupId)
             ->where('alumni_id', $adminId)
             ->first();
 
-        // ✅ FIX: Use created_by_type from the group table
-        $creatorType = $group->created_by_type ?? 'admin';
-        $creatorName = 'Unknown';
-        $creatorIsSystemAdmin = false;
-
-        if ($creatorType === 'admin') {
-            $creatorAdmin = Admin::find($group->created_by);
-            if ($creatorAdmin) {
-                $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
-                $creatorIsSystemAdmin = true;
+        // ✅ FIX: Get creator info with auto-detection
+        $creatorInfo = $this->getUserInfoWithAutoDetect($group->created_by);
+        if ($creatorInfo) {
+            $creatorType = $creatorInfo['user_type'];
+            $creatorName = $creatorInfo['full_name'];
+            $creatorIsSystemAdmin = ($creatorType === 'admin');
+        } else {
+            // Fallback: use stored type
+            $creatorType = $group->created_by_type ?? 'admin';
+            $creatorName = 'Unknown';
+            $creatorIsSystemAdmin = false;
+            
+            if ($creatorType === 'admin') {
+                $creatorAdmin = Admin::find($group->created_by);
+                if ($creatorAdmin) {
+                    $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
+                    $creatorIsSystemAdmin = true;
+                }
             } else {
-                // Fallback: try as alumni
                 $creatorAlumni = Alumni::find($group->created_by);
                 if ($creatorAlumni) {
                     $creatorName = $this->getAlumniFullName($creatorAlumni);
                 }
             }
-        } else {
-            $creatorAlumni = Alumni::find($group->created_by);
-            if ($creatorAlumni) {
-                $creatorName = $this->getAlumniFullName($creatorAlumni);
-            }
         }
 
         $members = [];
         foreach ($group->members as $member) {
-            $fullName = 'Unknown';
-            $initials = '??';
-            $avatar = null;
-            $isOnline = false;
-            $isSystemAdmin = false;
-            $isGroupAdmin = false;
+            $userId = $member->alumni_id;
             
-            // ✅ CRITICAL: Check member_type to determine which table to query
-            if ($member->member_type === 'admin') {
-                // This is a system admin
-                $isSystemAdmin = true;
-                $admin = Admin::find($member->alumni_id);
-                if ($admin) {
-                    $fullName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
-                    $initials = strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1));
-                    $avatar = $this->resolveAdminPhotoUrl($admin->photo);
-                    $isOnline = true;
-                } else {
-                    // If admin not found, try as alumni (fallback)
-                    $alumni = Alumni::find($member->alumni_id);
-                    if ($alumni) {
-                        $fullName = $this->getAlumniFullName($alumni);
-                        $initials = $this->getAlumniInitials($alumni);
-                        $avatar = $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null;
-                        $isOnline = $alumni->is_online ?? false;
+            // ✅ FIX: Use auto-detection instead of relying on stored member_type
+            $userInfo = $this->getUserInfoWithAutoDetect($userId);
+            
+            if ($userInfo) {
+                $userType = $userInfo['user_type'];
+                $fullName = $userInfo['full_name'];
+                $initials = $userInfo['initials'];
+                $avatar = $userInfo['avatar'];
+                $isOnline = $userInfo['is_online'];
+                $isSystemAdmin = ($userType === 'admin');
+                
+                // ✅ FIX: If the stored member_type is wrong, update it
+                if ($member->member_type !== $userType) {
+                    $oldType = $member->member_type;
+                    $member->member_type = $userType;
+                    // If it's an admin, also set role to admin
+                    if ($userType === 'admin') {
+                        $member->role = 'admin';
                     }
+                    $member->save();
+                    Log::info("✅ Fixed member_type for user {$userId} from '{$oldType}' to '{$userType}'");
                 }
             } else {
-                // This is a regular alumni
+                // User not found - use stored type as fallback
+                $userType = $member->member_type;
+                $fullName = 'Unknown User';
+                $initials = '??';
+                $avatar = null;
+                $isOnline = false;
                 $isSystemAdmin = false;
-                $alumni = Alumni::find($member->alumni_id);
-                if ($alumni) {
-                    $fullName = $this->getAlumniFullName($alumni);
-                    $initials = $this->getAlumniInitials($alumni);
-                    $avatar = $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null;
-                    $isOnline = $alumni->is_online ?? false;
-                }
+                Log::warning("⚠️ User {$userId} not found in admins or alumnis table");
             }
             
-            // Check if this member has group admin role
             $isGroupAdmin = ($member->role === 'admin');
-            
-            // ✅ Check if this member is the creator
-            $isCreator = ($group->created_by == $member->alumni_id);
+            $isCreator = ($group->created_by == $userId);
             
             $members[] = [
-                'id' => (int)$member->alumni_id,
-                'user_type' => $member->member_type,
+                'id' => (int)$userId,
+                'user_type' => $userType,
                 'full_name' => $fullName,
                 'initials' => $initials,
                 'role' => $member->role,
@@ -446,9 +533,9 @@ public function getGroupInfo($groupId)
             'is_archived' => $memberSetting ? (bool)$memberSetting->archived : false,
             'is_muted' => $memberSetting ? (bool)$memberSetting->muted : false,
             'created_by' => $group->created_by,
-            'created_by_type' => $group->created_by_type ?? 'admin',
+            'created_by_type' => $creatorType,
             'created_by_name' => $creatorName,
-            'created_by_is_system_admin' => $creatorIsSystemAdmin,
+            'created_by_is_system_admin' => $creatorIsSystemAdmin ?? false,
         ]);
 
     } catch (\Exception $e) {

@@ -3,34 +3,42 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Carbon\Carbon;
 
 class Announcement extends Model
 {
-    protected $table = 'announcements';
-
     protected $fillable = [
         'admin_id',
         'title',
         'announcement_description',
         'date_posted',
-        'scheduled_post_at',
+        'scheduled_at', // Changed from scheduled_post_at
         'status',
+        'scheduled_at' // Also ensure this is in fillable
     ];
 
     protected $casts = [
-        'admin_id' => 'integer',
-        'status' => 'integer',
+        'scheduled_at' => 'datetime',
         'date_posted' => 'datetime',
-        'scheduled_post_at' => 'datetime',
+        'scheduled_at' => 'datetime:Y-m-d H:i:s', // Ensure proper format
     ];
 
-    public function images()
+    // If you need to maintain backward compatibility temporarily
+    public function getScheduledPostAtAttribute($value)
     {
-        return $this->hasMany(ImagesAnnouncement::class, 'announcement_id', 'id');
+        // If scheduled_post_at is still in the database, use it as fallback
+        if ($value !== null) {
+            return Carbon::parse($value);
+        }
+        
+        // Otherwise use scheduled_at
+        return $this->scheduled_at;
     }
 
-    public function admin()
+    // Relationship with images
+    public function images(): HasMany
     {
-        return $this->belongsTo(Admin::class, 'admin_id', 'id');
+        return $this->hasMany(ImagesAnnouncement::class);
     }
 }

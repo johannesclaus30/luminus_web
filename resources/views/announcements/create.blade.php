@@ -116,8 +116,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="scheduled_post_at" class="form-label">Schedule Post (Optional)</label>
-                    <input type="datetime-local" id="scheduled_post_at" name="scheduled_post_at" class="form-control" value="{{ old('scheduled_post_at') }}">
+                    <label for="scheduled_at" class="form-label">Schedule Post (Optional)</label>
+                    <input type="datetime-local" id="scheduled_at" name="scheduled_at" class="form-control" value="{{ old('scheduled_at') }}">
                     <small style="color: var(--gray-500); font-size: 0.8125rem;">Leave blank to post immediately.</small>
                 </div>
 
@@ -490,3 +490,5 @@
     </script>
 </body>
 </html>
+
+{{-- This is the create.blade.php file for creating announcements --}}
