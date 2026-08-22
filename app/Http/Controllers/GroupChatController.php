@@ -24,349 +24,362 @@ class GroupChatController extends Controller
         $this->cryptoSecretKey = env('MESSAGE_SECRET_KEY', 'LumiNUs_Chat_Sec_' . Str::random(32));
     }
 
-    public function getGroups(Request $request)
-    {
-        try {
-            $adminId = $this->getAdminId();
-            
-            if (!$adminId) {
-                Log::error('getGroups: No admin ID found in session');
-                return response()->json([]);
-            }
+public function getGroups(Request $request)
+{
+    try {
+        $adminInfo = $this->getCurrentAdminInfo();
+        
+        if (!$adminInfo) {
+            Log::error('getGroups: No admin info found');
+            return response()->json([]);
+        }
 
-            $showArchived = $request->get('archived', '0') === '1';
-            Log::info('getGroups: Admin ID = ' . $adminId . ', showArchived = ' . ($showArchived ? 'true' : 'false'));
+        $adminId = $adminInfo['id'];
+        $showArchived = $request->get('archived', '0') === '1';
+        Log::info('getGroups: Admin ID = ' . $adminId . ', showArchived = ' . ($showArchived ? 'true' : 'false'));
 
-            // Get groups where admin is a member
-            $memberGroups = GroupChatMember::where('alumni_id', $adminId)
-                ->pluck('group_chat_id')
-                ->toArray();
-            
-            Log::info('getGroups: Found ' . count($memberGroups) . ' member group IDs');
+        $memberGroups = GroupChatMember::where('alumni_id', $adminId)
+            ->pluck('group_chat_id')
+            ->toArray();
+        
+        Log::info('getGroups: Found ' . count($memberGroups) . ' member group IDs');
 
-            if (empty($memberGroups)) {
-                Log::info('getGroups: No groups found, returning empty array');
-                return response()->json([]);
-            }
+        if (empty($memberGroups)) {
+            Log::info('getGroups: No groups found, returning empty array');
+            return response()->json([]);
+        }
 
-            // Fetch groups
-            $groups = GroupChat::whereIn('id', $memberGroups)->get();
-            Log::info('getGroups: Retrieved ' . $groups->count() . ' groups');
+        $groups = GroupChat::whereIn('id', $memberGroups)->get();
+        Log::info('getGroups: Retrieved ' . $groups->count() . ' groups');
 
-            $result = [];
+        $result = [];
 
-            foreach ($groups as $group) {
-                // Get admin's membership settings
-                $memberSetting = GroupChatMember::where('group_chat_id', $group->id)
-                    ->where('alumni_id', $adminId)
-                    ->first();
+        foreach ($groups as $group) {
+            $memberSetting = GroupChatMember::where('group_chat_id', $group->id)
+                ->where('alumni_id', $adminId)
+                ->first();
 
-                $isArchived = $memberSetting ? (bool)$memberSetting->archived : false;
-                if ($showArchived && !$isArchived) continue;
-                if (!$showArchived && $isArchived) continue;
+            $isArchived = $memberSetting ? (bool)$memberSetting->archived : false;
+            if ($showArchived && !$isArchived) continue;
+            if (!$showArchived && $isArchived) continue;
 
-                // GET LAST MESSAGE WITH TIMESTAMP
-                $lastMessage = GroupMessage::where('group_chat_id', $group->id)
-                    ->where(function($query) use ($adminId) {
-                        $query->whereNull('deleted_by')
-                            ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
-                    })
-                    ->latest()
-                    ->first();
-                    
-                $lastMessageContent = null;
-                $lastMessageFromMe = false;
-                $lastMessageTimestamp = null;
-
-                if ($lastMessage) {
-                    $lastMessageContent = $this->decryptMessageContent(
-                        $lastMessage->content,
-                        $lastMessage->sender_type,
-                        'admin'
-                    );
-                    $lastMessageFromMe = ($lastMessage->sender_id == $adminId && $lastMessage->sender_type === 'admin');
-                    $lastMessageTimestamp = $lastMessage->created_at ? $lastMessage->created_at->toISOString() : null;
-                }
-
-                // Get member count
-                $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
-
-                // ✅ FIX: Get creator name correctly
-                $creatorName = 'Unknown';
-                $creatorId = $group->created_by;
+            $lastMessage = GroupMessage::where('group_chat_id', $group->id)
+                ->where(function($query) use ($adminId) {
+                    $query->whereNull('deleted_by')
+                        ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+                })
+                ->latest()
+                ->first();
                 
-                // Try to find as admin first
-                $creatorAdmin = Admin::find($creatorId);
+            $lastMessageContent = null;
+            $lastMessageFromMe = false;
+            $lastMessageTimestamp = null;
+
+            if ($lastMessage) {
+                $lastMessageContent = $this->decryptMessageContent(
+                    $lastMessage->content,
+                    $lastMessage->sender_type,
+                    'admin'
+                );
+                $lastMessageFromMe = ($lastMessage->sender_id == $adminId && $lastMessage->sender_type === 'admin');
+                $lastMessageTimestamp = $lastMessage->created_at ? $lastMessage->created_at->toISOString() : null;
+            }
+
+            $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
+
+            // ✅ FIX: Use created_by_type from the group table
+            $creatorType = $group->created_by_type ?? 'admin';
+            $creatorName = 'Unknown';
+
+            if ($creatorType === 'admin') {
+                $creatorAdmin = Admin::find($group->created_by);
                 if ($creatorAdmin) {
                     $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
                 } else {
-                    // If not found as admin, try as alumni
-                    $creatorAlumni = Alumni::find($creatorId);
+                    $creatorAlumni = Alumni::find($group->created_by);
                     if ($creatorAlumni) {
                         $creatorName = $this->getAlumniFullName($creatorAlumni);
                     }
                 }
-
-                // Get unread count
-                $unreadCount = GroupMessage::where('group_chat_id', $group->id)
-                    ->where('sender_id', '!=', $adminId)
-                    ->where(function($query) use ($adminId) {
-                        $query->whereNull('deleted_by')
-                            ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
-                    })
-                    ->count();
-
-                // ✅ Get avatar URL with signed URL
-                $avatarUrl = null;
-                if ($group->avatar_url) {
-                    $avatarUrl = $this->getGroupAvatarUrl($group->avatar_url);
-                    Log::info('Group avatar URL for group ' . $group->id . ': ' . $avatarUrl);
+            } else {
+                $creatorAlumni = Alumni::find($group->created_by);
+                if ($creatorAlumni) {
+                    $creatorName = $this->getAlumniFullName($creatorAlumni);
                 }
+            }
 
-                $result[] = [
-                    'id' => (int)$group->id,
-                    'type' => 'group',
-                    'name' => $group->name,
-                    'initials' => $this->getInitials($group->name),
-                    'avatar' => $avatarUrl,
-                    'member_count' => $memberCount,
-                    'created_by' => $group->created_by,
-                    'created_by_name' => $creatorName, // ✅ Now properly resolved
-                    'last_message' => $lastMessageContent,
-                    'last_message_timestamp' => $lastMessageTimestamp,
-                    'last_message_from_me' => $lastMessageFromMe,
-                    'unread_count' => $unreadCount,
-                    'is_archived' => $isArchived,
-                    'is_muted' => $memberSetting ? (bool)$memberSetting->muted : false,
+            $unreadCount = GroupMessage::where('group_chat_id', $group->id)
+                ->where('sender_id', '!=', $adminId)
+                ->where(function($query) use ($adminId) {
+                    $query->whereNull('deleted_by')
+                        ->orWhereRaw('NOT (deleted_by @> ARRAY[?]::bigint[])', [$adminId]);
+                })
+                ->count();
+
+            $avatarUrl = null;
+            if ($group->avatar_url) {
+                $avatarUrl = $this->getGroupAvatarUrl($group->avatar_url);
+            }
+
+            $result[] = [
+                'id' => (int)$group->id,
+                'type' => 'group',
+                'name' => $group->name,
+                'initials' => $this->getInitials($group->name),
+                'avatar' => $avatarUrl,
+                'member_count' => $memberCount,
+                'created_by' => $group->created_by,
+                'created_by_type' => $creatorType,
+                'created_by_name' => $creatorName,
+                'last_message' => $lastMessageContent,
+                'last_message_timestamp' => $lastMessageTimestamp,
+                'last_message_from_me' => $lastMessageFromMe,
+                'unread_count' => $unreadCount,
+                'is_archived' => $isArchived,
+                'is_muted' => $memberSetting ? (bool)$memberSetting->muted : false,
+            ];
+        }
+
+        usort($result, function($a, $b) {
+            $timeA = $a['last_message_timestamp'] ? strtotime($a['last_message_timestamp']) : 0;
+            $timeB = $b['last_message_timestamp'] ? strtotime($b['last_message_timestamp']) : 0;
+            return $timeB - $timeA;
+        });
+
+        Log::info('getGroups: Returning ' . count($result) . ' groups');
+        return response()->json(array_values($result));
+
+    } catch (\Exception $e) {
+        Log::error('getGroups: Fatal error: ' . $e->getMessage());
+        Log::error('getGroups: Trace: ' . $e->getTraceAsString());
+        return response()->json([]);
+    }
+}
+
+public function createGroup(Request $request)
+{
+    try {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'members' => 'required|string',
+            'avatar' => 'nullable|image|max:2048',
+        ]);
+
+        $adminInfo = $this->getCurrentAdminInfo();
+        
+        if (!$adminInfo) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $adminId = $adminInfo['id'];
+        $adminType = $adminInfo['user_type']; // Should be 'admin'
+
+        // Parse members from frontend
+        $members = json_decode($request->members, true);
+        
+        if (!is_array($members) || count($members) < 2) {
+            return response()->json(['error' => 'Please add at least 2 members'], 400);
+        }
+
+        $validMembers = [];
+
+        foreach ($members as $member) {
+            $memberId = $member['id'] ?? null;
+            $userType = $member['user_type'] ?? 'alumni';
+            
+            if (!$memberId) continue;
+            
+            // Skip the current admin (they're added automatically)
+            if ($memberId == $adminId && $userType === $adminType) {
+                continue;
+            }
+            
+            // ✅ Check if this is a system admin
+            $admin = Admin::find($memberId);
+            if ($admin) {
+                Log::info("Member {$memberId} is a system admin");
+                $validMembers[] = [
+                    'id' => $memberId,
+                    'user_type' => 'admin',  // ✅ Set to 'admin'
+                    'role' => 'admin'        // Group admin permissions
+                ];
+                continue;
+            }
+            
+            // Check if alumni exists
+            $alumni = Alumni::find($memberId);
+            if ($alumni) {
+                Log::info("Member {$memberId} is an alumni");
+                $validMembers[] = [
+                    'id' => $memberId,
+                    'user_type' => 'alumni', // ✅ Set to 'alumni'
+                    'role' => 'alumni'       // No permissions
                 ];
             }
-
-            // Sort by last message timestamp (newest first)
-            usort($result, function($a, $b) {
-                $timeA = $a['last_message_timestamp'] ? strtotime($a['last_message_timestamp']) : 0;
-                $timeB = $b['last_message_timestamp'] ? strtotime($b['last_message_timestamp']) : 0;
-                return $timeB - $timeA;
-            });
-
-            Log::info('getGroups: Returning ' . count($result) . ' groups');
-            return response()->json(array_values($result));
-
-        } catch (\Exception $e) {
-            Log::error('getGroups: Fatal error: ' . $e->getMessage());
-            Log::error('getGroups: Trace: ' . $e->getTraceAsString());
-            return response()->json([]);
         }
-    }
 
-   public function createGroup(Request $request)
-    {
-        try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'members' => 'required|string',
-                'avatar' => 'nullable|image|max:2048',
-            ]);
+        // Create group
+        $group = GroupChat::create([
+            'name' => $request->name,
+            'created_by' => $adminId,
+            'created_by_type' => $adminType, // ✅ 'admin'
+            'avatar_url' => null,
+        ]);
 
-            $adminId = $this->getAdminId();
+        // Handle avatar upload
+        if ($request->hasFile('avatar')) {
+            $file = $request->file('avatar');
+            $extension = $file->getClientOriginalExtension();
+            $fileName = 'group_avatar/' . $group->id . '_' . Str::random(12) . '.' . $extension;
             
-            if (!$adminId) {
-                return response()->json(['error' => 'Unauthorized'], 401);
+            try {
+                Storage::disk('supabase_private_messages')->put($fileName, file_get_contents($file), 'private');
+                $group->avatar_url = $fileName;
+                $group->save();
+                Log::info('Group avatar stored at: ' . $fileName);
+            } catch (\Exception $e) {
+                Log::error('Failed to upload group avatar: ' . $e->getMessage());
             }
+        }
 
-            // Parse members from frontend
-            $members = json_decode($request->members, true);
-            
-            if (!is_array($members) || count($members) < 2) {
-                return response()->json(['error' => 'Please add at least 2 members'], 400);
-            }
-
-            $validMembers = [];
-
-            foreach ($members as $member) {
-                $memberId = $member['id'] ?? null;
-                $userType = $member['user_type'] ?? 'alumni';
-                
-                if (!$memberId) continue;
-                
-                // Skip the current admin (they're added automatically)
-                if ($memberId == $adminId && $userType === 'admin') {
-                    continue;
-                }
-                
-                // Check if this is a system admin
-                $admin = Admin::find($memberId);
-                if ($admin) {
-                    // System admin - they get group admin permissions
-                    $validMembers[] = [
-                        'id' => $memberId,
-                        'user_type' => 'admin',  // System admin account type
-                        'role' => 'admin'        // Group admin permissions
-                    ];
-                    continue;
-                }
-                
-                // Check if alumni exists
-                $alumni = Alumni::find($memberId);
-                if ($alumni) {
-                    // Regular alumni - they get no group permissions
-                    $validMembers[] = [
-                        'id' => $memberId,
-                        'user_type' => 'alumni',
-                        'role' => 'alumni'  // No permissions
-                    ];
-                }
-            }
-
-            // Create group
-            $group = GroupChat::create([
-                'name' => $request->name,
-                'created_by' => $adminId,
-                'avatar_url' => null,
-            ]);
-
-            // Handle avatar upload
-            if ($request->hasFile('avatar')) {
-                $file = $request->file('avatar');
-                $extension = $file->getClientOriginalExtension();
-                $fileName = 'group_avatar/' . $group->id . '_' . Str::random(12) . '.' . $extension;
-                
-                try {
-                    // ✅ Store in the private messages bucket
-                    Storage::disk('supabase_private_messages')->put($fileName, file_get_contents($file), 'private');
-                    $group->avatar_url = $fileName; // Store the relative path
-                    $group->save();
-                    
-                    Log::info('Group avatar stored at: ' . $fileName);
-                } catch (\Exception $e) {
-                    Log::error('Failed to upload group avatar: ' . $e->getMessage());
-                }
-            }
-
-        $creatorIsSystemAdmin = Admin::find($adminId) ? true : false;
-
+        // ✅ ADD CREATOR AS MEMBER with correct type
+        // IMPORTANT: The creator is a system admin, so member_type should be 'admin'
         GroupChatMember::create([
             'group_chat_id' => $group->id,
             'alumni_id' => $adminId,
-            'member_type' => $creatorIsSystemAdmin ? 'admin' : 'alumni',
+            'member_type' => 'admin', // ✅ FORCE 'admin' since the creator is a system admin
             'role' => 'admin',
             'archived' => false,
             'muted' => false,
         ]);
 
-        $creatorName = $creatorIsSystemAdmin 
-            ? trim(Admin::find($adminId)->admin_first_name . ' ' . Admin::find($adminId)->admin_last_name)
-            : Alumni::find($adminId)->first_name . ' ' . Alumni::find($adminId)->last_name;    
+        // Get creator name
+        $creatorName = $adminInfo['name'];
 
-
-        // ✅ ADD OTHER MEMBERS
+        // ✅ ADD OTHER MEMBERS with correct member_type
         foreach ($validMembers as $member) {
             GroupChatMember::create([
                 'group_chat_id' => $group->id,
                 'alumni_id' => $member['id'],
-                'member_type' => $member['user_type'],  // 'admin' or 'alumni'
-                'role' => $member['role'] ?? 'alumni',  // 'admin' if system admin, else 'alumni'
+                'member_type' => $member['user_type'], // ✅ This should be 'admin' or 'alumni'
+                'role' => $member['role'] ?? 'alumni',
                 'archived' => false,
                 'muted' => false,
             ]);
+            
+            Log::info("Added member {$member['id']} with member_type: {$member['user_type']}");
         }
 
-            // ============================================
-            // VERIFY MEMBERS WERE ADDED
-            // ============================================
-            $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
-            Log::info('Total members in group ' . $group->id . ': ' . $memberCount);
-            
-            // VERIFY CREATOR WAS ADDED
-            $creatorCheck = GroupChatMember::where('group_chat_id', $group->id)
-                ->where('alumni_id', $adminId)
-                ->where('member_type', 'admin')
-                ->exists();
-            
-            Log::info('Creator admin check: ' . ($creatorCheck ? '✅ EXISTS' : '❌ NOT FOUND'));
+        Log::info("Group {$group->id} created by admin {$adminId} (name: {$creatorName})");
+        
+        // Verify the members were added correctly
+        $memberCount = GroupChatMember::where('group_chat_id', $group->id)->count();
+        Log::info("Group {$group->id} has {$memberCount} members");
 
-            // ✅ FIXED: Use getGroupAvatarUrl() instead of getSupabaseStorageUrl()
-            $avatarUrl = $group->avatar_url ? $this->getGroupAvatarUrl($group->avatar_url) : null;
+        $avatarUrl = $group->avatar_url ? $this->getGroupAvatarUrl($group->avatar_url) : null;
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Channel created successfully',
-                'group' => [
-                    'id' => (int)$group->id,
-                    'name' => $group->name,
-                    'avatar' => $avatarUrl, // ✅ Now uses signed URL
-                    'member_count' => $memberCount,
-                    'created_by' => $adminId,
-                    'created_by_name' => $creatorName,
-                    'is_archived' => false,
-                    'is_muted' => false,
-                    'unread_count' => 0,
-                ]
-            ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Channel created successfully',
+            'group' => [
+                'id' => (int)$group->id,
+                'name' => $group->name,
+                'avatar' => $avatarUrl,
+                'member_count' => $memberCount,
+                'created_by' => $adminId,
+                'created_by_type' => $adminType,
+                'created_by_name' => $creatorName,
+                'is_archived' => false,
+                'is_muted' => false,
+                'unread_count' => 0,
+            ]
+        ]);
 
-        } catch (\Exception $e) {
-            Log::error('Error creating group: ' . $e->getMessage());
-            Log::error('Error trace: ' . $e->getTraceAsString());
-            return response()->json([
-                'error' => 'Failed to create channel: ' . $e->getMessage()
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        Log::error('Error creating group: ' . $e->getMessage());
+        Log::error('Error trace: ' . $e->getTraceAsString());
+        return response()->json([
+            'error' => 'Failed to create channel: ' . $e->getMessage()
+        ], 500);
     }
+}
 
-    public function getGroupInfo($groupId)
-    {
-        try {
-            $adminId = $this->getAdminId();
+public function getGroupInfo($groupId)
+{
+    try {
+        $adminInfo = $this->getCurrentAdminInfo();
+        
+        if (!$adminInfo) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $adminId = $adminInfo['id'];
+
+        $group = GroupChat::with(['members'])->find($groupId);
+
+        if (!$group) {
+            return response()->json(['error' => 'Group not found'], 404);
+        }
+
+        // Check if admin is a member
+        $isMember = GroupChatMember::where('group_chat_id', $groupId)
+            ->where('alumni_id', $adminId)
+            ->exists();
+
+        if (!$isMember) {
+            return response()->json(['error' => 'You are not a member of this group'], 403);
+        }
+
+        // Get member settings
+        $memberSetting = GroupChatMember::where('group_chat_id', $groupId)
+            ->where('alumni_id', $adminId)
+            ->first();
+
+        // ✅ FIX: Use created_by_type from the group table
+        $creatorType = $group->created_by_type ?? 'admin';
+        $creatorName = 'Unknown';
+        $creatorIsSystemAdmin = false;
+
+        if ($creatorType === 'admin') {
+            $creatorAdmin = Admin::find($group->created_by);
+            if ($creatorAdmin) {
+                $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
+                $creatorIsSystemAdmin = true;
+            } else {
+                // Fallback: try as alumni
+                $creatorAlumni = Alumni::find($group->created_by);
+                if ($creatorAlumni) {
+                    $creatorName = $this->getAlumniFullName($creatorAlumni);
+                }
+            }
+        } else {
+            $creatorAlumni = Alumni::find($group->created_by);
+            if ($creatorAlumni) {
+                $creatorName = $this->getAlumniFullName($creatorAlumni);
+            }
+        }
+
+        $members = [];
+        foreach ($group->members as $member) {
+            $fullName = 'Unknown';
+            $initials = '??';
+            $avatar = null;
+            $isOnline = false;
+            $isSystemAdmin = false;
+            $isGroupAdmin = false;
             
-            if (!$adminId) {
-                return response()->json(['error' => 'Unauthorized'], 401);
-            }
-
-            $group = GroupChat::with(['members'])->find($groupId);
-
-            if (!$group) {
-                return response()->json(['error' => 'Group not found'], 404);
-            }
-
-            // Check if admin is a member
-            $isMember = GroupChatMember::where('group_chat_id', $groupId)
-                ->where('alumni_id', $adminId)
-                ->exists();
-
-            if (!$isMember) {
-                return response()->json(['error' => 'You are not a member of this group'], 403);
-            }
-
-            // Get member settings
-            $memberSetting = GroupChatMember::where('group_chat_id', $groupId)
-                ->where('alumni_id', $adminId)
-                ->where('member_type', 'admin')
-                ->first();
-
-            $members = [];
-            foreach ($group->members as $member) {
-                $fullName = 'Unknown';
-                $initials = '??';
-                $avatar = null;
-                $isOnline = false;
-                
-                if ($member->member_type === 'admin') {
-                    $admin = Admin::find($member->alumni_id);
-                    if ($admin) {
-                        $fullName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
-                        $initials = strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1));
-                        $avatar = $this->resolveAdminPhotoUrl($admin->photo);
-                        $isOnline = true;
-                    } else {
-                        // ✅ FIX: If admin not found, try to find as alumni
-                        $alumni = Alumni::find($member->alumni_id);
-                        if ($alumni) {
-                            $fullName = $this->getAlumniFullName($alumni);
-                            $initials = $this->getAlumniInitials($alumni);
-                            $avatar = $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null;
-                            $isOnline = $alumni->is_online ?? false;
-                        }
-                    }
+            // ✅ CRITICAL: Check member_type to determine which table to query
+            if ($member->member_type === 'admin') {
+                // This is a system admin
+                $isSystemAdmin = true;
+                $admin = Admin::find($member->alumni_id);
+                if ($admin) {
+                    $fullName = trim($admin->admin_first_name . ' ' . $admin->admin_last_name);
+                    $initials = strtoupper(substr($admin->admin_first_name ?? 'A', 0, 1) . substr($admin->admin_last_name ?? 'A', 0, 1));
+                    $avatar = $this->resolveAdminPhotoUrl($admin->photo);
+                    $isOnline = true;
                 } else {
+                    // If admin not found, try as alumni (fallback)
                     $alumni = Alumni::find($member->alumni_id);
                     if ($alumni) {
                         $fullName = $this->getAlumniFullName($alumni);
@@ -375,67 +388,75 @@ class GroupChatController extends Controller
                         $isOnline = $alumni->is_online ?? false;
                     }
                 }
-                
-                $members[] = [
-                    'id' => (int)$member->alumni_id,
-                    'user_type' => $member->member_type,
-                    'full_name' => $fullName,
-                    'initials' => $initials,
-                    'role' => $member->role,
-                    'is_online' => $isOnline,
-                    'avatar' => $avatar,
-                ];
-            }
-
-            // ✅ FIX: Determine creator correctly
-            $creatorName = 'Unknown';
-            $creatorId = $group->created_by;
-            
-            // Try to find as admin first
-            $creatorAdmin = Admin::find($creatorId);
-            if ($creatorAdmin) {
-                $creatorName = trim($creatorAdmin->admin_first_name . ' ' . $creatorAdmin->admin_last_name);
             } else {
-                // If not found as admin, try as alumni
-                $creatorAlumni = Alumni::find($creatorId);
-                if ($creatorAlumni) {
-                    $creatorName = $this->getAlumniFullName($creatorAlumni);
+                // This is a regular alumni
+                $isSystemAdmin = false;
+                $alumni = Alumni::find($member->alumni_id);
+                if ($alumni) {
+                    $fullName = $this->getAlumniFullName($alumni);
+                    $initials = $this->getAlumniInitials($alumni);
+                    $avatar = $alumni->alumni_photo ? $this->resolveAvatarUrl($alumni->alumni_photo) : null;
+                    $isOnline = $alumni->is_online ?? false;
                 }
             }
             
-            // ✅ FIX: Check if current user is the creator (regardless of type)
-            $isCreator = ($group->created_by == $adminId);
-
-            $isGroupAdmin = GroupChatMember::where('group_chat_id', $groupId)
-                ->where('alumni_id', $adminId)
-                ->where('member_type', 'admin')
-                ->where('role', 'admin')
-                ->exists();
-
-            // ✅ Get avatar URL with signed URL
-            $avatarUrl = null;
-            if ($group->avatar_url) {
-                $avatarUrl = $this->getGroupAvatarUrl($group->avatar_url);
-            }
-
-            return response()->json([
-                'id' => (int)$group->id,
-                'name' => $group->name,
-                'avatar' => $avatarUrl,
-                'member_count' => count($members),
-                'members' => $members,
-                'is_admin' => $isGroupAdmin || $isCreator, // Creator is always admin
-                'is_archived' => $memberSetting ? $memberSetting->archived : false,
-                'is_muted' => $memberSetting ? $memberSetting->muted : false,
-                'created_by' => $group->created_by,
-                'created_by_name' => $creatorName, // ✅ Add creator name to response
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error getting group info: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to get group info'], 500);
+            // Check if this member has group admin role
+            $isGroupAdmin = ($member->role === 'admin');
+            
+            // ✅ Check if this member is the creator
+            $isCreator = ($group->created_by == $member->alumni_id);
+            
+            $members[] = [
+                'id' => (int)$member->alumni_id,
+                'user_type' => $member->member_type,
+                'full_name' => $fullName,
+                'initials' => $initials,
+                'role' => $member->role,
+                'is_online' => $isOnline,
+                'avatar' => $avatar,
+                'is_system_admin' => $isSystemAdmin,
+                'is_group_admin' => $isGroupAdmin,
+                'is_creator' => $isCreator,
+            ];
         }
+
+        // Check if current user is the creator
+        $isCreator = ($group->created_by == $adminId);
+
+        // Check if current user is a group admin
+        $isGroupAdmin = GroupChatMember::where('group_chat_id', $groupId)
+            ->where('alumni_id', $adminId)
+            ->where('role', 'admin')
+            ->exists();
+
+        // Get avatar URL with signed URL
+        $avatarUrl = null;
+        if ($group->avatar_url) {
+            $avatarUrl = $this->getGroupAvatarUrl($group->avatar_url);
+        }
+
+        return response()->json([
+            'id' => (int)$group->id,
+            'name' => $group->name,
+            'avatar' => $avatarUrl,
+            'member_count' => count($members),
+            'members' => $members,
+            'is_admin' => $isGroupAdmin || $isCreator,
+            'can_manage' => $isGroupAdmin || $isCreator,
+            'is_archived' => $memberSetting ? (bool)$memberSetting->archived : false,
+            'is_muted' => $memberSetting ? (bool)$memberSetting->muted : false,
+            'created_by' => $group->created_by,
+            'created_by_type' => $group->created_by_type ?? 'admin',
+            'created_by_name' => $creatorName,
+            'created_by_is_system_admin' => $creatorIsSystemAdmin,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Error getting group info: ' . $e->getMessage());
+        Log::error('Trace: ' . $e->getTraceAsString());
+        return response()->json(['error' => 'Failed to get group info: ' . $e->getMessage()], 500);
     }
+}
 
     public function getMessages($groupId, Request $request)
     {
@@ -499,7 +520,6 @@ class GroupChatController extends Controller
                             $senderName = trim($sender->admin_first_name . ' ' . $sender->admin_last_name);
                         }
                     }
-
                     // Get attachments
                     $attachmentsData = [];
                     $attachments = GroupMessagesAttachment::where('group_message_id', $message->id)->get();
@@ -1079,19 +1099,46 @@ class GroupChatController extends Controller
     // HELPER FUNCTIONS
     // ============================================
 
-    private function getAdminId()
-    {
-        if (session()->has('admin_id')) {
-            return session('admin_id');
-        }
-        
-        if (session()->has('admin_logged_in') && session()->has('admin_data')) {
-            $adminData = session('admin_data');
-            return $adminData['id'] ?? $adminData->id ?? null;
-        }
-        
-        return null;
+private function getAdminId()
+{
+    if (session()->has('admin_id')) {
+        return session('admin_id');
     }
+    
+    if (session()->has('admin_logged_in') && session()->has('admin_data')) {
+        $adminData = session('admin_data');
+        return $adminData['id'] ?? $adminData->id ?? null;
+    }
+    
+    return null;
+}
+
+private function getCurrentAdminInfo()
+{
+    $adminId = $this->getAdminId();
+    if (!$adminId) return null;
+    
+    $admin = Admin::find($adminId);
+    if ($admin) {
+        return [
+            'id' => $admin->id,
+            'user_type' => 'admin',
+            'name' => trim($admin->admin_first_name . ' ' . $admin->admin_last_name),
+        ];
+    }
+    
+    // Fallback: check if it's an alumni
+    $alumni = Alumni::find($adminId);
+    if ($alumni) {
+        return [
+            'id' => $alumni->id,
+            'user_type' => 'alumni',
+            'name' => $this->getAlumniFullName($alumni),
+        ];
+    }
+    
+    return null;
+}
 
     private function getAlumniFullName($alumni)
     {
@@ -1121,19 +1168,15 @@ class GroupChatController extends Controller
         return substr($initials, 0, 2);
     }
 
-/**
- * Resolve admin photo URL - use public URL (bucket is public)
- */
 private function resolveAdminPhotoUrl($path)
 {
     if (!$path) return null;
     if (filter_var($path, FILTER_VALIDATE_URL)) return $path;
     
-    // ✅ Use the admin assets bucket (public)
+    // Use the admin assets bucket (public)
     $bucket = env('SUPABASE_BUCKET', 'luminus_assets');
     $baseUrl = env('SUPABASE_URL') . '/storage/v1/object/public/' . $bucket;
     
-    // Clean up the path
     $path = ltrim($path, '/');
     
     // If the path doesn't start with 'admin_photos/', add it
@@ -1348,78 +1391,80 @@ private function getGroupAvatarUrl($path)
         }
     }
 
-    /**
-     * Add members to an existing group
-     */
-    public function addMembers(Request $request, $groupId)
-    {
-        try {
-            $request->validate([
-                'member_ids' => 'required|array',
-                'member_ids.*' => 'integer',
-            ]);
+public function addMembers(Request $request, $groupId)
+{
+    try {
+        $request->validate([
+            'member_ids' => 'required|array',
+            'member_ids.*' => 'integer',
+        ]);
 
-            $adminId = $this->getAdminId();
-            
-            if (!$adminId) {
-                return response()->json(['error' => 'Unauthorized'], 401);
-            }
+        $adminId = $this->getAdminId();
+        
+        if (!$adminId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
 
-            // Check if admin is a group admin
-            $isGroupAdmin = GroupChatMember::where('group_chat_id', $groupId)
-                ->where('alumni_id', $adminId)
-                ->where('member_type', 'admin')
-                ->where('role', 'admin')
+        // Check if admin is a group admin
+        $isGroupAdmin = GroupChatMember::where('group_chat_id', $groupId)
+            ->where('alumni_id', $adminId)
+            ->where('member_type', 'admin')
+            ->where('role', 'admin')
+            ->exists();
+
+        if (!$isGroupAdmin) {
+            return response()->json(['error' => 'Only group admins can add members'], 403);
+        }
+
+        $added = 0;
+        $skipped = 0;
+
+        foreach ($request->member_ids as $memberId) {
+            // Check if already a member
+            $exists = GroupChatMember::where('group_chat_id', $groupId)
+                ->where('alumni_id', $memberId)
                 ->exists();
 
-            if (!$isGroupAdmin) {
-                return response()->json(['error' => 'Only group admins can add members'], 403);
+            if ($exists) {
+                $skipped++;
+                continue;
             }
 
-            $added = 0;
-            $skipped = 0;
-
-            foreach ($request->member_ids as $memberId) {
-                // Check if already a member
-                $exists = GroupChatMember::where('group_chat_id', $groupId)
-                    ->where('alumni_id', $memberId)
-                    ->exists();
-
-                if ($exists) {
-                    $skipped++;
-                    continue;
-                }
-
-                // Determine member type
-                $memberType = 'alumni';
-                if (Admin::find($memberId)) {
-                    $memberType = 'admin';
-                }
-
-                GroupChatMember::create([
-                    'group_chat_id' => $groupId,
-                    'alumni_id' => $memberId,
-                    'member_type' => $memberType,
-                    'role' => 'alumni',
-                    'archived' => false,
-                    'muted' => false,
-                ]);
-
-                $added++;
+            // ✅ Determine member type correctly
+            $memberType = 'alumni';
+            $role = 'alumni';
+            
+            // Check if this is a system admin
+            if (Admin::find($memberId)) {
+                $memberType = 'admin';
+                $role = 'admin'; // System admins get group admin permissions
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => "Added {$added} members" . ($skipped > 0 ? " (skipped {$skipped} already in group)" : ""),
-                'added' => $added,
-                'skipped' => $skipped,
+            GroupChatMember::create([
+                'group_chat_id' => $groupId,
+                'alumni_id' => $memberId,
+                'member_type' => $memberType,
+                'role' => $role,
+                'archived' => false,
+                'muted' => false,
             ]);
 
-        } catch (\Exception $e) {
-            Log::error('Error adding members: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to add members'], 500);
+            $added++;
+            Log::info("Added member {$memberId} with member_type: {$memberType}");
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Added {$added} members" . ($skipped > 0 ? " (skipped {$skipped} already in group)" : ""),
+            'added' => $added,
+            'skipped' => $skipped,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Error adding members: ' . $e->getMessage());
+        return response()->json(['error' => 'Failed to add members'], 500);
     }
+}
 
     /**
      * Remove a member from a group

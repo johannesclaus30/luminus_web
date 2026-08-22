@@ -2231,8 +2231,9 @@ body {
 }
 
 .contact-dropdown.active {
-    display: block;
+    display: block !important;
     animation: dropdownFadeIn 0.15s ease-out;
+    pointer-events: auto !important;
 }
 
 @keyframes dropdownFadeIn {
@@ -2307,14 +2308,15 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 9998;
+    z-index: 99998 !important; /* Lower than dropdown, higher than everything else */
     display: none;
     background: rgba(0, 0, 0, 0.01); /* Almost invisible but clickable */
     cursor: default;
+    pointer-events: auto !important;
 }
 
 .dropdown-backdrop.active {
-    display: block;
+    display: block !important;
 }
 
 .dropdown-backdrop.active {
@@ -2358,7 +2360,7 @@ body {
     align-items: center;
     justify-content: center;
     position: relative;
-    z-index: 10; /* Above card but below dropdown */
+    z-index: 100 !important; /* Increased from 10 */
 }
 
 .btn-more {
@@ -2375,6 +2377,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 101 !important;
 }
 
 .btn-more:hover {
@@ -2579,6 +2583,615 @@ body {
     width: 28px;
     height: 28px;
     flex-shrink: 0;
+}
+
+/* ========================================
+   DROPDOWN MOBILE OVERRIDES
+   ======================================== */
+
+/* Ensure dropdown always works on smaller screens */
+@media (max-width: 1024px) {
+    .contact-dropdown {
+        z-index: 99999 !important;
+        position: fixed !important;
+        pointer-events: auto !important;
+    }
+    
+    .contact-dropdown.active {
+        display: block !important;
+        pointer-events: auto !important;
+    }
+    
+    .dropdown-backdrop {
+        z-index: 99998 !important;
+    }
+    
+    .btn-more {
+        z-index: 101 !important;
+    }
+    
+    /* Prevent mobile styles from interfering */
+    .contact-card {
+        overflow: visible !important;
+        position: relative !important;
+    }
+}
+
+/* ========================================
+   DROPDOWN EMERGENCY FIX
+   ======================================== */
+
+/* Force all dropdown items to be clickable */
+.contact-dropdown,
+.contact-dropdown *,
+.contact-dropdown .dropdown-item,
+.contact-dropdown .dropdown-item * {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+/* Ensure dropdown stays above everything */
+.contact-dropdown.active {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    z-index: 999999 !important;
+    pointer-events: auto !important;
+}
+
+/* Force the backdrop to not block clicks on the dropdown */
+.dropdown-backdrop.active {
+    pointer-events: none !important;
+    background: transparent !important;
+}
+
+/* Ensure dropdown items have hover state */
+.contact-dropdown .dropdown-item:hover {
+    background: var(--gray-100) !important;
+}
+
+.contact-dropdown .dropdown-item.danger:hover {
+    background: var(--danger-light) !important;
+}
+
+/* Force dropdown to be on top of everything */
+.contact-card:has(.contact-dropdown.active) {
+    z-index: 999998 !important;
+    position: relative !important;
+}
+
+/* Prevent the card from closing the dropdown on click */
+.contact-card .contact-actions .btn-more {
+    position: relative !important;
+    z-index: 999999 !important;
+}
+
+/* ========================================
+   GROUP INFO MODAL - IMPROVED UI
+   ======================================== */
+
+/* Modal Container */
+.modal-overlay#groupInfoModal .modal {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+    animation: modalSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Group Info Avatar - Glow Effect */
+.group-info-avatar {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.group-info-avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.4) !important;
+}
+
+.group-info-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Creator Info */
+#groupCreatorInfo {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+}
+
+#groupCreatorInfo .fa-crown {
+    color: var(--nu-gold);
+}
+
+/* Admin Actions - Hover Effects */
+.group-info-actions .btn-secondary:hover {
+    background: var(--nu-blue-soft) !important;
+    border-color: var(--nu-blue) !important;
+    color: var(--nu-blue) !important;
+    transform: translateY(-1px);
+}
+
+/* Member List - Improved */
+.group-members-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-200) transparent;
+}
+
+.group-members-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.group-members-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.group-members-list::-webkit-scrollbar-thumb {
+    background: var(--gray-200);
+    border-radius: 10px;
+}
+
+.group-members-list::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-300);
+}
+
+/* Member Item - Enhanced */
+.group-member-item {
+    display: flex;
+    align-items: center;
+    padding: 0.625rem 0.75rem;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    margin-bottom: 0.25rem;
+    background: var(--white);
+}
+
+.group-member-item:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-200);
+    transform: translateX(2px);
+}
+
+/* Member Avatar - with status indicator */
+.group-member-item .member-avatar-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    margin-right: 0.75rem;
+}
+
+.group-member-item .member-avatar-wrapper .member-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: white;
+    transition: transform 0.2s ease;
+}
+
+.group-member-item .member-avatar-wrapper .member-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Online Status Dot */
+.group-member-item .member-avatar-wrapper .online-indicator {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--success);
+    border: 2.5px solid var(--white);
+    box-shadow: 0 0 0 2px var(--success-light);
+    transition: transform 0.2s ease;
+}
+
+.group-member-item .member-avatar-wrapper .online-indicator.offline {
+    background: var(--gray-300);
+    box-shadow: 0 0 0 2px var(--gray-200);
+}
+
+/* Member Info */
+.group-member-item .member-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.group-member-item .member-info .member-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.group-member-item .member-info .member-role-text {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    margin-top: 0.125rem;
+}
+
+/* Member Badges */
+.group-member-item .badge {
+    display: inline-block;
+    font-size: 0.55rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 8px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.group-member-item .badge.creator {
+    background: var(--nu-gold);
+    color: var(--nu-blue-dark);
+}
+
+.group-member-item .badge.system-admin {
+    background: var(--nu-blue);
+    color: white;
+}
+
+.group-member-item .badge.group-admin {
+    background: #8b5cf6;
+    color: white;
+}
+
+.group-member-item .badge.you {
+    background: var(--gray-200);
+    color: var(--gray-600);
+}
+
+/* Member Actions */
+.group-member-item .member-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.group-member-item:hover .member-actions {
+    opacity: 1;
+}
+
+.group-member-item .member-actions button {
+    background: none;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: var(--gray-600);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.group-member-item .member-actions button:hover {
+    background: var(--nu-blue);
+    color: var(--white);
+    border-color: var(--nu-blue);
+}
+
+.group-member-item .member-actions button.danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+
+/* Leave Button - Hover */
+.btn-danger.leave-btn {
+    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%) !important;
+}
+
+.btn-danger.leave-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.35) !important;
+}
+
+.btn-danger.leave-btn:active {
+    transform: scale(0.97);
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+    .modal-overlay#groupInfoModal .modal {
+        max-width: 95%;
+        border-radius: 16px;
+    }
+    
+    .modal-overlay#groupInfoModal .modal-body {
+        padding: 1rem;
+    }
+    
+    .group-info-header .group-info-avatar {
+        width: 72px;
+        height: 72px;
+        font-size: 28px;
+    }
+    
+    .group-member-item .member-actions {
+        opacity: 1;
+    }
+    
+    .group-member-item .member-actions button {
+        padding: 0.25rem 0.375rem;
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .modal-overlay#groupInfoModal .modal-body {
+        padding: 0.75rem;
+    }
+    
+    .group-info-header .group-info-avatar {
+        width: 64px;
+        height: 64px;
+        font-size: 24px;
+    }
+    
+    .group-member-item {
+        padding: 0.5rem;
+    }
+    
+    .group-member-item .member-avatar-wrapper .member-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.7rem;
+    }
+}
+
+/* ========================================
+   ADD MEMBERS MODAL - STYLES
+   ======================================== */
+
+/* Modal Container */
+.modal-overlay#addMembersModal .modal {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+    animation: modalSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Search Input Focus */
+#addMemberSearch:focus {
+    outline: none;
+    border-color: var(--nu-blue);
+    background: var(--white);
+    box-shadow: 0 0 0 4px rgb(50 65 140 / 0.08);
+}
+
+/* Search Results - User Items */
+#addMemberResults .user-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0.875rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    margin-bottom: 0.25rem;
+}
+
+#addMemberResults .user-item:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-200);
+    transform: translateX(2px);
+}
+
+#addMemberResults .user-item.selected {
+    background: var(--nu-blue-soft);
+    border-color: var(--nu-blue);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#addMemberResults .user-item .user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: white;
+    flex-shrink: 0;
+    margin-right: 0.75rem;
+}
+
+#addMemberResults .user-item .user-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+#addMemberResults .user-item .user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+#addMemberResults .user-item .user-info .user-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--gray-800);
+}
+
+#addMemberResults .user-item .user-info .user-details {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.125rem;
+}
+
+#addMemberResults .user-item .user-status {
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+}
+
+#addMemberResults .user-item .user-status .online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+#addMemberResults .user-item .user-status .online-dot.online {
+    background: var(--success);
+    box-shadow: 0 0 0 3px var(--success-light);
+}
+
+#addMemberResults .user-item .user-status .online-dot.offline {
+    background: var(--gray-300);
+}
+
+#addMemberResults .user-item .add-btn {
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--nu-blue);
+    background: var(--nu-blue);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+#addMemberResults .user-item .add-btn:hover:not(:disabled) {
+    background: var(--nu-blue-dark);
+    transform: scale(1.05);
+}
+
+#addMemberResults .user-item .add-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#addMemberResults .user-item .add-btn.added {
+    background: var(--gray-200);
+    border-color: var(--gray-300);
+    color: var(--gray-600);
+}
+
+/* Selected Members Tags */
+#selectedAddMembers .selected-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background: var(--nu-blue-soft);
+    color: var(--nu-blue);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+#selectedAddMembers .selected-tag .remove-selected {
+    cursor: pointer;
+    color: var(--gray-400);
+    font-size: 0.7rem;
+    transition: all 0.2s ease;
+    background: none;
+    border: none;
+    padding: 0 2px;
+}
+
+#selectedAddMembers .selected-tag .remove-selected:hover {
+    color: var(--danger);
+}
+
+/* Admin badge in search results */
+#addMemberResults .admin-badge {
+    font-size: 0.6rem;
+    background: var(--nu-gold);
+    color: var(--nu-blue-dark);
+    padding: 1px 8px;
+    border-radius: 8px;
+    font-weight: 700;
+    margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Loading state */
+#addMemberResults .loading-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    color: var(--gray-500);
+    gap: 0.75rem;
+}
+
+#addMemberResults .loading-state i {
+    animation: spin 1s linear infinite;
+}
+
+/* Empty state */
+#addMemberResults .empty-state {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--gray-400);
+}
+
+#addMemberResults .empty-state i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.3;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+    #addMemberResults .user-item {
+        padding: 0.5rem 0.625rem;
+    }
+    
+    #addMemberResults .user-item .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.7rem;
+        margin-right: 0.5rem;
+    }
+    
+    #addMemberResults .user-item .user-info .user-name {
+        font-size: 0.8rem;
+    }
+    
+    #addMemberResults .user-item .add-btn {
+        font-size: 0.6rem;
+        padding: 0.125rem 0.5rem;
+    }
 }
 
 /* This is the test_messages.css */

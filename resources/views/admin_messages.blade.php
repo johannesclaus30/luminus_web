@@ -929,62 +929,137 @@
         </div>
     </div>
 
-    <!-- Group Info Modal -->
-    <div class="modal-overlay" id="groupInfoModal">
-        <div class="modal" style="max-width: 480px; max-height: 80vh;">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-info-circle" style="margin-right: 8px;"></i>Channel Info</h3>
-                <button class="btn-icon" onclick="closeGroupInfoModal()">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+<!-- Group Info Modal -->
+<div class="modal-overlay" id="groupInfoModal">
+    <div class="modal" style="max-width: 520px; max-height: 85vh; border-radius: 20px; overflow: hidden;">
+        <div class="modal-header" style="padding: 1.25rem 1.5rem; border-bottom: 2px solid var(--gray-100); background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--gray-800);">
+                <i class="fa-solid fa-users" style="color: #8b5cf6; font-size: 1.2rem;"></i>
+                Channel Info
+            </h3>
+            <button class="btn-icon" onclick="closeGroupInfoModal()" style="width: 36px; height: 36px; border-radius: 50%; background: var(--gray-100); border: none; color: var(--gray-600); cursor: pointer; transition: all 0.2s;">
+                <i class="fa-solid fa-xmark" style="font-size: 1.1rem;"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem; overflow-y: auto; background: var(--white);">
+            <!-- Group Info Header -->
+            <div class="group-info-header" style="text-align: center; margin-bottom: 1.5rem;">
+                <div class="group-info-avatar" id="groupInfoAvatar" 
+                    style="width: 88px; height: 88px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; margin: 0 auto 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 700; overflow: hidden; box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3); border: 3px solid var(--white);">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <h3 id="groupInfoName" style="margin: 0 0 0.25rem 0; font-size: 1.2rem; font-weight: 700; color: var(--gray-800); letter-spacing: -0.3px;">Channel Name</h3>
+                <p id="groupInfoMemberCount" style="color: var(--gray-500); font-size: 0.8rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-user-group" style="font-size: 0.75rem;"></i>
+                    <span>0 members</span>
+                </p>
+                <div id="groupCreatorInfo" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--gray-400);">
+                    <i class="fa-solid fa-crown" style="color: var(--nu-gold); font-size: 0.7rem;"></i>
+                    Created by <span id="groupCreatorName" style="color: var(--gray-600); font-weight: 500;">Unknown</span>
+                </div>
             </div>
-            <div class="modal-body" style="overflow-y: auto;">
-                <!-- Group Info Header -->
-                <div class="group-info-header" style="text-align: center; margin-bottom: 1.5rem;">
-                    <div class="group-info-avatar" id="groupInfoAvatar" 
-                        style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light)); color: var(--nu-gold); margin: 0 auto 0.75rem; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; overflow: hidden;">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
-                    <h3 id="groupInfoName" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--gray-800);">Channel Name</h3>
-                    <p id="groupInfoMemberCount" style="color: var(--gray-500); font-size: 0.875rem; margin: 0.25rem 0 0;">0 members</p>
-                </div>
-                
-                <!-- Admin Actions -->
-                <div id="groupAdminActions" class="group-info-actions" style="display: none; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-                    <button class="btn-secondary" onclick="editGroupName()" style="flex: 1; padding: 0.5rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); color: var(--gray-700); cursor: pointer; font-family: inherit; font-size: 0.8rem; font-weight: 600; transition: all var(--transition);">
-                        <i class="fa-solid fa-pen"></i> Edit Name
-                    </button>
-                    <button class="btn-secondary" onclick="document.getElementById('groupAvatarEditInput').click()" style="flex: 1; padding: 0.5rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); color: var(--gray-700); cursor: pointer; font-family: inherit; font-size: 0.8rem; font-weight: 600; transition: all var(--transition);">
-                        <i class="fa-solid fa-camera"></i> Change Avatar
-                    </button>
-                    <input type="file" id="groupAvatarEditInput" accept="image/*" style="display: none;" onchange="handleGroupAvatarEdit(event)">
-                </div>
-                
-                <!-- Members Section -->
-                <div class="group-members-section">
-                    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--gray-700);">
-                            <i class="fa-solid fa-user-group"></i> Members
-                        </h4>
-                        <button id="addMembersBtn" class="btn-icon" onclick="openAddMembersModal()" title="Add members" style="display: none; width: 32px; height: 32px; font-size: 0.8rem;">
-                            <i class="fa-solid fa-user-plus"></i>
-                        </button>
-                    </div>
-                    <div id="groupMembersList" class="group-members-list" style="max-height: 300px; overflow-y: auto;">
-                        <!-- Members rendered by JavaScript -->
-                    </div>
-                </div>
-                
-                <!-- Leave Button -->
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
-                    <button class="btn-danger" onclick="leaveGroup()" 
-                        style="width: 100%; padding: 0.75rem; border: none; border-radius: var(--radius-lg); background: var(--danger); color: var(--white); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.875rem; transition: all var(--transition);">
-                        <i class="fa-solid fa-right-from-bracket"></i> Leave Channel
+            
+            <!-- Admin Actions -->
+            <div id="groupAdminActions" class="group-info-actions" style="display: none; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; padding: 0.75rem; background: var(--gray-50); border-radius: 12px; border: 1px solid var(--gray-100);">
+                <button class="btn-secondary" onclick="editGroupName()" style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--gray-700); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: 80px;">
+                    <i class="fa-solid fa-pen" style="font-size: 0.7rem;"></i> Edit Name
+                </button>
+                <button class="btn-secondary" onclick="document.getElementById('groupAvatarEditInput').click()" style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--gray-700); cursor: pointer; font-family: inherit; font-size: 0.75rem; font-weight: 600; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: 80px;">
+                    <i class="fa-solid fa-camera" style="font-size: 0.7rem;"></i> Change Avatar
+                </button>
+                <input type="file" id="groupAvatarEditInput" accept="image/*" style="display: none;" onchange="handleGroupAvatarEdit(event)">
+            </div>
+            
+            <!-- Members Section -->
+            <div class="group-members-section" style="margin-top: 0.25rem;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 style="margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--gray-700); display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-user-group" style="color: #8b5cf6; font-size: 0.85rem;"></i>
+                        Members
+                        <span id="memberCountBadge" style="font-size: 0.65rem; background: var(--gray-200); color: var(--gray-600); padding: 0.125rem 0.5rem; border-radius: 12px; font-weight: 600; margin-left: 0.25rem;">0</span>
+                    </h4>
+                    <button id="addMembersBtn" class="btn-icon" onclick="openAddMembersModal()" title="Add members" style="display: none; width: 32px; height: 32px; border-radius: 50%; background: var(--nu-blue-soft); border: none; color: var(--nu-blue); cursor: pointer; transition: all 0.2s; font-size: 0.8rem;">
+                        <i class="fa-solid fa-user-plus"></i>
                     </button>
                 </div>
+                <div id="groupMembersList" class="group-members-list" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+                    <!-- Members rendered by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Leave Button -->
+            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+                <button class="btn-danger" onclick="leaveGroup()" 
+                    style="width: 100%; padding: 0.75rem; border: none; border-radius: 12px; background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%); color: var(--white); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-right-from-bracket" style="font-size: 0.85rem;"></i> Leave Channel
+                </button>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Add Members Modal -->
+<div class="modal-overlay" id="addMembersModal">
+    <div class="modal" style="max-width: 520px; max-height: 85vh; border-radius: 20px; overflow: hidden;">
+        <div class="modal-header" style="padding: 1.25rem 1.5rem; border-bottom: 2px solid var(--gray-100); background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--gray-800);">
+                <i class="fa-solid fa-user-plus" style="color: #8b5cf6; font-size: 1.2rem;"></i>
+                Add Members
+            </h3>
+            <button class="btn-icon" onclick="closeAddMembersModal()" style="width: 36px; height: 36px; border-radius: 50%; background: var(--gray-100); border: none; color: var(--gray-600); cursor: pointer; transition: all 0.2s;">
+                <i class="fa-solid fa-xmark" style="font-size: 1.1rem;"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem; overflow-y: auto; background: var(--white);">
+            <!-- Search Input -->
+            <div class="search-container" style="padding: 0 0 1rem 0; border-bottom: none; position: relative;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-size: 0.9rem; z-index: 1;"></i>
+                <input type="text" id="addMemberSearch" 
+                    placeholder="Search alumni or admins by name..." 
+                    oninput="searchUsersForAdd()"
+                    style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.75rem; border: 2px solid var(--gray-200); border-radius: var(--radius-full); font-family: inherit; font-size: 0.875rem; background: var(--gray-50); transition: all var(--transition);">
+            </div>
+            
+            <!-- Search Results -->
+            <div id="addMemberResults" class="search-results" style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;">
+                <div style="text-align: center; padding: 2rem 0; color: var(--gray-400);">
+                    <i class="fa-solid fa-users" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                    <p style="font-size: 0.9rem;">Search for users to add to this channel</p>
+                    <p style="font-size: 0.8rem; margin-top: 0.25rem;">Type at least 2 characters to start searching</p>
+                </div>
+            </div>
+            
+            <!-- Selected Members -->
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--gray-700);">
+                        Selected (<span id="selectedAddCount">0</span>)
+                    </span>
+                    <button onclick="clearSelectedAddMembers()" 
+                        style="background: none; border: none; color: var(--danger); font-size: 0.75rem; cursor: pointer; font-weight: 500; padding: 0.25rem 0.5rem; border-radius: 4px; transition: all 0.2s;">
+                        Clear All
+                    </button>
+                </div>
+                <div id="selectedAddMembers" style="display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem; min-height: 44px; border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); background: var(--gray-50);">
+                    <span style="color: var(--gray-400); font-size: 0.8rem; width: 100%; text-align: center; padding: 0.25rem 0;">No members selected</span>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+                <button class="btn-secondary" onclick="closeAddMembersModal()" 
+                    style="padding: 0.625rem 1.5rem; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); color: var(--gray-700); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.875rem; transition: all var(--transition);">
+                    Cancel
+                </button>
+                <button class="btn-primary" id="addMembersConfirmBtn" onclick="confirmAddMembers()" 
+                    style="padding: 0.625rem 1.5rem; border: none; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--nu-blue) 0%, var(--nu-blue-light) 100%); color: var(--white); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.875rem; box-shadow: var(--shadow-blue); transition: all var(--transition); display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-user-plus" style="font-size: 0.9rem;"></i> 
+                    Add Members
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Dropdown Backdrop -->
     <div class="dropdown-backdrop" id="dropdownBackdrop" onclick="closeAllDropdowns()"></div>
@@ -2134,7 +2209,9 @@ function renderContacts(contacts) {
                     </button>
                     <hr>
                 ` : ''}
-                <button type="button" class="dropdown-item" onclick="handleDropdownAction(event, ${contactId}, '${contactType}', '${isArchived ? 'unarchive' : 'archive'}')">
+
+                <button type="button" class="dropdown-item" 
+                    onclick="event.stopPropagation(); event.preventDefault(); handleDropdownAction(event, ${contactId}, '${contactType}', '${isArchived ? 'unarchive' : 'archive'}')">
                     <i class="fa-solid ${isArchived ? 'fa-box-open' : 'fa-box-archive'}"></i>
                     ${isArchived ? 'Unarchive Chat' : 'Archive Chat'}
                 </button>
@@ -4056,64 +4133,75 @@ function renderAttachments(attachments, isSent) {
 const dropdownHeightCache = {};
 
 function toggleContactDropdown(contactId, contactType, button) {
-    event.stopPropagation();
+    // Prevent event from bubbling to parent
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
     const dropdownId = `dropdown-${contactId}-${contactType}`;
     const dropdown = document.getElementById(dropdownId);
     const backdrop = document.getElementById('dropdownBackdrop');
     
-    // ✅ Close all other dropdowns first
-    closeAllDropdowns();
-    
-    // If this dropdown was already open, it's now closed by closeAllDropdowns()
-    // Check if it still has active class (it shouldn't)
-    if (dropdown.classList.contains('active')) {
+    // If this dropdown is already active, close it
+    if (dropdown && dropdown.classList.contains('active')) {
+        closeAllDropdowns();
         return;
     }
     
-    // Position the dropdown near the button
+    // Close all other dropdowns first
+    closeAllDropdowns();
+    
+    if (!dropdown) {
+        console.error('Dropdown not found:', dropdownId);
+        return;
+    }
+    
+    // Position the dropdown
     const buttonRect = button.getBoundingClientRect();
     
-    // Get or measure dropdown height
-    let dropdownHeight = dropdownHeightCache[contactType];
+    // Get dropdown height
+    let dropdownHeight = dropdownHeightCache[contactType] || 150;
     
-    if (!dropdownHeight) {
-        const originalDisplay = dropdown.style.display;
-        dropdown.style.visibility = 'hidden';
-        dropdown.style.display = 'block';
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = '-9999px';
-        dropdown.style.left = '-9999px';
-        
-        dropdownHeight = dropdown.scrollHeight + 20;
-        dropdownHeightCache[contactType] = dropdownHeight;
-        
-        dropdown.style.display = originalDisplay || 'none';
-        dropdown.style.visibility = 'visible';
-        dropdown.style.top = '';
-        dropdown.style.left = '';
-        dropdown.style.position = '';
-    }
-    
-    let top = buttonRect.bottom + 2;
+    let top = buttonRect.bottom + 4;
     let left = buttonRect.right - 200;
     
+    // Ensure dropdown stays in viewport
     if (top + dropdownHeight > window.innerHeight - 10) {
-        top = buttonRect.top - dropdownHeight - 2;
+        top = buttonRect.top - dropdownHeight - 4;
     }
-    
     if (top < 10) top = 10;
     if (left < 10) left = 10;
-    if (left + 200 > window.innerWidth) left = window.innerWidth - 210;
+    if (left + 200 > window.innerWidth) {
+        left = window.innerWidth - 210;
+    }
     
+    // Apply styles - use direct style assignment, not cssText
+    dropdown.style.position = 'fixed';
     dropdown.style.top = top + 'px';
     dropdown.style.left = left + 'px';
     dropdown.style.right = 'auto';
+    dropdown.style.bottom = 'auto';
     dropdown.style.display = 'block';
     dropdown.style.visibility = 'visible';
-    dropdown.style.position = 'fixed';
+    dropdown.style.zIndex = '999999';
+    dropdown.style.pointerEvents = 'auto';
+    dropdown.style.opacity = '1';
+    dropdown.style.transform = 'none';
     
+    // Add active class
     dropdown.classList.add('active');
-    backdrop.classList.add('active');
+    
+    // Show backdrop with pointer-events: none
+    if (backdrop) {
+        backdrop.style.display = 'block';
+        backdrop.style.pointerEvents = 'none';
+        backdrop.style.background = 'transparent';
+        backdrop.classList.add('active');
+    }
+    
+    // Log for debugging
+    console.log('✅ Dropdown opened:', dropdownId, 'at position:', top, left);
 }
 
 function handleDropdownAction(event, contactId, contactType, action) {
@@ -4158,15 +4246,65 @@ function handleDropdownAction(event, contactId, contactType, action) {
 function closeAllDropdowns() {
     document.querySelectorAll('.contact-dropdown.active').forEach(d => {
         d.classList.remove('active');
-        // Reset styles
         d.style.display = 'none';
-        d.style.visibility = 'visible';
+        d.style.pointerEvents = 'none';
     });
+    
     const backdrop = document.getElementById('dropdownBackdrop');
     if (backdrop) {
         backdrop.classList.remove('active');
+        backdrop.style.display = 'none';
+        backdrop.style.pointerEvents = 'none';
     }
 }
+
+// ============================================
+// DROPDOWN ITEM CLICK HANDLER - FIX
+// ============================================
+
+// Direct click handler for dropdown items using event delegation
+document.addEventListener('click', function(event) {
+    // Check if click is on a dropdown item
+    const item = event.target.closest('.dropdown-item');
+    if (item) {
+        // Prevent the dropdown from closing
+        event.stopPropagation();
+        
+        // Find the onclick attribute and execute it
+        const onclickAttr = item.getAttribute('onclick');
+        if (onclickAttr) {
+            console.log('🔘 Dropdown item clicked:', onclickAttr);
+            // Execute the onclick
+            try {
+                // Use Function constructor to execute with proper context
+                const fn = new Function('event', onclickAttr);
+                fn(event);
+            } catch (e) {
+                console.error('Error executing dropdown onclick:', e);
+            }
+        }
+    }
+}, true); // Use capture phase to ensure we catch it
+
+// Also handle touch events
+document.addEventListener('touchstart', function(event) {
+    const item = event.target.closest('.dropdown-item');
+    if (item) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const onclickAttr = item.getAttribute('onclick');
+        if (onclickAttr) {
+            console.log('👆 Dropdown item touched:', onclickAttr);
+            try {
+                const fn = new Function('event', onclickAttr);
+                fn(event);
+            } catch (e) {
+                console.error('Error executing dropdown touch:', e);
+            }
+        }
+    }
+}, { passive: false, capture: true });
 
 // ✅ Close dropdown when clicking outside (using event delegation)
 document.addEventListener('click', function(event) {
@@ -5039,6 +5177,9 @@ async function sendTextMessage(content) {
     // GROUP CHAT STATE
     // ============================================
     let selectedGroupMembers = [];
+    let selectedAddMembers = [];
+    let addMemberSearchTimeout = null;
+    let addMemberResultsCache = [];
     let groupAvatarFile = null;
     let currentGroupInfo = null;
     let groupRealtimeChannel = null;
@@ -6430,67 +6571,120 @@ async function openGroupInfo(groupId) {
 function renderGroupMembers(members) {
     const container = document.getElementById('groupMembersList');
     
+    // Update member count badge
+    const badge = document.getElementById('memberCountBadge');
+    if (badge && members) {
+        badge.textContent = members.length;
+    }
+    
     if (!members || members.length === 0) {
-        container.innerHTML = '<p style="color: var(--gray-400); text-align: center; padding: 1rem;">No members found</p>';
+        container.innerHTML = `
+            <div style="text-align: center; padding: 1.5rem; color: var(--gray-400);">
+                <i class="fa-solid fa-user-group" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                <p style="margin: 0; font-size: 0.85rem;">No members found</p>
+            </div>
+        `;
         return;
     }
     
     container.innerHTML = members.map(member => {
-        // ✅ Use the new flags
-        const isGroupAdmin = member.is_group_admin || false;  // Has group permissions
-        const isSystemAdmin = member.is_system_admin || false;  // Is a system admin
+        const isGroupAdmin = member.is_group_admin || false;
+        const isSystemAdmin = member.is_system_admin || false;
+        const isCreator = member.is_creator || false;
         const isSelf = member.id == adminId;
-        const isCreator = currentGroupInfo && currentGroupInfo.created_by == member.id;
+        const canManage = currentGroupInfo && currentGroupInfo.can_manage;
+        
+        // Determine badge HTML
+        let badgeHtml = '';
+        if (isSelf) {
+            badgeHtml = `<span class="badge you">You</span>`;
+        }
+        if (isCreator) {
+            badgeHtml += `<span class="badge creator"><i class="fa-solid fa-crown" style="font-size: 0.45rem;"></i> Creator</span>`;
+        }
+        if (isSystemAdmin && !isCreator) {
+            badgeHtml += `<span class="badge system-admin"><i class="fa-solid fa-shield-halved" style="font-size: 0.45rem;"></i> System Admin</span>`;
+        }
+        if (isGroupAdmin && !isCreator && !isSystemAdmin) {
+            badgeHtml += `<span class="badge group-admin"><i class="fa-solid fa-user-tie" style="font-size: 0.45rem;"></i> Group Admin</span>`;
+        }
+        
+        // Avatar background color based on user type
+        const avatarBg = member.user_type === 'admin' 
+            ? 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))'
+            : 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
+        
+        const isOnline = member.is_online || false;
         
         return `
-            <div class="group-member-item" style="display: flex; align-items: center; padding: 0.625rem; border-radius: var(--radius-lg); transition: all var(--transition);">
-                <div style="position: relative; flex-shrink: 0; margin-right: 0.75rem;">
-                    ${member.avatar 
-                        ? `<img src="${member.avatar}" alt="${escapeHtml(member.full_name)}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">`
-                        : `<div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light)); color: var(--nu-gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">${member.initials || '??'}</div>`
-                    }
-                    ${member.is_online ? `<span style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--success); border: 2px solid var(--white);"></span>` : ''}
+            <div class="group-member-item" style="display: flex; align-items: center; padding: 0.625rem 0.75rem; border-radius: 12px; transition: all 0.2s ease; border: 1px solid transparent; margin-bottom: 0.25rem; background: var(--white);">
+                <div class="member-avatar-wrapper" style="position: relative; flex-shrink: 0; margin-right: 0.75rem;">
+                    <div class="member-avatar" style="width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: white; background: ${avatarBg};">
+                        ${member.avatar 
+                            ? `<img src="${member.avatar}" alt="${escapeHtml(member.full_name)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` 
+                            : (member.initials || '??')
+                        }
+                    </div>
+                    <span class="online-indicator ${isOnline ? '' : 'offline'}" style="position: absolute; bottom: -1px; right: -1px; width: 12px; height: 12px; border-radius: 50%; background: ${isOnline ? 'var(--success)' : 'var(--gray-300)'}; border: 2.5px solid var(--white); box-shadow: 0 0 0 2px ${isOnline ? 'var(--success-light)' : 'var(--gray-200)'};"></span>
                 </div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 0.9rem; color: var(--gray-800); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <div class="member-info" style="flex: 1; min-width: 0;">
+                    <div class="member-name" style="font-weight: 600; font-size: 0.875rem; color: var(--gray-800); display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap;">
                         ${escapeHtml(member.full_name)}
-                        ${isSelf ? '<span style="font-size: 0.65rem; color: var(--gray-500); font-weight: 400;">(You)</span>' : ''}
-                        ${isCreator ? '<span style="font-size: 0.6rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 1px 8px; border-radius: 8px; font-weight: 700;">Creator</span>' : ''}
-                        ${isSystemAdmin && !isCreator ? '<span style="font-size: 0.6rem; background: var(--nu-blue); color: white; padding: 1px 8px; border-radius: 8px; font-weight: 600;">System Admin</span>' : ''}
-                        ${isGroupAdmin && !isCreator && !isSystemAdmin ? '<span style="font-size: 0.6rem; background: #8b5cf6; color: white; padding: 1px 8px; border-radius: 8px; font-weight: 600;">Group Admin</span>' : ''}
+                        ${badgeHtml}
                     </div>
-                    <div style="font-size: 0.7rem; color: var(--gray-500);">
-                        ${isGroupAdmin ? 'Has management permissions' : 'Member'}
-                        ${member.is_online ? ' • Online' : ' • Offline'}
+                    <div class="member-role-text" style="font-size: 0.7rem; color: var(--gray-500); margin-top: 0.125rem;">
+                        ${member.user_type === 'admin' ? '👑 Admin Account' : '🎓 Alumni Account'}
+                        ${isOnline ? ' • <span style="color: var(--success); font-weight: 500;">Online</span>' : ' • <span style="color: var(--gray-400);">Offline</span>'}
                     </div>
                 </div>
-                ${currentGroupInfo && currentGroupInfo.can_manage && !isSelf && !isCreator ? `
-                    <div style="display: flex; gap: 0.375rem;">
+                ${canManage && !isSelf && !isCreator ? `
+                    <div class="member-actions" style="display: flex; gap: 0.25rem; opacity: 0; transition: opacity 0.2s ease;">
                         ${isGroupAdmin ? `
                             <button onclick="updateMemberRole(${member.id}, 'alumni')" 
-                                style="background: none; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--gray-600); transition: all var(--transition);"
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
                                 title="Remove group admin permissions">
                                 <i class="fa-solid fa-user"></i> Demote
                             </button>
                         ` : `
                             <button onclick="updateMemberRole(${member.id}, 'admin')" 
-                                style="background: none; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--gray-600); transition: all var(--transition);"
+                                style="background: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--gray-600); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
                                 title="Give group admin permissions">
                                 <i class="fa-solid fa-crown"></i> Promote
                             </button>
                         `}
                         <button onclick="removeGroupMember(${member.id})" 
-                            style="background: none; border: 1px solid var(--danger); border-radius: var(--radius); padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--danger); transition: all var(--transition);"
+                            style="background: none; border: 1px solid var(--danger); border-radius: 6px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.65rem; color: var(--danger); transition: all 0.2s ease; display: flex; align-items: center; gap: 0.25rem;"
                             title="Remove Member">
-                            <i class="fa-solid fa-xmark"></i>
+                            <i class="fa-solid fa-xmark"></i> Remove
                         </button>
                     </div>
                 ` : ''}
             </div>
         `;
     }).join('');
+    
+    // Add hover effect via CSS since we can't use :hover with inline styles
+    container.querySelectorAll('.group-member-item').forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            const actions = this.querySelector('.member-actions');
+            if (actions) {
+                actions.style.opacity = '1';
+            }
+            this.style.background = 'var(--gray-50)';
+            this.style.borderColor = 'var(--gray-200)';
+            this.style.transform = 'translateX(2px)';
+        });
+        item.addEventListener('mouseleave', function() {
+            const actions = this.querySelector('.member-actions');
+            if (actions) {
+                actions.style.opacity = '0';
+            }
+            this.style.background = 'var(--white)';
+            this.style.borderColor = 'transparent';
+            this.style.transform = 'translateX(0)';
+        });
+    });
 }
-
 
 // GROUP MEMBER MANAGEMENT
 async function updateMemberRole(memberId, newRole) {
@@ -6818,39 +7012,278 @@ function renderSelectedGroupMembers() {
     `).join('');
 }
 
-// OPEN ADD MEMBERS MODAL
-async function openAddMembersModal() {
-    if (!currentGroupInfo) return;
+function openAddMembersModal() {
+    // Reset state
+    selectedAddMembers = [];
+    document.getElementById('addMemberSearch').value = '';
+    document.getElementById('addMemberResults').innerHTML = `
+        <div style="text-align: center; padding: 2rem 0; color: var(--gray-400);">
+            <i class="fa-solid fa-users" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+            <p style="font-size: 0.9rem;">Search for users to add to this channel</p>
+            <p style="font-size: 0.8rem; margin-top: 0.25rem;">Type at least 2 characters to start searching</p>
+        </div>
+    `;
+    renderSelectedAddMembers();
     
-    // Simple prompt for now - you can replace with a proper modal later
-    const searchQuery = prompt('Enter alumni name or ID to add to this channel:');
-    if (!searchQuery || searchQuery.trim() === '') return;
+    // Show modal
+    document.getElementById('addMembersModal').classList.add('active');
+    
+    // Focus search input after a delay
+    setTimeout(() => {
+        document.getElementById('addMemberSearch').focus();
+    }, 300);
+}
+
+function closeAddMembersModal() {
+    document.getElementById('addMembersModal').classList.remove('active');
+    selectedAddMembers = [];
+}
+
+// Search users for adding to group
+function searchUsersForAdd() {
+    const query = document.getElementById('addMemberSearch').value.trim();
+    const resultsContainer = document.getElementById('addMemberResults');
+    
+    if (query.length < 2) {
+        resultsContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem 0; color: var(--gray-400);">
+                <i class="fa-solid fa-users" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+                <p style="font-size: 0.9rem;">Search for users to add to this channel</p>
+                <p style="font-size: 0.8rem; margin-top: 0.25rem;">Type at least 2 characters to start searching</p>
+            </div>
+        `;
+        return;
+    }
+    
+    resultsContainer.innerHTML = `
+        <div class="loading-state">
+            <i class="fa-solid fa-spinner fa-spin"></i> Searching...
+        </div>
+    `;
+    
+    clearTimeout(addMemberSearchTimeout);
+    addMemberSearchTimeout = setTimeout(async () => {
+        try {
+            // Get current group members to exclude them
+            const currentMemberIds = currentGroupInfo?.members?.map(m => m.id) || [];
+            
+            // Use the existing search endpoint
+            const response = await fetch(`/admin/messages/groups/search/alumni?q=${encodeURIComponent(query)}`);
+            
+            if (!response.ok) {
+                throw new Error('Search failed');
+            }
+            
+            const data = await response.json();
+            addMemberResultsCache = data;
+            
+            // Filter out already selected and existing members
+            const filtered = data.filter(user => {
+                // Exclude current user
+                if (user.id == adminId) return false;
+                // Exclude already in group
+                if (currentMemberIds.includes(user.id)) return false;
+                // Exclude already selected for addition
+                if (selectedAddMembers.some(m => m.id == user.id && m.user_type === user.user_type)) return false;
+                return true;
+            });
+            
+            if (filtered.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-user-slash"></i>
+                        <p>No users available to add</p>
+                        <p style="font-size: 0.8rem; margin-top: 0.25rem;">All matching users are either already in the channel or selected</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            resultsContainer.innerHTML = filtered.map(user => {
+                const isAdmin = user.user_type === 'admin';
+                const isOnline = user.is_online || false;
+                const avatarBg = isAdmin 
+                    ? 'linear-gradient(135deg, var(--nu-blue), var(--nu-blue-light))'
+                    : 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
+                
+                return `
+                    <div class="user-item" data-user-id="${user.id}" data-user-type="${user.user_type}">
+                        <div class="user-avatar" style="background: ${avatarBg};">
+                            ${user.avatar 
+                                ? `<img src="${user.avatar}" alt="${escapeHtml(user.full_name)}">` 
+                                : (user.initials || '??')
+                            }
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">
+                                ${escapeHtml(user.full_name)}
+                                ${isAdmin ? `<span class="admin-badge"><i class="fa-solid fa-shield-halved" style="font-size: 0.45rem;"></i> Admin</span>` : ''}
+                            </div>
+                            <div class="user-details">
+                                ${isAdmin 
+                                    ? `👑 ${escapeHtml(user.admin_role || 'System Admin')}`
+                                    : `🎓 Batch ${escapeHtml(user.batch || 'N/A')} | ${escapeHtml(user.program || 'N/A')}`
+                                }
+                            </div>
+                        </div>
+                        <div class="user-status">
+                            <span class="online-dot ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}"></span>
+                        </div>
+                        <button class="add-btn" onclick="addUserToSelection(${user.id}, '${user.user_type}', '${escapeHtml(user.full_name)}', '${escapeHtml(user.initials || '??')}', ${isAdmin})">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+        } catch (error) {
+            console.error('Error searching users:', error);
+            resultsContainer.innerHTML = `
+                <div class="empty-state" style="color: var(--danger);">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <p>Error searching users</p>
+                    <p style="font-size: 0.8rem; margin-top: 0.25rem;">Please try again</p>
+                </div>
+            `;
+        }
+    }, 400);
+}
+
+// Add user to selection
+function addUserToSelection(userId, userType, fullName, initials, isAdmin) {
+    // Check if already selected
+    if (selectedAddMembers.some(m => m.id == userId && m.user_type === userType)) {
+        return;
+    }
+    
+    // Check if already in group
+    const currentMemberIds = currentGroupInfo?.members?.map(m => m.id) || [];
+    if (currentMemberIds.includes(userId)) {
+        showToast('User is already in this channel', 'info');
+        return;
+    }
+    
+    selectedAddMembers.push({
+        id: userId,
+        user_type: userType,
+        full_name: fullName,
+        initials: initials,
+        is_admin: isAdmin
+    });
+    
+    // Update UI
+    renderSelectedAddMembers();
+    updateAddMemberSearchResults();
+}
+
+// Remove user from selection
+function removeUserFromSelection(userId, userType) {
+    selectedAddMembers = selectedAddMembers.filter(m => !(m.id == userId && m.user_type === userType));
+    renderSelectedAddMembers();
+    updateAddMemberSearchResults();
+}
+
+// Clear all selected
+function clearSelectedAddMembers() {
+    selectedAddMembers = [];
+    renderSelectedAddMembers();
+    updateAddMemberSearchResults();
+}
+
+// Render selected members tags
+function renderSelectedAddMembers() {
+    const container = document.getElementById('selectedAddMembers');
+    const countEl = document.getElementById('selectedAddCount');
+    
+    countEl.textContent = selectedAddMembers.length;
+    
+    if (selectedAddMembers.length === 0) {
+        container.innerHTML = `
+            <span style="color: var(--gray-400); font-size: 0.8rem; width: 100%; text-align: center; padding: 0.25rem 0;">No members selected</span>
+        `;
+        return;
+    }
+    
+    container.innerHTML = selectedAddMembers.map(m => `
+        <span class="selected-tag">
+            ${escapeHtml(m.full_name)}
+            ${m.is_admin ? `<span style="font-size: 0.55rem; background: var(--nu-gold); color: var(--nu-blue-dark); padding: 1px 6px; border-radius: 6px; font-weight: 700; margin-left: 2px;">Admin</span>` : ''}
+            <button class="remove-selected" onclick="removeUserFromSelection(${m.id}, '${m.user_type}')" title="Remove">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </span>
+    `).join('');
+}
+
+// Update search results to reflect selections
+function updateAddMemberSearchResults() {
+    const resultsContainer = document.getElementById('addMemberResults');
+    const items = resultsContainer.querySelectorAll('.user-item');
+    
+    items.forEach(item => {
+        const userId = parseInt(item.dataset.userId);
+        const userType = item.dataset.userType;
+        const isSelected = selectedAddMembers.some(m => m.id == userId && m.user_type === userType);
+        const addBtn = item.querySelector('.add-btn');
+        
+        if (isSelected) {
+            item.classList.add('selected');
+            addBtn.textContent = 'Added';
+            addBtn.disabled = true;
+            addBtn.className = 'add-btn added';
+        } else {
+            item.classList.remove('selected');
+            addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add';
+            addBtn.disabled = false;
+            addBtn.className = 'add-btn';
+        }
+    });
+}
+
+// Confirm and add members to group
+async function confirmAddMembers() {
+    if (selectedAddMembers.length === 0) {
+        showToast('Please select at least one member to add', 'error');
+        return;
+    }
+    
+    const memberIds = selectedAddMembers.map(m => m.id);
+    
+    const confirmBtn = document.getElementById('addMembersConfirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...';
     
     try {
-        const response = await fetch(`/admin/messages/groups/search/alumni?q=${encodeURIComponent(searchQuery)}`);
+        const response = await fetch(`/admin/messages/groups/${currentGroupInfo.id}/members/add`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ member_ids: memberIds })
+        });
+        
         const data = await response.json();
         
-        if (data.length === 0) {
-            showToast('No alumni found', 'error');
-            return;
-        }
-        
-        const existingMemberIds = currentGroupInfo.members.map(m => m.id);
-        const available = data.filter(a => !existingMemberIds.includes(a.id));
-        
-        if (available.length === 0) {
-            showToast('All found alumni are already in this channel', 'error');
-            return;
-        }
-        
-        // Just add the first one for simplicity
-        const memberToAdd = available[0];
-        if (confirm(`Add ${memberToAdd.full_name} to this channel?`)) {
-            await addGroupMembers([memberToAdd.id]);
+        if (data.success) {
+            showToast(data.message || 'Members added successfully');
+            closeAddMembersModal();
+            
+            // Refresh group info
+            await openGroupInfo(currentGroupInfo.id);
+            
+            // Refresh group conversations
+            await loadGroupConversations();
+        } else {
+            showToast(data.error || 'Failed to add members', 'error');
         }
     } catch (error) {
-        console.error('Error searching alumni:', error);
-        showToast('Failed to search alumni', 'error');
+        console.error('Error adding members:', error);
+        showToast('Failed to add members', 'error');
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fa-solid fa-user-plus" style="font-size: 0.9rem;"></i> Add Members';
     }
 }
 
